@@ -1,34 +1,44 @@
-# syntax=docker/dockerfile:1
-# ── Build stage ──────────────────────────────────────────────────────────
-FROM python:3.12-slim AS builder
+FROM python:3.11-slim-bookworm
 
-WORKDIR /build
-COPY requirements.txt .
-RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
 
-# ── Runtime stage ────────────────────────────────────────────────────────
-FROM python:3.12-slim AS runtime
-
-# Security: run as a dedicated non-root user, not root.
-RUN groupadd --gid 1000 zcoder && \
-    useradd --uid 1000 --gid zcoder --shell /bin/bash --create-home zcoder
-
-COPY --from=builder /install /usr/local
+# Create non-root user for security
+RUN groupadd --gid 1000 appgroup && \
+    useradd --uid 1000 --gid appgroup --shell /bin/bash --create-home appuser
 
 WORKDIR /app
-COPY --chown=zcoder:zcoder . .
 
-# Config/cache live under the app user's home, not in the image layer.
-ENV HOME=/home/zcoder \
-    ZCODER_LOG_FORMAT=json \
-    ZCODER_LOG_LEVEL=INFO \
-    PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
 
-USER zcoder
+# Copy requirements first for better caching
+COPY requirements-enterprise.txt .
+RUN pip install --no-cache-dir -r requirements-enterprise.txt
 
+# Copy application code
+COPY app/ ./app/
+COPY AGENTS.md .
+COPY README.md .
+
+# Create necessary directories with proper permissions
+RUN mkdir -p /app/data/uploads /app/logs && \
+    chown -R appuser:appgroup /app
+
+# Switch to non-root user
+USER appuser
+
+# Expose ports
+EXPOSE 8000 9090
+
+# Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python main.py --health-check || exit 1
+    CMD curl -f http://localhost:8000/v1/wire/health/live || exit 1
 
-ENTRYPOINT ["python", "main.py"]
-CMD ["--help"]
+# Run the application
+CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
