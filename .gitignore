@@ -1,56 +1,51 @@
 ```
-# Dependencies
+# Python
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
+*.pyc
 .Python
+*.so
+*.egg-info/
+
+# Dependencies
 venv/
-env/
-ENV/
 .venv/
 .env
 .env.local
 .env.*
-.env~
-pyvenv.cfg
-pip-log.txt
-pip-delete-this-directory.txt
 
-# Build and distribution artifacts
+# Build artifacts
 build/
-develop-eggs/
 dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
 *.egg
+*.whl
 
-# Testing
+# gRPC/Protobuf
+*_pb2.py
+*_pb2_grpc.py
+
+# Logs
+*.log
+
+# Coverage
 .coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
 htmlcov/
-.tox/
-.nox/
-.coverage*
+coverage/
 
-# Security
-.secret
-.id_rsa
-.id_rsa.pub
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*.tmp
 
-# Environment specific
+# OS
 .DS_Store
 Thumbs.db
+
+# Testing
+.pytest_cache/
+.mypy_cache/
 ```
