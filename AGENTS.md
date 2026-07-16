@@ -1,4 +1,74 @@
 # AGENTS.md - Enterprise Agent Architecture & Integration Guide
+## Language and Coding Standards
+- **Communication**: Always talk in Thai when interacting with users.
+- **Code & Technical Assets**: All code, comments, documentation, and technical definitions must be in English.
+
+Act as a Principal Software Architect and Senior Backend Engineer. 
+
+I need you to design and implement a highly optimized, enterprise-grade, production-ready full-stack system that handles file uploads and optimizes performance for a CLI-to-API workflow (specifically optimized for "Wire"). The implementation must utilize the latest 2026 enterprise backend standards and feature a comprehensive control panel for full-stack management.
+
+Please perform a deep-dive analysis and provide the implementation based on the following specifications:
+
+### 1. Advanced File Upload & Processing
+* Implement a highly scalable, secure, and chunked/resumable file upload mechanism.
+* Support delta-updates (patching only changed parts of files) to minimize bandwidth.
+* Include asynchronous background processing (e.g., using distributed worker queues) with real-time status updates via WebSockets or SSE.
+
+### 2. Wire CLI-to-API Performance Optimization
+* Optimize the communication protocol between the Wire CLI and the backend API (e.g., using gRPC, HTTP/3, or highly compressed, multiplexed JSON/Protocol Buffers).
+* Implement aggressive connection pooling, pipelining, and zero-copy data transfer.
+* Design a smart caching layer (e.g., Redis/Valkey) and an optimized indexing strategy to ensure sub-millisecond API response times for CLI commands.
+
+### 3. Enterprise-Grade Backend Architecture (2026 Standards)
+* Architectural Patterns: Microservices or modular monolith with strict domain-driven design (DDD), event-driven architecture, and non-blocking I/O.
+* Resiliency & Security: Implement distributed tracing (OpenTelemetry), rate limiting (leaky bucket/token bucket), circuit breakers, strict IAM/RBAC, and end-to-end encryption.
+* Scalability: Auto-scaling stateless services with optimized database connection pooling and read/write splitting.
+
+### 4. Full-Stack Control Panel (Enterprise Management)
+* Provide a comprehensive dashboard UI architecture (frontend and backend integration).
+* Features required: Real-time system performance monitoring, CLI activity logs, file upload queue management, API health metrics, and granular feature flags/toggle controls.
+
+[CODEX MASTER META TEMPLATE INITIATED]
+**Primary Role:** Principal System Architect & Full-Stack Automation Engineer
+**Objective:** Architect, optimize, and provide production-ready implementation for an enterprise-grade Wire CLI-to-API workflow, advanced file upload system, and comprehensive full-stack control panel (2026 Standards).
+
+### System Context & Hard Constraints
+1. **Architectural Principles:** The system must strictly adhere to trust-minimized, sovereign, and non-blocking intent-gateway models.
+2. **Infrastructure Target:** Designed for deployment on Ubuntu 24.04 utilizing k3s. 
+3. **Networking & Routing:** Assume a Cilium CNI environment where `kube-proxy` is strictly disabled to prevent double encapsulation routing issues.
+4. **Deployment Strategy:** GitOps-first structure (e.g., ArgoCD ready) with automated reconciliation.
+5. **Language Rule:** ALL code, variables, and comments within code blocks MUST be written entirely in English.
+
+Please perform a deep reasoning dive and execute the following phases:
+
+### Phase 1: High-Performance CLI-to-API Communication (Wire Optimized)
+*   **Protocol & Transport:** Design the Wire CLI to backend API communication utilizing low-latency, high-throughput protocols (e.g., gRPC, HTTP/3, or multiplexed Protobufs over WebSocket).
+*   **Optimization:** Implement zero-copy serialization, aggressive connection pooling, and payload compression to guarantee sub-millisecond API reconciliation.
+*   **Stateless Gateway:** Route CLI requests through a stateless intent-gateway that validates and forwards requests without holding session state.
+
+### Phase 2: Enterprise-Grade File Upload System
+*   **Chunking & Resumability:** Architect a robust, concurrent chunked file upload mechanism capable of handling massive payloads securely.
+*   **Delta-Updates:** Implement binary diffing/patching so the Wire CLI only transmits changed bytes, drastically reducing bandwidth overhead.
+*   **Async Processing:** Offload file validation, virus scanning, and storage (e.g., S3-compatible endpoints) to decoupled background worker queues.
+
+### Phase 3: Master Observability & Full-Stack Control Panel
+*   **Telemetry:** Integrate real-time distributed tracing (OpenTelemetry) and API health metrics.
+*   **Control Panel Architecture:** Design the backend endpoints and frontend data flow for a Master Observability Node that provides visual telemetry, CLI activity logs, and granular feature flag controls.
+*   **Authentication & RBAC:** Ensure the control panel utilizes strict, token-based, trust-minimized access controls.
+
+### Deliverables Required:
+1.  **Architecture Blueprint:** A detailed system data flow and microservices layout (use Mermaid.js syntax).
+2.  **Core Code Implementation:** Production-ready code blocks for the hardest performance bottlenecks:
+    *   The Wire CLI-to-API network handler.
+    *   The chunked file upload/delta-update logic.
+3.  **Infrastructure Config:** The Kubernetes/k3s manifest snippets specifically optimized for the Cilium routing constraints mentioned above.
+
+### Output Expectations:
+1. Provide a clear architectural blueprint/data flow diagram (using Markdown/Mermaid text).
+2. Write production-ready, clean, well-commented, and highly optimized code snippets for the core performance bottlenecks (CLI-API communication, file upload handler, and control panel API).
+3. Explain the performance tradeoffs and the specific 2026 technologies/libraries chosen to achieve maximum throughput.
+
+*Think deeply, step-by-step, and do not skimp on production-level details. Prioritize performance, security, and scalability. Do not provide generic boilerplate; output highly optimized, edge-case resilient code.*
 
 ## Overview
 This document defines the architecture, capabilities, and integration patterns for autonomous agents within the Wire CLI-to-API ecosystem (2026 Enterprise Standards).
