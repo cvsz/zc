@@ -1,40 +1,47 @@
-# Python
+```gitignore
+# Python compiled files
 __pycache__/
-*.py[cod]
-*$py.class
-*.egg-info/
-.eggs/
+*.pyc
+*.pyo
+*.pyd
 
-# Virtual environments
-.venv/
-venv/
-env/
+# Test files
+tests/__pycache__/
 
-# Env / secrets — never commit real credentials
+# Logs
+*.log
+
+# Environment files
 .env
-.env.*
-!.env.example
+.env.local
+*.env.*
 
-# Test / coverage / lint / type-check caches
-.pytest_cache/
-.coverage
-coverage.xml
-htmlcov/
-.mypy_cache/
-.ruff_cache/
-
-# PyInstaller build artifacts
-build/
-dist/
-*.spec.bak
-
-# Local app state (mirrors what the CLI writes under the user's home;
-# harmless if it ever ends up in-repo during local testing)
-.ai-coder/
-.ai-coder-config.json
-
-# Editors / OS
+# IDE files
 .vscode/
 .idea/
 *.swp
+*.swo
+
+# Dependencies
+venv/
+.venv/
+node_modules/
+
+# Build artifacts
+dist/
+build/
+target/
+
+# Coverage reports
+.coverage
+coverage/
+htmlcov/
+
+# Temporary files
+*.tmp
+*.temp
+
+# OS files
 .DS_Store
+Thumbs.db
+```

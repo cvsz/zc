@@ -40,7 +40,9 @@ def _artifacts_dir() -> Path:
 
 
 def _artifact_path(artifact_id: str) -> Path:
-    return _artifacts_dir() / artifact_id
+    """Resolve artifact path securely, ensuring it stays within ARTIFACTS_DIR."""
+    from security import safe_resolve
+    return safe_resolve(artifact_id, ARTIFACTS_DIR)
 
 
 def _meta_path(artifact_id: str) -> Path:
