@@ -1347,8 +1347,15 @@ def main():
     if args.project_show:
         from projects import cmd_project_show; cmd_project_show(args.project_show); return
     if args.project_delete:
-        from projects import ProjectManager; ProjectManager().delete_project(args.project_delete)
-        print("✓ Deleted."); return
+        from projects import ProjectManager
+        from exceptions import SecurityError, ValidationError
+        try:
+            ProjectManager().delete_project(args.project_delete)
+            print("✓ Deleted.")
+        except (SecurityError, ValidationError) as e:
+            print(f"✗ Error: {e}")
+            sys.exit(1)
+        return
     if args.project_archive:
         from projects import ProjectManager; ProjectManager().archive_project(args.project_archive)
         print("✓ Archived."); return
@@ -1379,7 +1386,15 @@ def main():
         from artifacts import cmd_artifact_diff
         cmd_artifact_diff(args.artifact_diff, args.v1, args.v2); return
     if args.artifact_delete:
-        from artifacts import cmd_artifact_delete; cmd_artifact_delete(args.artifact_delete); return
+        from artifacts import cmd_artifact_delete
+        from exceptions import SecurityError, ValidationError
+        try:
+            cmd_artifact_delete(args.artifact_delete)
+            print("✓ Deleted.")
+        except (SecurityError, ValidationError) as e:
+            print(f"✗ Error: {e}")
+            sys.exit(1)
+        return
     if args.artifact_tag:
         from artifacts import cmd_artifact_tag; cmd_artifact_tag(args.artifact_tag, args.tag); return
     if args.artifact_attach:

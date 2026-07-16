@@ -12,6 +12,8 @@ import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 
+from security import safe_resolve
+
 PROJECTS_DIR = os.path.expanduser("~/.ai-coder/projects")
 
 
@@ -28,7 +30,8 @@ def _projects_dir() -> Path:
 
 
 def _project_path(project_id: str) -> Path:
-    return _projects_dir() / project_id
+    """Resolve project path securely, ensuring it stays within PROJECTS_DIR."""
+    return safe_resolve(project_id, PROJECTS_DIR)
 
 
 def _manifest_path(project_id: str) -> Path:
