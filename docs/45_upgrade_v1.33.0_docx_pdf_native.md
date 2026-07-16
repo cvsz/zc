@@ -9,8 +9,8 @@ simply never got a second half built.
 
 ## What was found
 
-`claude_skills_api.py`'s `PREBUILT_SKILLS` dict has listed all four
-Anthropic-maintained Skills since v1.15.0:
+`zc_skills_api.py`'s `PREBUILT_SKILLS` dict has listed all four
+ZaiCoder-maintained Skills since v1.15.0:
 
 ```python
 PREBUILT_SKILLS = {
@@ -19,7 +19,7 @@ PREBUILT_SKILLS = {
 ```
 
 v1.16.0 built native routing for two of them — `--excel-native` and
-`--pptx-native` route `claude_excel.py` / `claude_powerpoint.py`'s chat
+`--pptx-native` route `zc_excel.py` / `zc_powerpoint.py`'s chat
 loops through the xlsx/pptx Skills instead of the hand-rolled
 pandas/openpyxl or python-pptx path. `docx` and `pdf` never got the same
 treatment: `--skills-list` has been printing them as available skill_ids
@@ -28,16 +28,16 @@ one. Confirmed with a plain grep across `main.py` for `docx`/`.pdf` — the
 only hit was the `--skills-list` help string itself.
 
 This isn't the `test_cli_wiring.py` class of bug (a `cmd_*` function with
-no flag) — there was no `claude_word.py` or `claude_pdf.py` to wire in
+no flag) — there was no `zc_word.py` or `zc_pdf.py` to wire in
 the first place. The gap was one level up: an API capability the project
 already knows how to call (the Skills client, file upload/download, the
 container-reuse pattern) that nobody had pointed at these two formats.
 
 ## What changed
 
-**Two new modules**, `claude_word.py` and `claude_pdf.py`, each a single
+**Two new modules**, `zc_word.py` and `zc_pdf.py`, each a single
 `cmd_docx_chat()` / `cmd_pdf_chat()` function mirroring
-`claude_powerpoint.py`'s `_cmd_pptx_chat_native()` one-for-one: upload the
+`zc_powerpoint.py`'s `_cmd_pptx_chat_native()` one-for-one: upload the
 starting file once (if given), run a `messages`/`container_id` chat loop
 through `SkillsApiClient.call_with_skills_turn()`, download whatever
 `extract_output_file_ids()` finds after each turn. Same error handling,
@@ -45,15 +45,15 @@ same `/exit`-only command surface, same reasoning for why there's no
 `/undo` or content preview (the Skill owns the document server-side —
 this CLI never holds a local copy to inspect or revert).
 
-**Unlike xlsx/pptx, there's no `native=` branch.** `claude_excel.py` and
-`claude_powerpoint.py` each have a hand-rolled pandas/openpyxl or
+**Unlike xlsx/pptx, there's no `native=` branch.** `zc_excel.py` and
+`zc_powerpoint.py` each have a hand-rolled pandas/openpyxl or
 python-pptx path that `native=False` (the default) still uses — Skills
 access is opt-in there because the fallback is a real, working
 alternative. No such fallback exists for Word documents or PDFs in this
-CLI, so `claude_word.py` / `claude_pdf.py` are Skills-only: one function
+CLI, so `zc_word.py` / `zc_pdf.py` are Skills-only: one function
 each, no boolean parameter, always native. The `-native` suffix on the
 flag name stays anyway — it's still documentation of *which*
-implementation runs (Anthropic's maintained Skill vs. a hand-rolled one),
+implementation runs (ZaiCoder's maintained Skill vs. a hand-rolled one),
 consistent with the other two, even though today it's the only choice.
 
 **`main.py`**: new "Word / PDF Chat (Skills API only)" argument group —
@@ -62,7 +62,7 @@ consistent with the other two, even though today it's the only choice.
 `--pptx` (bare flag starts a fresh document, a path loads an existing
 one), dispatched right after the `--pptx` branch.
 
-**`claude_skills_api.py`**: module docstring corrected. It previously
+**`zc_skills_api.py`**: module docstring corrected. It previously
 described routing xlsx/pptx through Skills as "intentionally left as a
 separate follow-up," which was already stale before this cycle started —
 that follow-up shipped in v1.16.0, the docstring just never caught up.
@@ -72,7 +72,7 @@ Skills-only with no such default to fall back to.
 
 ## Tests
 
-`tests/test_claude_word_pdf.py` (new, 12 tests): both modules' upload
+`tests/test_zc_word_pdf.py` (new, 12 tests): both modules' upload
 path (called once, only when an input file is given), upload-failure and
 missing-file-id exit paths, container-id reuse across turns, the
 API-error path not crashing the loop, generated-file download, and a
@@ -86,8 +86,8 @@ and dispatch-level checks — monkeypatched `cmd_docx_chat` /
 `--pdf-native` equivalent actually reach the new modules with the right
 arguments, including the bare-flag-passes-`None`-input-path case. The
 existing `test_every_cmd_function_is_referenced_in_main` parametrized
-test picked up `claude_word.py` and `claude_pdf.py` automatically (it
-globs `claude_*.py`) — no changes needed there, and it passed on the
+test picked up `zc_word.py` and `zc_pdf.py` automatically (it
+globs `zc_*.py`) — no changes needed there, and it passed on the
 first run, confirming both new `cmd_*` functions were wired correctly
 before any dedicated test was even written for them.
 
@@ -107,7 +107,7 @@ code issue; excluded from the count, same convention as prior cycles).
   "chat loop" shape — it depends entirely on what the custom Skill
   does) and wasn't part of what this cycle set out to close.
 - **A hand-rolled docx/pdf fallback** — could be built the way
-  `claude_excel.py` reimplements xlsx by hand with pandas/openpyxl. Not
+  `zc_excel.py` reimplements xlsx by hand with pandas/openpyxl. Not
   attempted here: this cycle's gap was specifically "a documented API
   capability with zero CLI access," not "give these formats a second,
   Skills-independent implementation." Worth a future `ROADMAP.md` entry

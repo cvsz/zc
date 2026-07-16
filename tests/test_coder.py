@@ -30,14 +30,14 @@ def _fake_response(payload: dict):
 
 
 def test_generate_returns_error_without_api_key():
-    c = Coder(api_key="", model="claude-sonnet-5")
+    c = Coder(api_key="", model="zc-sonnet-5")
     result = c.generate("hello")
     assert "[ERROR]" in result
     assert "API key" in result
 
 
 def test_generate_concatenates_multiple_text_blocks():
-    c = Coder(api_key="sk-ant-test", model="claude-sonnet-5")
+    c = Coder(api_key="sk-ant-test", model="zc-sonnet-5")
     payload = {"content": [{"type": "thinking", "thinking": "..."},
                             {"type": "text", "text": "Hello "},
                             {"type": "text", "text": "world"}]}
@@ -47,7 +47,7 @@ def test_generate_concatenates_multiple_text_blocks():
 
 
 def test_generate_handles_refusal():
-    c = Coder(api_key="sk-ant-test", model="claude-sonnet-5")
+    c = Coder(api_key="sk-ant-test", model="zc-sonnet-5")
     payload = {"content": [], "stop_reason": "refusal"}
     with patch("urllib.request.urlopen", return_value=_fake_response(payload)):
         result = c.generate("hi")
@@ -55,7 +55,7 @@ def test_generate_handles_refusal():
 
 
 def test_generate_no_sampling_params_for_sonnet5():
-    c = Coder(api_key="sk-ant-test", model="claude-sonnet-5", temperature=0.9)
+    c = Coder(api_key="sk-ant-test", model="zc-sonnet-5", temperature=0.9)
     captured = {}
 
     def fake_urlopen(req, timeout=None):
@@ -68,7 +68,7 @@ def test_generate_no_sampling_params_for_sonnet5():
 
 
 def test_generate_401_does_not_retry():
-    c = Coder(api_key="sk-ant-bad", model="claude-sonnet-5")
+    c = Coder(api_key="sk-ant-bad", model="zc-sonnet-5")
     call_count = {"n": 0}
 
     def raise_401(req, timeout=None):
@@ -83,7 +83,7 @@ def test_generate_401_does_not_retry():
 
 
 def test_generate_500_retries_then_succeeds():
-    c = Coder(api_key="sk-ant-test", model="claude-sonnet-5")
+    c = Coder(api_key="sk-ant-test", model="zc-sonnet-5")
     call_count = {"n": 0}
 
     def flaky(req, timeout=None):
@@ -101,7 +101,7 @@ def test_generate_500_retries_then_succeeds():
 
 
 def test_generate_429_exhausts_retries_returns_error():
-    c = Coder(api_key="sk-ant-test", model="claude-sonnet-5")
+    c = Coder(api_key="sk-ant-test", model="zc-sonnet-5")
 
     def always_429(req, timeout=None):
         raise urllib.error.HTTPError(url="", code=429, msg="rate limited",

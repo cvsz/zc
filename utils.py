@@ -33,14 +33,14 @@ def confirm(prompt):
         return False
 
 
-# Models that reject explicit sampling parameters. Per platform.claude.com/docs
+# Models that reject explicit sampling parameters. Per platform.zaicoder.com/docs
 # (checked 2026-07-02, "What's new in Claude Sonnet 5"): Claude Sonnet 5 returns
 # a 400 invalid_request_error if temperature/top_p/top_k are set to non-default
 # values at all. Any call site that hardcodes temperature=... needs to route
 # through sampling_kwargs() instead of building the dict itself, or it will
-# 400 the moment someone points it at claude-sonnet-5 (the default model in
+# 400 the moment someone points it at zc-sonnet-5 (the default model in
 # config.py / coder.py).
-NO_SAMPLING_PARAMS_MODEL_PREFIXES = ("claude-sonnet-5", "claude-fable-5", "claude-mythos-5")
+NO_SAMPLING_PARAMS_MODEL_PREFIXES = ("zc-sonnet-5", "zc-fable-5", "zc-mythos-5")
 
 
 def sampling_kwargs(model, temperature=None, top_p=None, top_k=None):

@@ -2,8 +2,8 @@
 
 v1.31.0's CLI-to-API wiring audit (`docs/43_upgrade_v1.31.0_cli_wiring_audit.md`)
 wired four modules and thirteen functions, and explicitly left two things
-alone. One (`claude_evals.py`'s `cmd_eval`) was a dead-code call, correctly
-out of scope. The other, `claude_router.py`'s `--route-add-agent`, wasn't
+alone. One (`zc_evals.py`'s `cmd_eval`) was a dead-code call, correctly
+out of scope. The other, `zc_router.py`'s `--route-add-agent`, wasn't
 dead code or a naming problem — it was a real gap that cycle didn't have an
 answer for yet: `route_and_call()`, `cmd_route()`, and `cmd_route_list()`
 have all accepted an `extra_table: Optional[dict] = None` parameter since
@@ -43,7 +43,7 @@ python main.py --route "optimise this slow query" \
 
 ## What changed
 
-- **`claude_router.py`**: new `extra_table_from_pairs(pairs)` helper — turns
+- **`zc_router.py`**: new `extra_table_from_pairs(pairs)` helper — turns
   the `[[NAME, DESCRIPTION], ...]` list argparse hands back into the
   `{NAME: DESCRIPTION}` dict `cmd_route()`/`cmd_route_list()` already know
   how to merge. Returns `None` (not `{}`) for a falsy input, so every call
@@ -55,7 +55,7 @@ python main.py --route "optimise this slow query" \
   Multi-Agent Router argument group (`nargs=2`, `action="append"`), wired
   into both router dispatch branches (`--route` and `--route-list`) via the
   new helper.
-- **`claude_router.py`**'s module docstring updated to describe the real
+- **`zc_router.py`**'s module docstring updated to describe the real
   flag shape instead of the old one-value placeholder, with a short note on
   why — mirrors how other modules in this codebase document their own CLI
   surface.
@@ -113,8 +113,8 @@ this tree — properly expanding every `@pytest.mark.parametrize` the same
 way `test_cli_wiring.py`'s own 62 was counted, rather than counting each
 decorated function once — comes to 387 immediately before this cycle's
 changes. Likely explanation: parametrized cases in
-`test_claude_agents_sdk.py`, `test_claude_compliance_api.py`,
-`test_claude_wif.py`, `test_security.py`, `test_tui_streaming.py`, and
+`test_zc_agents_sdk.py`, `test_zc_compliance_api.py`,
+`test_zc_wif.py`, `test_security.py`, `test_tui_streaming.py`, and
 `test_utils.py` weren't consistently expanded when past totals were
 tallied by hand. Not chasing that down further here — a suite-wide
 recount is its own cycle, not a router flag's — but the number below is a

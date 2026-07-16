@@ -45,9 +45,9 @@ This project ships the following controls (see `security.py`,
 - **No secrets in the image** — `.dockerignore` excludes `.env`, `.bak`
   files, and git history from the build context.
 - **Dependency pinning + scanning** — `requirements.txt` pins a minimum
-  `anthropic` SDK version; CI runs `bandit` (static analysis) against the
+  `zc` SDK version; CI runs `bandit` (static analysis) against the
   full source tree on every push (see `.github/workflows/ci.yml`).
-- **Dry-run-by-default destructive operations** — `claude_compliance_api.py`'s
+- **Dry-run-by-default destructive operations** — `zc_compliance_api.py`'s
   hard-delete endpoints (chat/file/project) are permanent, org-wide, and
   have no recovery window. Every `cmd_*` that deletes something previews
   what it would do and requires an explicit `--compliance-yes` to actually
@@ -56,13 +56,13 @@ This project ships the following controls (see `security.py`,
 ## Known limitations / out of scope
 
 - **Local code execution**: this CLI does not execute model-generated
-  code locally. `claude_sandbox.py` and `claude_code_exec.py` delegate to
-  Anthropic's hosted code-execution tool. If you extend this project to
+  code locally. `zc_sandbox.py` and `zc_code_exec.py` delegate to
+  ZaiCoder's hosted code-execution tool. If you extend this project to
   run generated code locally, that requires its own sandboxing (containers,
   seccomp, no network) which is *not* provided here.
 - **API key storage**: `~/.ai-coder-config.json` stores the key in plain
   text on disk if you use `--setup` instead of an environment variable.
-  Prefer `ANTHROPIC_API_KEY` (env var, or a secrets manager in production)
+  Prefer `ZC_API_KEY` (env var, or a secrets manager in production)
   over the on-disk config for anything beyond local dev.
 - **Rate limiting is client-side only**: `resilience.py`'s retry/circuit
   breaker protect *this process* from hammering a struggling API; they are
@@ -70,11 +70,11 @@ This project ships the following controls (see `security.py`,
   behind a shared service.
 - **Admin/Compliance keys have a much larger blast radius than a regular
   API key**: `--admin-api-key` and `--compliance-api-key` (and their
-  `ANTHROPIC_ADMIN_API_KEY` / `ANTHROPIC_COMPLIANCE_API_KEY` env-var
+  `ZC_ADMIN_API_KEY` / `ZC_COMPLIANCE_API_KEY` env-var
   equivalents) follow the same plain-text-on-disk-if-you-use-`--setup`
   handling as the regular API key above, but a leaked Compliance Access
   Key can read or hard-delete *any user's* chats and files org-wide, not
   just this CLI session's. Treat these as higher-sensitivity secrets than
-  `ANTHROPIC_API_KEY` — prefer an env var or secrets manager, not
+  `ZC_API_KEY` — prefer an env var or secrets manager, not
   `--compliance-api-key`/`--admin-api-key` on the command line where
   shell history or `ps` can leak it.

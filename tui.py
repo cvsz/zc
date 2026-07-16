@@ -7,10 +7,10 @@ end alongside the plain-argparse CLI and the FastAPI web console
 
     coder.Coder               -> chat/generation (streamed, via the
                                   anthropic SDK -- same shape as
-                                  claude_stream.StreamCoder)
+                                  zc_stream.StreamCoder)
     personalities.py          -> PersonalityManager
     skills.py                 -> SkillManager
-    claude_models.py          -> MODEL_CATALOG
+    zc_models.py          -> MODEL_CATALOG
     main.py                   -> AGENT_SYSTEM_PROMPTS, VERSION
     config.py                 -> Config (persisted to ~/.ai-coder-config.json)
 
@@ -20,7 +20,7 @@ principle webapp/backend/server.py documents for itself.
 `textual` is an optional dependency (see requirements.txt): importing
 this module raises a clear, actionable ImportError if it isn't
 installed, rather than an ugly traceback, matching the pattern used by
-claude_excel.py / claude_powerpoint.py for their own optional deps.
+zc_excel.py / zc_powerpoint.py for their own optional deps.
 """
 from __future__ import annotations
 
@@ -46,11 +46,11 @@ except ImportError as e:  # pragma: no cover - exercised only w/o textual instal
 from config import Config
 from personalities import PersonalityManager
 from skills import SkillManager
-from claude_models import MODEL_CATALOG
+from zc_models import MODEL_CATALOG
 from tui_streaming import StreamRenderGate
 
 
-DEFAULT_MODEL = "claude-sonnet-5"
+DEFAULT_MODEL = "zc-sonnet-5"
 
 
 def _agent_prompts() -> dict:
