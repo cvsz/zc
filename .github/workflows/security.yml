@@ -1,0 +1,64 @@
+name: Security Scan
+
+# ci.yml's `security` job runs bandit (static analysis of *our* code) on
+# every PR. This workflow covers the other three angles: known CVEs in
+# *dependencies*, secrets accidentally committed to the *repo*, and known
+# CVEs in the *built container image*'s OS packages. These are slower and
+# noisier (dependency advisories change daily independent of code changes),
+# so they run on push to main, weekly, and on demand rather than blocking
+# every PR.
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "40 4 * * *"  # daily — dependency advisories are published continuously
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  dependency-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # Known-CVE scan of pinned/resolved dependencies. Complements bandit
+      # (which only looks at *our* code, not what our dependencies pull in).
+      - uses: pypa/gh-action-pip-audit@v1.1.0
+        with:
+          inputs: requirements.txt requirements-dev.txt webapp/requirements-web.txt
+
+  secret-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # full history, so this also catches secrets in old commits, not just HEAD
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # No GITLEAKS_LICENSE needed for public repositories.
+
+  container-scan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write  # required by github/codeql-action/upload-sarif below
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t zcoder:security-scan .
+      - uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: zcoder:security-scan
+          format: sarif
+          output: trivy-results.sarif
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+      - uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-results.sarif
