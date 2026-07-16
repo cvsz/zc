@@ -14,7 +14,7 @@ This document outlines the complete implementation plan for transforming zcoder 
 ### 1.2 Redis/Valkey Caching Layer
 - **Target**: Hot state caching for model catalogs, session data, rate limiting
 - **Benefit**: Sub-millisecond API responses for repeated CLI commands
-- **Files**: New `app/core/cache.py`, integration in `claude_*.py` modules
+- **Files**: New `app/core/cache.py`, integration in `zc_*.py` modules
 
 ### 1.3 Protocol Buffers Integration
 - **Target**: Replace JSON with Protobuf for CLI-API communication

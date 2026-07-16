@@ -1,7 +1,7 @@
 # CHECKLIST.md
 
 **zcoder v1.16.0 — Roadmap Execution Checklist**
-Derived from `ROADMAP.md` Part 2 (Gap Audit vs. `platform.claude.com/docs`, checked 2026-07-04).
+Derived from `ROADMAP.md` Part 2 (Gap Audit vs. `platform.zaicoder.com/docs`, checked 2026-07-04).
 
 Six confirmed gaps, ranked by priority. Check off each sub-task as it lands;
 a priority group is only "done" when every box under it is checked **and**
@@ -22,23 +22,23 @@ held back in v1.15.0 pending a concrete request, which has since arrived
   - [x] If `fallback_chain` is set → inspect `stop_reason` + which model served the response, no manual retry
   - [x] If `fallback_chain` is unset → fall through to the existing manual retry path
 - [x] Add new CLI flag: `--fable5-fallback-chain MODEL1,MODEL2` (max 3 models total, including primary)
-- [x] Update `claude_fable5.py` module docstring to document both patterns and when to use each:
+- [x] Update `zc_fable5.py` module docstring to document both patterns and when to use each:
   - [x] Manual retry → changing prompt/system before retrying
   - [x] `fallbacks` param → let the platform handle it in one round trip
-- [x] Add/update tests covering both the `fallback_chain` path and the legacy manual path (`tests/test_claude_fable5.py`, 15 tests)
+- [x] Add/update tests covering both the `fallback_chain` path and the legacy manual path (`tests/test_zc_fable5.py`, 15 tests)
 
 ---
 
 ## 🟠 P1 — Context editing ✅ DONE (scope revised — see note)
 *Est. effort: ~1 new file + 1 integration point, ~200 lines total.*
 
-> **Correction found during implementation:** `claude_tools.py` already had
+> **Correction found during implementation:** `zc_tools.py` already had
 > a complete `build_context_management()` — the roadmap's audit missed it.
-> No new `claude_context_editing.py` module was needed; the real gap was
+> No new `zc_context_editing.py` module was needed; the real gap was
 > narrower (the agent loop just never called the existing function).
 
-- [x] ~~Create new module `claude_context_editing.py`~~ — not needed, reused `claude_tools.build_context_management()`
-- [x] Wire into `claude_code.py`'s agent loop behind an opt-in `--agent-context-editing` flag
+- [x] ~~Create new module `zc_context_editing.py`~~ — not needed, reused `zc_tools.build_context_management()`
+- [x] Wire into `zc_code.py`'s agent loop behind an opt-in `--agent-context-editing` flag
 - [x] Add a worked example under `docs/` showing Compaction + context editing used together in one long agent run (`docs/29_upgrade_v1.15.0.md`)
 - [x] Confirm this does not change default behavior (opt-in only, `context_management=None` default)
 
@@ -47,22 +47,22 @@ held back in v1.15.0 pending a concrete request, which has since arrived
 ## 🟠 P1 — Agent Skills via the API (`skill_id`) ✅ DONE (base client)
 *Est. effort: ~1 new file for the base client, ~120 lines (excel/pptx integration is a separate follow-up).*
 
-- [x] Create new module `claude_skills_api.py`
+- [x] Create new module `zc_skills_api.py`
   - [x] `list_skills()` (static list of pre-built skills — no documented list endpoint for custom skills)
   - [x] `SkillRef` helper to build a `skill_id` reference for a Messages request
   - [x] CLI flag `--skills-list`
-  - [x] CLI flag `--skills-info ID` (info-only, matching `claude_fable5.py`'s `cmd_fable5_info` pattern)
-- [x] **Follow-up (landed this pass, ahead of schedule):** `--excel-native` / `--pptx-native` flags added to `claude_excel.py` / `claude_powerpoint.py`, routing through `claude_skills_api.py`'s `call_with_skills_turn()` while keeping the hand-rolled implementation as the fallback when Skills access isn't available
+  - [x] CLI flag `--skills-info ID` (info-only, matching `zc_fable5.py`'s `cmd_fable5_info` pattern)
+- [x] **Follow-up (landed this pass, ahead of schedule):** `--excel-native` / `--pptx-native` flags added to `zc_excel.py` / `zc_powerpoint.py`, routing through `zc_skills_api.py`'s `call_with_skills_turn()` while keeping the hand-rolled implementation as the fallback when Skills access isn't available
 
 ---
 
 ## 🟡 P2 — Usage and Cost API ✅ DONE
 *Est. effort: ~1 file, ~100 lines. Requires an Admin API key.*
 
-- [x] Create new module `claude_admin_api.py` (named per the roadmap's own suggested regrouping, see below)
+- [x] Create new module `zc_admin_api.py` (named per the roadmap's own suggested regrouping, see below)
   - [x] `get_usage_report(start, end, group_by)` wrapping the usage/cost endpoint (plus `get_cost_report`)
   - [x] CLI flag `--usage-report` that prints a table
-- [x] Cross-link from `claude_cost_optimizer.py`'s docstring to the real reporting endpoint
+- [x] Cross-link from `zc_cost_optimizer.py`'s docstring to the real reporting endpoint
 - [x] Clearly flag in CLI help text / runtime error that this requires an **Admin API key** (not a regular key)
 
 ---
@@ -70,7 +70,7 @@ held back in v1.15.0 pending a concrete request, which has since arrived
 ## 🟡 P2 — API key management (Admin API) ✅ DONE (list/revoke — create is N/A by design)
 *Est. effort: ~80 lines, combined with the Usage API module.*
 
-- [x] Decide module name: folded into `claude_admin_api.py` alongside the Usage API, per the roadmap's own suggested grouping
+- [x] Decide module name: folded into `zc_admin_api.py` alongside the Usage API, per the roadmap's own suggested grouping
 - [x] CLI flag `--admin-list-keys`
 - [x] CLI flag `--admin-create-key NAME` — implemented as an explanation, not a real call: there's no documented create-key endpoint (Console-only, secret shown once), so this prints why instead of faking success
 - [x] CLI flag `--admin-revoke-key ID`
@@ -88,10 +88,10 @@ held back in v1.15.0 pending a concrete request, which has since arrived
 > only if there's an actual concrete request for it" — has since been met,
 > which is why this is now built. It is not a decision to build
 > speculatively against a guessed shape; the endpoint family is confirmed
-> against `platform.claude.com/docs/en/manage-claude/compliance-api*`
+> against `platform.zaicoder.com/docs/en/manage-zc/compliance-api*`
 > (checked 2026-07-04).
 
-- [x] Create new module `claude_compliance_api.py`
+- [x] Create new module `zc_compliance_api.py`
   - [x] `ComplianceApiClient` with the documented retry/backoff contract
         (429 + retryable 5xx back off exponentially 1s→60s; 400/401/403/
         404/409 never retry)
@@ -110,14 +110,14 @@ held back in v1.15.0 pending a concrete request, which has since arrived
   - [x] Dry-run-by-default guard on every destructive `cmd_*`
         (`cmd_compliance_chat_delete`, `cmd_compliance_file_delete`,
         `cmd_compliance_project_delete`) — requires explicit `yes=True`
-        (CLI: `--compliance-yes`), mirroring `claude_models.py`'s
+        (CLI: `--compliance-yes`), mirroring `zc_models.py`'s
         `--upgrade-all`/`--upgrade-yes` pattern
   - [x] Surfaces the documented 403 scope-mismatch message
         (`Got:`/`Needed:` scopes) with a concrete fix instead of a bare
         permission error, since Compliance Access Key vs. Admin API key
         reach differs per-endpoint
 - [x] Add CLI flags (all under a new `Compliance API` argument group in
-      `main.py`, dispatch mirrors the `claude_admin_api.py` block):
+      `main.py`, dispatch mirrors the `zc_admin_api.py` block):
       `--compliance-api-key`, `--compliance-activities(-since/-until)`,
       `--compliance-activity-types`, `--compliance-activities-limit`,
       `--compliance-activities-all`, `--compliance-chats-list`,
@@ -131,13 +131,13 @@ held back in v1.15.0 pending a concrete request, which has since arrived
       `--compliance-group-members`, `--compliance-yes`,
       `--compliance-output`
 - [x] Key fallback order: `--compliance-api-key` →
-      `ANTHROPIC_COMPLIANCE_API_KEY` → `--admin-api-key` →
-      `ANTHROPIC_ADMIN_API_KEY` (Admin key fallback only reaches the
+      `ZC_COMPLIANCE_API_KEY` → `--admin-api-key` →
+      `ZC_ADMIN_API_KEY` (Admin key fallback only reaches the
       Activity Feed; every other flag 403s with a clear message)
 - [x] Module docstring documents both key types and the endpoint-reach
-      table, and cross-links `claude_admin_api.py` explaining how the two
+      table, and cross-links `zc_admin_api.py` explaining how the two
       modules differ
-- [x] Add tests (`tests/test_claude_compliance_api.py`, 28 tests): error
+- [x] Add tests (`tests/test_zc_compliance_api.py`, 28 tests): error
       classification/retry, exponential backoff on 429/retryable-5xx
       (never on 400/401/403/404/409), cursor-safety in `iterate_*`,
       `Content-Disposition` filename parsing, dry-run guard on every
@@ -153,33 +153,33 @@ held back in v1.15.0 pending a concrete request, which has since arrived
 > absent — zero matches for role:"system" message construction anywhere
 > in the tree. Opus 4.8 only, no beta header.
 
-- [x] `build_mid_system_message(text)` in `claude_cache.py`
+- [x] `build_mid_system_message(text)` in `zc_cache.py`
 - [x] `validate_system_message_placement(messages)` — all five documented
       placement rules, dedicated `SystemMessagePlacementError`
 - [x] `MID_SYSTEM_SUPPORTED_MODELS` model gate (Opus 4.8 only)
 - [x] Threaded through `generate_cached(mid_system=...)` and
       `multi_turn_cached(mid_system_updates=...)`
 - [x] CLI: `--cache-multi-turn`, `--cache-mid-system`, `--cache-mid-system-after`
-- [x] Add tests (`tests/test_claude_cache.py` — new file, 18 tests)
+- [x] Add tests (`tests/test_zc_cache.py` — new file, 18 tests)
 
 ## 🟡 P2 — Cache diagnostics (beta) CLI wiring ✅ DONE (v1.18.0)
 
 > Looked like a fresh gap on first grep (`cache_diagnostic` / `cache.diagnostic`
 > matched nothing), but the feature was already fully built in
-> `claude_cache.py` (`diagnose=`, the `cache-diagnosis-2026-04-07` beta
+> `zc_cache.py` (`diagnose=`, the `cache-diagnosis-2026-04-07` beta
 > header, `cache_miss_reason`) — just never reachable from `main.py`.
 
 - [x] Add `--cache-diagnose` flag, wire to `cmd_cache_generate(diagnose=...)`
 - [x] Add tests covering both the first-call and reference-prior-id cases
-      (`tests/test_claude_cache.py`)
+      (`tests/test_zc_cache.py`)
 
 ## 🟠 P1 — Managed Agents memory stores ✅ DONE (v1.19.0)
 
 > New feature, found in the v1.19.0 audit cycle (2026-07-08) by checking
-> the `anthropic` SDK's own changelog for drift, which surfaced the
+> the `zc` SDK's own changelog for drift, which surfaced the
 > `agent-memory-2026-07-22` beta header. Genuinely absent — zero matches
 > for `memory_store` or a `resources` param anywhere in
-> `claude_agents_sdk.py`.
+> `zc_agents_sdk.py`.
 
 - [x] `ManagedAgentsClient.create_memory_store(name)` wraps
       `client.beta.memory_stores.create`
@@ -187,7 +187,7 @@ held back in v1.15.0 pending a concrete request, which has since arrived
       `resources` entry and adds the `agent-memory-2026-07-22` beta header
 - [x] `cmd_agent_memory_store_create()` standalone helper
 - [x] CLI: `--agent-memory-store NAME`, `--agent-memory-store-create`
-- [x] Add tests (`tests/test_claude_agents_sdk.py` — new file, 10 tests,
+- [x] Add tests (`tests/test_zc_agents_sdk.py` — new file, 10 tests,
       also covering pre-existing untested behavior per this cycle's scope)
 
 ## 🟠 P1 — Managed Agents Dreaming ✅ DONE (v1.20.0)
@@ -202,7 +202,7 @@ held back in v1.15.0 pending a concrete request, which has since arrived
       wrap `client.beta.dreams.*` with the `dreaming-2026-04-21` beta header
 - [x] CLI: `--agent-dream`, `--agent-dream-sessions`,
       `--agent-dream-instructions`, `--agent-dream-list`, `--agent-dream-get`
-- [x] Tests added (`tests/test_claude_agents_sdk.py`)
+- [x] Tests added (`tests/test_zc_agents_sdk.py`)
 
 ## 🟠 P1 — Managed Agents Outcomes ✅ DONE (v1.20.0)
 
@@ -217,7 +217,7 @@ held back in v1.15.0 pending a concrete request, which has since arrived
       through to the existing `run_task()` path when unset
 - [x] CLI: `--agent-outcome`, `--agent-outcome-rubric`,
       `--agent-outcome-max-iter`
-- [x] Tests added (`tests/test_claude_agents_sdk.py`)
+- [x] Tests added (`tests/test_zc_agents_sdk.py`)
 
 ## 🟡 P2 — Managed Agents Webhooks ✅ DONE (v1.20.0)
 
@@ -226,7 +226,7 @@ held back in v1.15.0 pending a concrete request, which has since arrived
 
 - [x] `ManagedAgentsClient.register_webhook()` wraps `client.beta.webhooks.create`
 - [x] CLI: `--agent-webhook-register`, `--agent-webhook-events`
-- [x] Tests added (`tests/test_claude_agents_sdk.py`)
+- [x] Tests added (`tests/test_zc_agents_sdk.py`)
 
 ## 🟡 P2 — Managed Agents native Multiagent orchestration ⏸ DEFERRED (v1.20.0)
 
@@ -243,8 +243,8 @@ held back in v1.15.0 pending a concrete request, which has since arrived
 ## Definition of Done (applies to every P0/P1/P2 item above)
 
 - [x] New/changed code has a CLI flag consistent with existing house style (`--flag-name`) — verified: `--fable5-fallback-chain`, `--agent-context-editing`, `--skills-list`/`--skills-info`, `--usage-report`/`--cost-report`(+`-start`/`-end`/`-group-by`), `--admin-list-keys`/`--admin-revoke-key`/`--admin-create-key`, `--excel-native`/`--pptx-native`, the full `--compliance-*` group (23 flags), `--cache-diagnose`/`--cache-multi-turn`/`--cache-mid-system`/`--cache-mid-system-after`, `--agent-memory-store`/`--agent-memory-store-create`, and the new `--agent-dream*`/`--agent-outcome*`/`--agent-webhook-*` groups all wired in `main.py`
-- [x] Module docstring updated to explain the feature and, where relevant, how it relates to an existing similar feature — confirmed in `claude_fable5.py`, `claude_code.py`, `claude_skills_api.py`, `claude_admin_api.py`, `claude_compliance_api.py`, `claude_cache.py`, `claude_agents_sdk.py`
-- [x] Tests added or updated for the new code path — `tests/test_claude_fable5.py` (15), `tests/test_claude_code_context_editing.py` (6), `tests/test_claude_skills_api.py` (17), `tests/test_claude_admin_api.py` (10), `tests/test_claude_compliance_api.py` (28), `tests/test_claude_cache.py` (18), `tests/test_claude_agents_sdk.py` (26, up from 10 in v1.19.0); all 176 pass
+- [x] Module docstring updated to explain the feature and, where relevant, how it relates to an existing similar feature — confirmed in `zc_fable5.py`, `zc_code.py`, `zc_skills_api.py`, `zc_admin_api.py`, `zc_compliance_api.py`, `zc_cache.py`, `zc_agents_sdk.py`
+- [x] Tests added or updated for the new code path — `tests/test_zc_fable5.py` (15), `tests/test_zc_code_context_editing.py` (6), `tests/test_zc_skills_api.py` (17), `tests/test_zc_admin_api.py` (10), `tests/test_zc_compliance_api.py` (28), `tests/test_zc_cache.py` (18), `tests/test_zc_agents_sdk.py` (26, up from 10 in v1.19.0); all 176 pass
 - [x] `README.md` per-flag reference updated — "New in v1.15.0" section, "New in v1.16.0" section for the Compliance API, "New in v1.18.0" section, "New in v1.19.0" section, and a new "New in v1.20.0" section
 - [x] `CHANGELOG.md` entry added — see "v1.15.0 — Roadmap gap-audit implementation", "v1.16.0 — Compliance API", "v1.18.0 — Mid-conversation system messages + Cache diagnostics CLI wiring", "v1.19.0 — Managed Agents memory stores", and "v1.20.0 — Dreaming, Outcomes, Webhooks"
 - [x] No regression to existing default behavior — every new capability is opt-in (`context_management=None` default, `fallback_chain` unset falls through to the existing manual-retry path, Admin/Compliance API calls only fire when their flags are passed, every Compliance destructive op is dry-run unless `--compliance-yes` is also passed, `mid_system`/`mid_system_updates` default to `None`/`{}`, `diagnose` defaults to `False`, `memory_store_id` defaults to `None`, and `outcome_description`/`outcome_rubric` default to `None` so existing callers are unaffected)
@@ -256,16 +256,16 @@ held back in v1.15.0 pending a concrete request, which has since arrived
 
 | Priority | Item | Status |
 |---|---|---|
-| 🔴 P0 | Server-side `fallbacks` param | ✅ Done (`claude_fable5.py`) |
-| 🟠 P1 | Context editing | ✅ Done — wired existing `claude_tools.build_context_management()` into `claude_code.py` |
-| 🟠 P1 | Agent Skills API (`skill_id`) | ✅ Done (`claude_skills_api.py`) — base client + `--excel-native`/`--pptx-native` (v1.16.0) + `--docx-native`/`--pdf-native` (v1.33.0), all four pre-built Skills now have a CLI path |
-| 🟡 P2 | Usage and Cost API | ✅ Done (`claude_admin_api.py`) |
-| 🟡 P2 | API key management | ✅ Done — list/revoke (`claude_admin_api.py`); create is N/A by design |
-| 🟡 P2 | Compliance API | ✅ Done (`claude_compliance_api.py`, v1.16.0) — built once the recommendation's own "concrete request" condition was met |
-| 🟠 P1 | Mid-conversation system messages | ✅ Done (`claude_cache.py`, v1.18.0) |
-| 🟡 P2 | Cache diagnostics CLI wiring | ✅ Done (`claude_cache.py`/`main.py`, v1.18.0) |
-| 🟠 P1 | Managed Agents memory stores | ✅ Done (`claude_agents_sdk.py`, v1.19.0) |
-| 🟠 P1 | Managed Agents Dreaming | ✅ Done (`claude_agents_sdk.py`, v1.20.0) |
-| 🟠 P1 | Managed Agents Outcomes | ✅ Done (`claude_agents_sdk.py`, v1.20.0) |
-| 🟡 P2 | Managed Agents Webhooks | ✅ Done (`claude_agents_sdk.py`, v1.20.0) |
+| 🔴 P0 | Server-side `fallbacks` param | ✅ Done (`zc_fable5.py`) |
+| 🟠 P1 | Context editing | ✅ Done — wired existing `zc_tools.build_context_management()` into `zc_code.py` |
+| 🟠 P1 | Agent Skills API (`skill_id`) | ✅ Done (`zc_skills_api.py`) — base client + `--excel-native`/`--pptx-native` (v1.16.0) + `--docx-native`/`--pdf-native` (v1.33.0), all four pre-built Skills now have a CLI path |
+| 🟡 P2 | Usage and Cost API | ✅ Done (`zc_admin_api.py`) |
+| 🟡 P2 | API key management | ✅ Done — list/revoke (`zc_admin_api.py`); create is N/A by design |
+| 🟡 P2 | Compliance API | ✅ Done (`zc_compliance_api.py`, v1.16.0) — built once the recommendation's own "concrete request" condition was met |
+| 🟠 P1 | Mid-conversation system messages | ✅ Done (`zc_cache.py`, v1.18.0) |
+| 🟡 P2 | Cache diagnostics CLI wiring | ✅ Done (`zc_cache.py`/`main.py`, v1.18.0) |
+| 🟠 P1 | Managed Agents memory stores | ✅ Done (`zc_agents_sdk.py`, v1.19.0) |
+| 🟠 P1 | Managed Agents Dreaming | ✅ Done (`zc_agents_sdk.py`, v1.20.0) |
+| 🟠 P1 | Managed Agents Outcomes | ✅ Done (`zc_agents_sdk.py`, v1.20.0) |
+| 🟡 P2 | Managed Agents Webhooks | ✅ Done (`zc_agents_sdk.py`, v1.20.0) |
 | 🟡 P2 | Managed Agents native Multiagent orchestration | ⏸ Deferred (v1.20.0) — real gap, no concrete use case yet |

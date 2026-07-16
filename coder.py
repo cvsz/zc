@@ -27,7 +27,7 @@ class Coder:
                  service_tier=None, inference_geo=None, fast_mode=False):
         self.config = Config()
         self.api_key = api_key or self.config.get("api_key") or os.getenv("ANTHROPIC_API_KEY", "")
-        self.model = model or self.config.get("model") or "claude-sonnet-5"
+        self.model = model or self.config.get("model") or "zc-sonnet-5"
         self.temperature = temperature
         self.max_tokens = max_tokens
         self.provider = provider or "anthropic"
@@ -44,7 +44,7 @@ class Coder:
         self.inference_geo = inference_geo
         # fast_mode: sends speed:"fast" — reduced-latency mode, currently a
         # research-preview feature restricted to certain Opus models and
-        # billed at a premium rate. See claude_models.py FAST_MODE_SUPPORTED.
+        # billed at a premium rate. See zc_models.py FAST_MODE_SUPPORTED.
         self.fast_mode = fast_mode
 
     def generate(self, prompt, system=None, file_content=None, history=None):
@@ -151,11 +151,11 @@ class Coder:
         # KeyError/IndexError outright) whenever content[0] wasn't a
         # plain text block: thinking-capable models (Sonnet 5, Opus
         # 4.8, Fable 5/Mythos 5 — Fable 5 has thinking on by default,
-        # see claude_fable5.py) can return a thinking block first,
+        # see zc_fable5.py) can return a thinking block first,
         # and any response with >1 text block silently dropped every
         # block after the first. Concatenate every text block instead,
-        # matching the pattern already used in claude_models.py /
-        # claude_fable5.py / claude_mythos5.py.
+        # matching the pattern already used in zc_models.py /
+        # zc_fable5.py / zc_mythos5.py.
         content = data.get("content", [])
         text = "".join(b.get("text", "") for b in content if b.get("type") == "text")
         if not text and data.get("stop_reason") == "refusal":

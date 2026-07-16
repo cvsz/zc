@@ -1,12 +1,12 @@
 """tests/test_cli_wiring.py — CLI-to-API wiring coverage
 
 Regression test for the v1.30.0 wiring audit: every `cmd_*` function
-defined in a `claude_*.py` module is expected to be reachable from
+defined in a `zc_*.py` module is expected to be reachable from
 `main.py`'s dispatch, either directly or via a re-exported name. This
 doesn't verify the *behavior* of each wired command (that's each
 module's own test file's job) — only that nothing gets left behind the
-way claude_github.py, claude_metrics.py, claude_prompt_optimizer.py,
-and claude_router.py were before this cycle: fully written, fully
+way zc_github.py, zc_metrics.py, zc_prompt_optimizer.py,
+and zc_router.py were before this cycle: fully written, fully
 tested at the function level, and never given a CLI flag.
 """
 import ast
@@ -21,14 +21,14 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # Modules intentionally excluded from the "every cmd_* must be wired"
 # sweep, with the reason on file:
 KNOWN_EXCEPTIONS = {
-    # claude_evals.py (plural) is the pre-v1.10 eval harness, superseded
-    # by claude_eval.py (singular) — cmd_eval_run/cmd_eval_list/
-    # cmd_eval_scaffold/cmd_eval_compare in claude_eval.py cover the same
+    # zc_evals.py (plural) is the pre-v1.10 eval harness, superseded
+    # by zc_eval.py (singular) — cmd_eval_run/cmd_eval_list/
+    # cmd_eval_scaffold/cmd_eval_compare in zc_eval.py cover the same
     # ground with more features (threshold, output file, verbose). Wiring
-    # claude_evals.cmd_eval too would create a second, conflicting
+    # zc_evals.cmd_eval too would create a second, conflicting
     # `--eval`-family flag set for the same job. Left unwired on purpose;
     # a candidate for deletion in a future cycle, not a wiring gap.
-    ("claude_evals.py", "cmd_eval"),
+    ("zc_evals.py", "cmd_eval"),
 }
 
 
@@ -39,8 +39,8 @@ def _cmd_functions(path):
             if isinstance(node, ast.FunctionDef) and node.name.startswith("cmd_")]
 
 
-def _all_claude_modules():
-    return sorted(glob.glob(os.path.join(REPO_ROOT, "claude_*.py")))
+def _all_zc_modules():
+    return sorted(glob.glob(os.path.join(REPO_ROOT, "zc_*.py")))
 
 
 @pytest.fixture(scope="module")
@@ -49,7 +49,7 @@ def main_source():
         return f.read()
 
 
-@pytest.mark.parametrize("module_path", _all_claude_modules(),
+@pytest.mark.parametrize("module_path", _all_zc_modules(),
                          ids=lambda p: os.path.basename(p))
 def test_every_cmd_function_is_referenced_in_main(module_path, main_source):
     module_name = os.path.basename(module_path)
@@ -129,10 +129,10 @@ def test_ab_test_flags_parse(parsed_args):
 
 
 def test_metrics_show_and_modifiers_parse(parsed_args):
-    args = parsed_args(["--metrics-show", "--metrics-today", "--metrics-model", "claude-sonnet-5"])
+    args = parsed_args(["--metrics-show", "--metrics-today", "--metrics-model", "zc-sonnet-5"])
     assert args.metrics_show is True
     assert args.metrics_today is True
-    assert args.metrics_model == "claude-sonnet-5"
+    assert args.metrics_model == "zc-sonnet-5"
 
 
 def test_metrics_export_flag_parses(parsed_args):
@@ -151,39 +151,39 @@ def _run_main_with(monkeypatch, argv, api_key="sk-ant-test"):
 
 
 def test_route_list_dispatches_to_cmd_route_list(monkeypatch):
-    import claude_router
+    import zc_router
     called = {}
-    monkeypatch.setattr(claude_router, "cmd_route_list", lambda *a, **k: called.setdefault("hit", True))
+    monkeypatch.setattr(zc_router, "cmd_route_list", lambda *a, **k: called.setdefault("hit", True))
     _run_main_with(monkeypatch, ["--route-list"])
     assert called.get("hit") is True
 
 
 def test_prompt_lib_list_dispatches(monkeypatch):
-    import claude_prompt_optimizer
+    import zc_prompt_optimizer
     called = {}
-    monkeypatch.setattr(claude_prompt_optimizer, "cmd_prompt_lib_list",
+    monkeypatch.setattr(zc_prompt_optimizer, "cmd_prompt_lib_list",
                         lambda *a, **k: called.setdefault("hit", True))
     _run_main_with(monkeypatch, ["--prompt-lib-list"])
     assert called.get("hit") is True
 
 
 def test_metrics_clear_dispatches(monkeypatch):
-    import claude_metrics
+    import zc_metrics
     called = {}
-    monkeypatch.setattr(claude_metrics, "cmd_metrics_clear",
+    monkeypatch.setattr(zc_metrics, "cmd_metrics_clear",
                         lambda *a, **k: called.setdefault("hit", True))
     _run_main_with(monkeypatch, ["--metrics-clear"])
     assert called.get("hit") is True
 
 
 def test_gh_triage_dispatches_with_positional_order(monkeypatch):
-    import claude_github
+    import zc_github
     seen = {}
 
     def fake_triage(repo, max_items, token, api_key, model):
         seen.update(repo=repo, max_items=max_items, token=token)
 
-    monkeypatch.setattr(claude_github, "cmd_gh_triage", fake_triage)
+    monkeypatch.setattr(zc_github, "cmd_gh_triage", fake_triage)
     _run_main_with(monkeypatch, ["--gh-triage-issues", "acme/widgets",
                                 "--gh-max-items", "5", "--gh-token", "ghp_x"])
     assert seen == {"repo": "acme/widgets", "max_items": 5, "token": "ghp_x"}
@@ -227,31 +227,31 @@ def test_route_add_agent_defaults_to_none(parsed_args):
 
 
 def test_extra_table_from_pairs_builds_dict():
-    from claude_router import extra_table_from_pairs
+    from zc_router import extra_table_from_pairs
     table = extra_table_from_pairs([["frontend", "React and CSS"], ["infra", "Terraform"]])
     assert table == {"frontend": "React and CSS", "infra": "Terraform"}
 
 
 def test_extra_table_from_pairs_none_for_empty_input():
-    from claude_router import extra_table_from_pairs
+    from zc_router import extra_table_from_pairs
     assert extra_table_from_pairs(None) is None
     assert extra_table_from_pairs([]) is None
 
 
 def test_extra_table_from_pairs_last_write_wins_on_duplicate_name():
-    from claude_router import extra_table_from_pairs
+    from zc_router import extra_table_from_pairs
     table = extra_table_from_pairs([["frontend", "first draft"], ["frontend", "second draft"]])
     assert table == {"frontend": "second draft"}
 
 
 def test_route_add_agent_merges_into_route_dispatch(monkeypatch):
-    import claude_router
+    import zc_router
     seen = {}
 
     def fake_cmd_route(prompt, api_key, model, explain=False, parallel=False, extra_table=None):
         seen.update(prompt=prompt, extra_table=extra_table)
 
-    monkeypatch.setattr(claude_router, "cmd_route", fake_cmd_route)
+    monkeypatch.setattr(zc_router, "cmd_route", fake_cmd_route)
     _run_main_with(monkeypatch, ["--route", "optimise this query",
                                 "--route-add-agent", "dba", "Query plans and indexing"])
     assert seen["prompt"] == "optimise this query"
@@ -259,31 +259,31 @@ def test_route_add_agent_merges_into_route_dispatch(monkeypatch):
 
 
 def test_route_add_agent_merges_into_route_list_dispatch(monkeypatch):
-    import claude_router
+    import zc_router
     seen = {}
 
     def fake_cmd_route_list(extra_table=None):
         seen["extra_table"] = extra_table
 
-    monkeypatch.setattr(claude_router, "cmd_route_list", fake_cmd_route_list)
+    monkeypatch.setattr(zc_router, "cmd_route_list", fake_cmd_route_list)
     _run_main_with(monkeypatch, ["--route-list",
                                 "--route-add-agent", "dba", "Query plans and indexing"])
     assert seen["extra_table"] == {"dba": "Query plans and indexing"}
 
 
 def test_route_without_add_agent_passes_none_not_omitted(monkeypatch):
-    import claude_router
+    import zc_router
     seen = {}
 
     def fake_cmd_route(prompt, api_key, model, explain=False, parallel=False, extra_table=None):
         seen["extra_table"] = extra_table
 
-    monkeypatch.setattr(claude_router, "cmd_route", fake_cmd_route)
+    monkeypatch.setattr(zc_router, "cmd_route", fake_cmd_route)
     _run_main_with(monkeypatch, ["--route", "fix this bug"])
     assert seen["extra_table"] is None
 
 
-# ── --docx-native / --pdf-native (v1.33.0: claude_skills_api.py's
+# ── --docx-native / --pdf-native (v1.33.0: zc_skills_api.py's
 #    PREBUILT_SKILLS listed docx/pdf since v1.15.0 with no CLI access to
 #    either — see docs/45_upgrade_v1.33.0_docx_pdf_native.md) ────────────
 
@@ -315,48 +315,48 @@ def test_pdf_native_defaults_to_none_when_omitted(parsed_args):
 
 
 def test_docx_native_dispatches_to_cmd_docx_chat(monkeypatch):
-    import claude_word
+    import zc_word
     seen = {}
 
     def fake_cmd_docx_chat(api_key, model, input_path=None, output_path=None, max_tokens=4096):
         seen.update(input_path=input_path, output_path=output_path)
 
-    monkeypatch.setattr(claude_word, "cmd_docx_chat", fake_cmd_docx_chat)
+    monkeypatch.setattr(zc_word, "cmd_docx_chat", fake_cmd_docx_chat)
     _run_main_with(monkeypatch, ["--docx-native", "draft.docx", "--docx-output", "out.docx"])
     assert seen == {"input_path": "draft.docx", "output_path": "out.docx"}
 
 
 def test_docx_native_with_no_file_passes_none_input_path(monkeypatch):
-    import claude_word
+    import zc_word
     seen = {}
 
     def fake_cmd_docx_chat(api_key, model, input_path=None, output_path=None, max_tokens=4096):
         seen["input_path"] = input_path
 
-    monkeypatch.setattr(claude_word, "cmd_docx_chat", fake_cmd_docx_chat)
+    monkeypatch.setattr(zc_word, "cmd_docx_chat", fake_cmd_docx_chat)
     _run_main_with(monkeypatch, ["--docx-native"])
     assert seen["input_path"] is None
 
 
 def test_pdf_native_dispatches_to_cmd_pdf_chat(monkeypatch):
-    import claude_pdf
+    import zc_pdf
     seen = {}
 
     def fake_cmd_pdf_chat(api_key, model, input_path=None, output_path=None, max_tokens=4096):
         seen.update(input_path=input_path, output_path=output_path)
 
-    monkeypatch.setattr(claude_pdf, "cmd_pdf_chat", fake_cmd_pdf_chat)
+    monkeypatch.setattr(zc_pdf, "cmd_pdf_chat", fake_cmd_pdf_chat)
     _run_main_with(monkeypatch, ["--pdf-native", "form.pdf", "--pdf-output", "out.pdf"])
     assert seen == {"input_path": "form.pdf", "output_path": "out.pdf"}
 
 
 def test_pdf_native_with_no_file_passes_none_input_path(monkeypatch):
-    import claude_pdf
+    import zc_pdf
     seen = {}
 
     def fake_cmd_pdf_chat(api_key, model, input_path=None, output_path=None, max_tokens=4096):
         seen["input_path"] = input_path
 
-    monkeypatch.setattr(claude_pdf, "cmd_pdf_chat", fake_cmd_pdf_chat)
+    monkeypatch.setattr(zc_pdf, "cmd_pdf_chat", fake_cmd_pdf_chat)
     _run_main_with(monkeypatch, ["--pdf-native"])
     assert seen["input_path"] is None

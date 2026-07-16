@@ -1,12 +1,12 @@
 """
-cowork.py — Claude Cowork (All Features)
+cowork.py — ZaiCoder Cowork (All Features)
 AI Model Coder CLI v1.8.0
 
 Cowork is Claude's autonomous multi-step task execution mode.
 Hand off complex tasks and Claude breaks them down, executes each step,
 uses tools, iterates, and delivers a complete result.
 
-Features modelled on Claude Cowork (claude.ai/cowork):
+Features modelled on ZaiCoder Cowork (zaicoder.ai/cowork):
   • Deep Research       — multi-source research with synthesis
   • Writing Assistant   — draft, edit, iterate long-form content
   • Data Analysis       — analyse data files and generate insights
@@ -263,7 +263,7 @@ WORKFLOW:
 class CoworkAgent:
     """Autonomous multi-step task executor."""
 
-    def __init__(self, api_key: str, model: str = "claude-sonnet-5",
+    def __init__(self, api_key: str, model: str = "zc-sonnet-5",
                  max_tokens: int = 8192):
         self.api_key    = api_key
         self.model      = model

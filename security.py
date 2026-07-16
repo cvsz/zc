@@ -2,7 +2,7 @@
 security.py — Input validation and security controls
 
 Centralizes the checks that were previously either missing or duplicated
-ad hoc across claude_files.py, claude_code_exec.py, claude_sandbox.py,
+ad hoc across zc_files.py, zc_code_exec.py, zc_sandbox.py,
 projects.py, and artifacts.py — every module that takes a user-supplied
 path or writes files to disk. Import from here instead of re-implementing
 path checks locally.
@@ -17,7 +17,7 @@ Threat model covered:
 - Unvalidated shell/URL schemes reaching url-fetch-style tools.
 
 Not covered here (out of scope for a CLI security module): sandboxing of
-arbitrary code the model asks to execute — see claude_sandbox.py, which
+arbitrary code the model asks to execute — see zc_sandbox.py, which
 already delegates that to Anthropic's hosted code-execution tool rather
 than running anything locally.
 """

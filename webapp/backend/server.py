@@ -8,7 +8,7 @@ and modules `main.py` already uses:
     coder.Coder              -> chat/generation
     personalities.py         -> PersonalityManager
     skills.py                -> SkillManager
-    claude_models.py         -> MODEL_CATALOG (dropdown list)
+    zc_models.py         -> MODEL_CATALOG (dropdown list)
     main.py                  -> VERSION, AGENT_SYSTEM_PROMPTS
     config.py                -> Config (persisted to ~/.ai-coder-config.json)
     health.py                -> run_health_check (used for Docker/orchestrator
@@ -43,7 +43,7 @@ from health import run_health_check                      # noqa: E402
 from personalities import PersonalityManager              # noqa: E402
 from skills import SkillManager                           # noqa: E402
 from main import VERSION, AGENT_SYSTEM_PROMPTS            # noqa: E402
-from claude_models import MODEL_CATALOG                   # noqa: E402
+from zc_models import MODEL_CATALOG                   # noqa: E402
 from logging_config import get_logger                     # noqa: E402
 
 logger = get_logger("webapp.server")
@@ -76,7 +76,7 @@ _SESSION_LIMIT = 200  # oldest session dropped past this to bound memory
 class ChatRequest(BaseModel):
     prompt: str
     session_id: Optional[str] = None
-    model: str = "claude-sonnet-5"
+    model: str = "zc-sonnet-5"
     temperature: float = 0.3
     max_tokens: int = 4096
     system: Optional[str] = None
@@ -280,7 +280,7 @@ def chat_stream(req: ChatRequest, request: Request):
     """Server-Sent Events variant of /api/chat. Same request body and same
     session-history semantics; the difference is purely transport — tokens
     arrive as they're generated instead of after the full response. Reuses
-    claude_stream.py's event-handling shape (content_block_delta/text_delta)
+    zc_stream.py's event-handling shape (content_block_delta/text_delta)
     rather than reimplementing SSE parsing.
 
     Each SSE `data:` line is a small JSON object:

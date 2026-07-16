@@ -3,7 +3,7 @@
 Runs Textual's headless test harness (App.run_test()) so no real terminal
 is needed. Every test is skipped, not failed, if `textual` isn't
 installed, matching how tests for other optional-dependency modules
-(claude_excel.py/claude_powerpoint.py) handle the same situation — see
+(zc_excel.py/zc_powerpoint.py) handle the same situation — see
 tests/test_config.py's pattern for the equivalent skip-if-missing idiom.
 """
 import pytest
