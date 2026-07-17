@@ -1,0 +1,6 @@
+interface:
+  display_name: "Zc"
+  short_description: "Repo-specific patterns and workflows for zc"
+  default_prompt: "Use the zc repo skill to follow existing architecture, testing, and workflow conventions."
+policy:
+  allow_implicit_invocation: true
