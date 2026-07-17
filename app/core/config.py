@@ -5,9 +5,9 @@ Centralized configuration with environment variable support,
 secrets management, and runtime feature flags.
 """
 import os
-from pathlib import Path
-from typing import Optional, List, Dict, Any
 from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Optional
 
 
 @dataclass
@@ -54,7 +54,7 @@ class Config:
     
     # NATS Message Queue
     nats_url: str = "nats://localhost:4222"
-    nats_cluster: List[str] = field(default_factory=list)
+    nats_cluster: list[str] = field(default_factory=list)
     nats_enabled: bool = True
     
     # Security
@@ -80,8 +80,8 @@ class Config:
     
     # Control Panel
     control_panel_enabled: bool = True
-    control_panel_admin_users: List[str] = field(default_factory=list)
-    feature_flags: Dict[str, bool] = field(default_factory=dict)
+    control_panel_admin_users: list[str] = field(default_factory=list)
+    feature_flags: dict[str, bool] = field(default_factory=dict)
     
     # HTTP/3 (QUIC)
     http3_enabled: bool = False

@@ -8,18 +8,17 @@ then generates a grounded, cited response. Uses the Files API to
 upload large corpora once and reference them cheaply across queries.
 """
 
-from utils import sampling_kwargs
-
 import json
 import math
-import os
 import re
-import urllib.request
-from collections import Counter, defaultdict
-from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from collections import Counter
 from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Optional
+
 import anthropic
+
+from utils import sampling_kwargs
 
 INDEX_DIR = Path.home() / ".ai-coder" / "rag_indexes"
 SUPPORTED_EXTS = {".txt", ".md", ".py", ".js", ".ts", ".go", ".java", ".rs",
@@ -37,9 +36,9 @@ class Chunk:
 @dataclass
 class RAGIndex:
     name:     str
-    chunks:   List[Chunk] = field(default_factory=list)
-    idf:      Dict[str, float] = field(default_factory=dict)
-    file_ids: Dict[str, str] = field(default_factory=dict)  # cid → Files API id
+    chunks:   list[Chunk] = field(default_factory=list)
+    idf:      dict[str, float] = field(default_factory=dict)
+    file_ids: dict[str, str] = field(default_factory=dict)  # cid → Files API id
 
     def to_dict(self):
         return {"name": self.name,
@@ -56,12 +55,12 @@ class RAGIndex:
         return idx
 
 
-def _tokenize(text: str) -> List[str]:
+def _tokenize(text: str) -> list[str]:
     return re.findall(r"\b\w+\b", text.lower())
 
 
 def _chunk_text(source: str, text: str, size: int = 600,
-                overlap: int = 100) -> List[Chunk]:
+                overlap: int = 100) -> list[Chunk]:
     words = text.split(); chunks = []
     i = 0; cid_base = Path(source).stem
     while i < len(words):
@@ -101,8 +100,8 @@ def load_index(name: str) -> Optional[RAGIndex]:
     return RAGIndex.from_dict(json.loads(p.read_text()))
 
 
-def _score(query_tokens: List[str], chunk: Chunk,
-           idf: Dict[str, float]) -> float:
+def _score(query_tokens: list[str], chunk: Chunk,
+           idf: dict[str, float]) -> float:
     tf = Counter(_tokenize(chunk.content))
     score = 0.0
     for qt in query_tokens:
@@ -111,14 +110,14 @@ def _score(query_tokens: List[str], chunk: Chunk,
     return score
 
 
-def retrieve(idx: RAGIndex, query: str, k: int = 5) -> List[Chunk]:
+def retrieve(idx: RAGIndex, query: str, k: int = 5) -> list[Chunk]:
     qt = _tokenize(query)
     scored = [(c, _score(qt, c, idx.idf)) for c in idx.chunks]
     scored.sort(key=lambda x: x[1], reverse=True)
     return [c for c, s in scored[:k] if s > 0]
 
 
-def generate(query: str, chunks: List[Chunk], api_key: str,
+def generate(query: str, chunks: list[Chunk], api_key: str,
              model: str = "claude-sonnet-5") -> str:
     client = anthropic.Anthropic(api_key=api_key)
     ctx = "\n\n".join(f"[{c.source}]\n{c.content}" for c in chunks)

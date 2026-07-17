@@ -20,7 +20,6 @@ from claude_compliance_api import (
     cmd_compliance_project_delete,
 )
 
-
 # ── error classification / retry contract ────────────────────────────────
 
 
@@ -138,7 +137,8 @@ def test_request_does_not_retry_403(monkeypatch):
         ) if False else _http_error(req.full_url, 403, body)
 
     def _http_error(url, code, body):
-        import urllib.error, io
+        import io
+        import urllib.error
         e = urllib.error.HTTPError(url, code, "forbidden", {}, io.BytesIO(body))
         return e
 
@@ -160,7 +160,8 @@ def test_request_gives_up_after_max_retries(monkeypatch):
 
     def fake_urlopen(req, timeout=None):
         calls["n"] += 1
-        import urllib.error, io
+        import io
+        import urllib.error
         body = json.dumps({"error": {"type": "rate_limit_error", "message": "slow down"}}).encode()
         raise urllib.error.HTTPError(req.full_url, 429, "rate limited", {}, io.BytesIO(body))
 

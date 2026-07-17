@@ -37,9 +37,9 @@ CLI flags:
 import json
 import math
 import os
-import urllib.request
 import urllib.error
-from typing import List, Optional
+import urllib.request
+from typing import Optional
 
 from exceptions import AICoderError
 from resilience import CircuitBreaker, retry, urlopen_json
@@ -69,9 +69,9 @@ def _voyage_key(explicit: Optional[str] = None) -> str:
     return key
 
 
-def embed(texts: List[str], model: str = DEFAULT_MODEL,
+def embed(texts: list[str], model: str = DEFAULT_MODEL,
           input_type: Optional[str] = "document",
-          api_key: Optional[str] = None) -> List[List[float]]:
+          api_key: Optional[str] = None) -> list[list[float]]:
     """Embed a list of strings, return one vector per input. input_type
     should be "document" when embedding things you'll search over, and
     "query" when embedding the search query itself — Voyage optimizes the
@@ -101,7 +101,7 @@ def _call(req: "urllib.request.Request") -> dict:
     return urlopen_json(req, timeout=60)
 
 
-def cosine_similarity(a: List[float], b: List[float]) -> float:
+def cosine_similarity(a: list[float], b: list[float]) -> float:
     """Voyage embeddings are normalized to length 1, so dot product equals
     cosine similarity and is cheaper — but this stays a true cosine
     similarity so it's correct even against non-Voyage vectors."""
@@ -123,11 +123,11 @@ class EmbeddingIndex:
     def __init__(self, model: str = DEFAULT_MODEL, api_key: Optional[str] = None):
         self.model   = model
         self.api_key = api_key
-        self._ids:   List[str]         = []
-        self._texts: List[str]         = []
-        self._vecs:  List[List[float]] = []
+        self._ids:   list[str]         = []
+        self._texts: list[str]         = []
+        self._vecs:  list[list[float]] = []
 
-    def add(self, ids: List[str], texts: List[str], batch_size: int = 128):
+    def add(self, ids: list[str], texts: list[str], batch_size: int = 128):
         for i in range(0, len(texts), batch_size):
             batch_ids   = ids[i:i + batch_size]
             batch_texts = texts[i:i + batch_size]
@@ -137,7 +137,7 @@ class EmbeddingIndex:
             self._texts.extend(batch_texts)
             self._vecs.extend(vecs)
 
-    def search(self, query: str, top_k: int = 5) -> List[dict]:
+    def search(self, query: str, top_k: int = 5) -> list[dict]:
         if not self._vecs:
             return []
         [qvec] = embed([query], model=self.model, input_type="query", api_key=self.api_key)

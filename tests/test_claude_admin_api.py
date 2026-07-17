@@ -5,22 +5,19 @@ default date range, the 401/403 admin-key-required error hint, API key
 revoke (status -> inactive, no delete endpoint), and that
 --admin-create-key is a pure explanation with no network call.
 """
-import re
 
-import pytest
 
 from claude_admin_api import (
     AdminApiClient,
-    cmd_usage_report,
-    cmd_cost_report,
+    _default_date_range,
+    cmd_admin_create_key,
     cmd_admin_list_keys,
     cmd_admin_revoke_key,
-    cmd_admin_create_key,
+    cmd_cost_report,
     cmd_rate_limits,
     cmd_rate_limits_workspace,
-    _default_date_range,
+    cmd_usage_report,
 )
-
 
 # ── AdminApiClient query building ────────────────────────────────────────
 
@@ -445,7 +442,7 @@ def test_get_claude_code_usage_report_passes_page_cursor(monkeypatch):
 
 
 def test_cmd_claude_code_usage_report_prints_wrong_key_hint(monkeypatch, capsys):
-    client = AdminApiClient(admin_api_key="admin-k")
+    AdminApiClient(admin_api_key="admin-k")
     monkeypatch.setattr(AdminApiClient, "get_claude_code_usage_report",
                         lambda self, *a, **k: {"error": "forbidden", "status": 403})
     from claude_admin_api import cmd_claude_code_usage_report
@@ -492,7 +489,7 @@ def test_cmd_claude_code_usage_report_prints_named_user_and_metrics(monkeypatch,
     cmd_claude_code_usage_report("admin-k", "2026-07-08")
 
     out = capsys.readouterr().out
-    assert "[email protected]" in out
+    assert "[em***ed]" in out
     assert "sessions=5" in out
     assert "cost=1025" in out
 

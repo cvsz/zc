@@ -5,14 +5,14 @@ AI Model Coder CLI v1.10.0
 """
 
 import json
-import math
 import time
 import uuid
 from collections import defaultdict
+from datetime import datetime, timedelta
 from functools import wraps
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
-from datetime import datetime, timedelta
+from typing import Any, Callable, Optional
+
 import anthropic
 
 OBS_DIR  = Path.home() / ".ai-coder" / "observability"
@@ -21,13 +21,13 @@ LOG_FILE = OBS_DIR / "requests.jsonl"
 
 # ── Structured logging ────────────────────────────────────────────────────────
 
-def _log(record: Dict[str, Any]):
+def _log(record: dict[str, Any]):
     OBS_DIR.mkdir(parents=True, exist_ok=True)
     with open(LOG_FILE, "a") as f:
         f.write(json.dumps(record) + "\n")
 
 
-def _read_logs(hours: int = 24) -> List[Dict]:
+def _read_logs(hours: int = 24) -> list[dict]:
     if not LOG_FILE.exists(): return []
     cutoff = (datetime.now() - timedelta(hours=hours)).isoformat()
     records = []
@@ -42,7 +42,7 @@ def _read_logs(hours: int = 24) -> List[Dict]:
 
 def record_request(model: str, prompt: str, response: str,
                    latency_ms: int, in_tokens: int, out_tokens: int,
-                   error: Optional[str] = None, tags: Optional[List[str]] = None):
+                   error: Optional[str] = None, tags: Optional[list[str]] = None):
     _log({"req_id": str(uuid.uuid4())[:8], "ts": datetime.now().isoformat(),
           "model": model, "prompt_preview": prompt[:120],
           "response_preview": response[:120] if response else "",
@@ -52,7 +52,7 @@ def record_request(model: str, prompt: str, response: str,
 
 # ── Decorator for auto-instrumentation ───────────────────────────────────────
 
-def observe(model: str = "unknown", tags: Optional[List[str]] = None):
+def observe(model: str = "unknown", tags: Optional[list[str]] = None):
     """Decorator: wrap any function that (a) takes prompt as first arg and
     (b) returns a string response, logging latency + token estimate."""
     def decorator(fn: Callable) -> Callable:
@@ -79,7 +79,7 @@ def observe(model: str = "unknown", tags: Optional[List[str]] = None):
 
 # ── Analytics ─────────────────────────────────────────────────────────────────
 
-def _histogram(values: List[float], buckets: int = 6) -> str:
+def _histogram(values: list[float], buckets: int = 6) -> str:
     if not values: return "(no data)"
     lo, hi = min(values), max(values)
     if hi == lo: return f"all values = {lo:.0f}"
@@ -100,7 +100,7 @@ def latency_report(hours: int = 24):
     records = _read_logs(hours)
     if not records: print(f"No requests in the last {hours}h."); return
     lats = [r["latency_ms"] for r in records if "latency_ms" in r]
-    by_model: Dict[str, List[float]] = defaultdict(list)
+    by_model: dict[str, list[float]] = defaultdict(list)
     for r in records: by_model[r.get("model","?")].append(r.get("latency_ms",0))
     errors = [r for r in records if r.get("error")]
 

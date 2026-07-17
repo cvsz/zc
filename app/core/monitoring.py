@@ -5,15 +5,18 @@ Grafana Dashboards, Prometheus Alerts, and Real-time System Health
 """
 
 import os
-import json
-import asyncio
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Any
+from datetime import datetime, timezone
 from pathlib import Path
-from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
-from prometheus_client import CollectorRegistry, multiprocess
-import aiofiles
+from typing import Any
 
+import aiofiles
+from prometheus_client import (
+    CollectorRegistry,
+    Counter,
+    Gauge,
+    Histogram,
+    generate_latest,
+)
 
 # =============================================================================
 # PROMETHEUS METRICS DEFINITIONS
@@ -441,7 +444,7 @@ class OpenTelemetryConfig:
         self.trace_sample_rate = float(os.getenv("OTEL_TRACE_SAMPLE_RATE", "0.1"))
         self.metrics_export_interval = int(os.getenv("OTEL_METRICS_EXPORT_INTERVAL", "60"))
     
-    def get_config(self) -> Dict[str, Any]:
+    def get_config(self) -> dict[str, Any]:
         return {
             "service_name": self.service_name,
             "exporter": {
@@ -468,7 +471,7 @@ class HealthChecker:
     """Comprehensive Health Check System"""
     
     def __init__(self):
-        self.checks: Dict[str, callable] = {}
+        self.checks: dict[str, callable] = {}
         self.register_default_checks()
     
     def register_default_checks(self):
@@ -482,17 +485,17 @@ class HealthChecker:
         """Register a health check"""
         self.checks[name] = check_func
     
-    async def _check_database(self) -> Dict[str, Any]:
+    async def _check_database(self) -> dict[str, Any]:
         """Check database connectivity"""
         # Implementation depends on actual DB driver
         return {"status": "healthy", "latency_ms": 5}
     
-    async def _check_redis(self) -> Dict[str, Any]:
+    async def _check_redis(self) -> dict[str, Any]:
         """Check Redis connectivity"""
         # Implementation depends on actual Redis client
         return {"status": "healthy", "latency_ms": 2}
     
-    async def _check_storage(self) -> Dict[str, Any]:
+    async def _check_storage(self) -> dict[str, Any]:
         """Check storage availability"""
         storage_path = Path(os.getenv("STORAGE_PATH", "/tmp/wire-storage"))
         try:
@@ -505,12 +508,12 @@ class HealthChecker:
         except Exception as e:
             return {"status": "unhealthy", "error": str(e)}
     
-    async def _check_workers(self) -> Dict[str, Any]:
+    async def _check_workers(self) -> dict[str, Any]:
         """Check worker queue health"""
         # Implementation depends on actual queue system
         return {"status": "healthy", "active_workers": 3}
     
-    async def run_all_checks(self) -> Dict[str, Any]:
+    async def run_all_checks(self) -> dict[str, Any]:
         """Run all registered health checks"""
         results = {}
         overall_status = "healthy"

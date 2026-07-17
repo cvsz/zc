@@ -9,12 +9,11 @@ Implements binary diffing (BSDiff/VCDIFF) for bandwidth-optimized file updates.
 - Automatic fallback to full upload when delta > threshold
 """
 
-import os
 import asyncio
-import hashlib
-from pathlib import Path
-from typing import Optional, Tuple, Dict, List
 from dataclasses import dataclass
+from pathlib import Path
+from typing import Optional
+
 import blake3
 
 # Try optional high-performance diff libraries
@@ -123,7 +122,7 @@ class DeltaSyncService:
             )
         
         original_size = len(target_content)
-        base_size = len(base_content)
+        len(base_content)
         
         # Compute target hash
         target_hash = blake3.blake3(target_content).hexdigest()
@@ -223,7 +222,7 @@ class DeltaSyncService:
         base_hash: str,
         patch_data: bytes,
         algorithm: str = "bsdiff"
-    ) -> Tuple[Optional[bytes], str]:
+    ) -> tuple[Optional[bytes], str]:
         """
         Apply patch to base version and return reconstructed content.
         
@@ -283,7 +282,7 @@ class DeltaSyncService:
         self,
         base_hash: str,
         target_size: int
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """
         Estimate potential bandwidth savings without computing full delta.
         Uses heuristics based on file size difference.

@@ -32,12 +32,10 @@ CLI flags:
                            code_execution_20260521 — GA, no beta header)
 """
 
-import os
-import sys
-import json
 import base64
-import urllib.request
+import json
 import urllib.error
+import urllib.request
 from pathlib import Path
 from typing import Optional
 
@@ -214,14 +212,14 @@ class CodeExecutionCoder:
 def cmd_code_exec(prompt: str, api_key: str, model: str,
                   file_ids: list[str] = None, output_dir: str = None,
                   code_exec_version: str = DEFAULT_CODE_EXEC_VERSION):
-    print(f"\033[94mℹ Code Execution Tool (Anthropic sandbox)\033[0m\n")
+    print("\033[94mℹ Code Execution Tool (Anthropic sandbox)\033[0m\n")
     cec    = CodeExecutionCoder(api_key=api_key, model=model, code_exec_version=code_exec_version)
     result = cec.execute(prompt, file_ids=file_ids, output_dir=output_dir)
 
     print(result["text"])
 
     if result["outputs"]:
-        print(f"\n\033[90m── Execution Trace ─────────────────────\033[0m")
+        print("\n\033[90m── Execution Trace ─────────────────────\033[0m")
         for out in result["outputs"]:
             ot = out.get("type", "")
             if ot in ("code", "executed_code"):

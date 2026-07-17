@@ -9,22 +9,20 @@ Features:
 - CORS configuration
 - Request/response logging
 """
-import asyncio
-import signal
 import time
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
 
+import uvicorn
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-import uvicorn
 
-from .core.config import get_config, Config
+from .api.v1.routes import router as wire_router
 from .core.cache import init_cache, shutdown_cache
+from .core.config import get_config
 from .core.http_client import init_http_client, shutdown_http_client
 from .services.upload_manager import init_upload_manager
-from .api.v1.routes import router as wire_router
 
 
 # Track request timing for metrics

@@ -15,13 +15,14 @@ CLI flags:
 """
 
 import json
-import time
-import os
-from pathlib import Path
-from dataclasses import dataclass, field, asdict
-from typing import Optional, Any
 import re
+import time
+from dataclasses import asdict, dataclass, field
+from pathlib import Path
+from typing import Any, Optional
+
 import anthropic
+
 from utils import sampling_kwargs
 
 

@@ -1,5 +1,8 @@
 """utils.py — Terminal utilities & formatters"""
-import sys, os, textwrap
+import os
+import sys
+import textwrap
+
 
 def print_header(title):
     width = min(os.get_terminal_size().columns if sys.stdout.isatty() else 80, 80)

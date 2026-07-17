@@ -30,8 +30,8 @@ def cmd_pdf_chat(api_key, model, input_path=None, output_path=None, max_tokens=4
     """Mirrors claude_word.py's cmd_docx_chat one-for-one against the pdf
     Skill instead of docx. No local PDF-generation dependency needed for
     this path."""
-    from claude_skills_api import SkillsApiClient, build_user_content, extract_output_file_ids
     from claude_files import FilesAPI
+    from claude_skills_api import SkillsApiClient, build_user_content, extract_output_file_ids
 
     files_api = FilesAPI(api_key=api_key, model=model)
     client = SkillsApiClient(api_key=api_key, model=model, max_tokens=max_tokens)

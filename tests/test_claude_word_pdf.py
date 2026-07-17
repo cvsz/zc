@@ -10,8 +10,8 @@ than duplicating a full interactive-session harness.
 """
 import pytest
 
-import claude_word
 import claude_pdf
+import claude_word
 from claude_files import FilesAPI
 from claude_skills_api import SkillsApiClient
 

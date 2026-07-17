@@ -3,15 +3,16 @@ Real-time Latency Profiler Middleware for Enterprise Wire API
 Tracks p50, p95, p99 latencies with automatic alerting on regressions.
 """
 
-import time
 import asyncio
-from typing import Callable, Dict, List, Optional
-from dataclasses import dataclass, field
-from collections import deque
+import logging
 import statistics
+import time
+from collections import deque
+from dataclasses import dataclass, field
+from typing import Callable, Optional
+
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +57,7 @@ class LatencyMetrics:
     def add_sample(self, latency_ms: float):
         self.samples.append(latency_ms)
     
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         return {
             'count': self.count,
             'p50_ms': round(self.p50, 3),
@@ -70,10 +71,10 @@ class LatencyProfiler:
     """Centralized latency tracking across all endpoints."""
     
     def __init__(self, alert_threshold_p99: float = 100.0):
-        self._metrics: Dict[str, LatencyMetrics] = {}
+        self._metrics: dict[str, LatencyMetrics] = {}
         self._alert_threshold_p99 = alert_threshold_p99
         self._global_metrics = LatencyMetrics()
-        self._alerts: List[Dict] = []
+        self._alerts: list[dict] = []
     
     def get_metrics(self, endpoint: str) -> LatencyMetrics:
         if endpoint not in self._metrics:
@@ -102,13 +103,13 @@ class LatencyProfiler:
         self._alerts.append(alert)
         logger.warning(f"HIGH_LATENCY: {endpoint} took {latency_ms:.2f}ms (threshold: {self._alert_threshold_p99}ms)")
     
-    def get_global_metrics(self) -> Dict:
+    def get_global_metrics(self) -> dict:
         return self._global_metrics.to_dict()
     
-    def get_all_endpoint_metrics(self) -> Dict[str, Dict]:
+    def get_all_endpoint_metrics(self) -> dict[str, dict]:
         return {ep: m.to_dict() for ep, m in self._metrics.items()}
     
-    def get_recent_alerts(self, limit: int = 10) -> List[Dict]:
+    def get_recent_alerts(self, limit: int = 10) -> list[dict]:
         return self._alerts[-limit:]
     
     def reset_alerts(self):

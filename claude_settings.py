@@ -25,8 +25,8 @@ CLI flags:
   --status-line             Render the statusLine once for the current state
 """
 
-import os
 import json
+import os
 import subprocess
 from pathlib import Path
 from typing import Optional

@@ -24,18 +24,23 @@ claude_excel.py / claude_powerpoint.py for their own optional deps.
 """
 from __future__ import annotations
 
-import sys
 import time
-from typing import Optional
 
 try:
+    from textual import work
     from textual.app import App, ComposeResult
     from textual.containers import Horizontal, Vertical, VerticalScroll
     from textual.widgets import (
-        Footer, Header, Static, Input, Select, Button, Label, Switch,
+        Button,
+        Footer,
+        Header,
+        Input,
+        Label,
+        Select,
+        Static,
+        Switch,
     )
     from textual.worker import Worker, get_current_worker
-    from textual import work
 except ImportError as e:  # pragma: no cover - exercised only w/o textual installed
     raise ImportError(
         "The --tui flag needs the 'textual' package, which isn't installed.\n"
@@ -43,12 +48,11 @@ except ImportError as e:  # pragma: no cover - exercised only w/o textual instal
         "(or: pip install -r requirements.txt, it's an optional extra there)"
     ) from e
 
+from claude_models import MODEL_CATALOG
 from config import Config
 from personalities import PersonalityManager
 from skills import SkillManager
-from claude_models import MODEL_CATALOG
 from tui_streaming import StreamRenderGate
-
 
 DEFAULT_MODEL = "claude-sonnet-5"
 
@@ -146,7 +150,7 @@ class ZCoderTUI(App):
         ("ctrl+t", "toggle_dark", "Toggle theme"),
     ]
 
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, api_key: str | None = None):
         super().__init__()
         self.api_key = api_key or Config().get("api_key")
         self.history: list = []
@@ -206,7 +210,7 @@ class ZCoderTUI(App):
             t = 0.3
         return max(0.0, min(1.0, t))
 
-    def _build_system_prompt(self) -> Optional[str]:
+    def _build_system_prompt(self) -> str | None:
         parts = []
         agent = self._selected("agent_select")
         if agent:
@@ -302,7 +306,7 @@ class ZCoderTUI(App):
         return full_text
 
 
-def run_tui(api_key: Optional[str] = None) -> None:
+def run_tui(api_key: str | None = None) -> None:
     """Entry point used by main.py's --tui flag."""
     ZCoderTUI(api_key=api_key).run()
 

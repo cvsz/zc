@@ -13,14 +13,12 @@ CLI flags:
   --vision-compare F1 F2  Compare two images side by side
 """
 
-import os
-import sys
 import base64
 import mimetypes
-import anthropic
+import sys
 from pathlib import Path
-from typing import Optional, List
 
+import anthropic
 
 SUPPORTED_IMAGE_TYPES = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
 SUPPORTED_DOC_TYPES   = {".pdf"}
@@ -91,7 +89,7 @@ class VisionCoder:
         system  = "You are an expert developer. Write clean, production-ready code."
         return self._call(content, system)
 
-    def compare_images(self, paths: List[str], prompt: str = "") -> str:
+    def compare_images(self, paths: list[str], prompt: str = "") -> str:
         content = [_image_block(path=p) for p in paths]
         content.append({
             "type": "text",
@@ -163,7 +161,7 @@ def cmd_vision_pdf(path: str, prompt: str, api_key: str, model: str):
     return result
 
 
-def cmd_vision_compare(paths: List[str], prompt: str, api_key: str, model: str):
+def cmd_vision_compare(paths: list[str], prompt: str, api_key: str, model: str):
     for p in paths:
         _validate_image(p)
     vc = VisionCoder(api_key=api_key, model=model)

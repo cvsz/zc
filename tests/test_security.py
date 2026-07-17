@@ -1,11 +1,15 @@
 """tests/test_security.py"""
 import pytest
 
-from security import (
-    safe_resolve, validate_name, validate_url, contains_secret,
-    assert_no_secret, env_flag,
-)
 from exceptions import SecurityError, ValidationError
+from security import (
+    assert_no_secret,
+    contains_secret,
+    env_flag,
+    safe_resolve,
+    validate_name,
+    validate_url,
+)
 
 
 def test_safe_resolve_allows_path_inside_base(tmp_path):

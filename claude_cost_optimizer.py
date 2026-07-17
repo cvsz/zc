@@ -23,16 +23,18 @@ module instead of folded into local estimation here.
 
 import json
 import time
-from pathlib import Path
-from typing import Dict, Optional, Tuple
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
+from pathlib import Path
+from typing import Optional
+
 import anthropic
+
 from utils import sampling_kwargs
 
 SPEND_LOG = Path.home() / ".ai-coder" / "cost_log.json"
 
-PRICE: Dict[str, Dict[str, float]] = {
+PRICE: dict[str, dict[str, float]] = {
     # Current
     "claude-haiku-4-5-20251001":  {"in": 1.0,   "out": 5.0},
     "claude-sonnet-5":            {"in": 3.0,   "out": 15.0},
@@ -68,7 +70,7 @@ TIER_MODELS = ["claude-haiku-4-5-20251001", "claude-sonnet-5", "claude-opus-4-8"
 # legacy models here only once their surcharge terms are confirmed —
 # guessing a multiplier is worse than omitting it, since PRICE already
 # falls back sanely for anything not in this table.
-LONG_CONTEXT_SURCHARGE: Dict[str, Dict[str, float]] = {
+LONG_CONTEXT_SURCHARGE: dict[str, dict[str, float]] = {
     "claude-sonnet-4-5": {"threshold": 200_000, "in_mult": 2.0, "out_mult": 1.5},
 }
 

@@ -14,8 +14,6 @@ directly — this is what actually proves the anthropic-beta header is
 """
 import json
 
-import pytest
-
 import claude_code_exec as mod
 from claude_code_exec import CodeExecutionCoder
 

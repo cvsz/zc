@@ -19,7 +19,6 @@ CLI:
 
 Slash commands inside the REPL are documented in HELP_TEXT below.
 """
-import sys
 
 HELP_TEXT = """\
 Commands:
@@ -80,7 +79,7 @@ def cmd_interactive(api_key, model, system=None, temperature=0.3, max_tokens=409
                 continue
             if cmd == "/system":
                 system = rest or None
-                print(f"[system prompt set]" if system else "[system prompt cleared]")
+                print("[system prompt set]" if system else "[system prompt cleared]")
                 continue
             if cmd == "/model":
                 if rest:

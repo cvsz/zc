@@ -18,7 +18,7 @@ import sys
 import time
 from dataclasses import dataclass, field
 
-from config import Config, CONFIG_PATH
+from config import CONFIG_PATH, Config
 
 
 @dataclass

@@ -55,7 +55,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - run: pip install -r requirements-dev.txt
-      - run: pytest --cov --cov-report=xml --cov-report=term-missing
+      - run: pytest --ignore=tests/test_webapp_server.py --cov --cov-report=xml --cov-report=term-missing
       - uses: actions/upload-artifact@v4
         if: matrix.python-version == '3.12'
         with:

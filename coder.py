@@ -2,15 +2,16 @@
 coder.py — Claude API integration core
 AI Model Coder CLI v1.7.0
 """
-import os
 import json
-import urllib.request
+import os
 import urllib.error
+import urllib.request
+
 from config import Config
-from utils import sampling_kwargs
-from exceptions import AuthenticationError, RateLimitError, TransientAPIError, APIError
-from resilience import retry, CircuitBreaker
+from exceptions import APIError, AuthenticationError, RateLimitError, TransientAPIError
 from logging_config import get_logger
+from resilience import CircuitBreaker, retry
+from utils import sampling_kwargs
 
 logger = get_logger("coder")
 

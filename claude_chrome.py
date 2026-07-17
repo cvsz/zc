@@ -39,14 +39,13 @@ CLI:
 """
 import json
 import re
-import sys
-import urllib.request
 import urllib.error
+import urllib.request
 from html.parser import HTMLParser
 from urllib.parse import urljoin, urlparse
 
-from resilience import raise_for_http_error, retry
 from exceptions import APIError
+from resilience import raise_for_http_error, retry
 
 MAX_PAGE_CHARS = 8000  # keep pages small enough to stay a cheap loop step
 

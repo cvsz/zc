@@ -68,13 +68,12 @@ CLI flags:
 """
 
 import json
-import urllib.request
 import urllib.error
-from typing import Optional, Callable
+import urllib.request
+from typing import Callable, Optional
 
 from exceptions import AICoderError
 from resilience import CircuitBreaker, retry, urlopen_json
-
 
 # ── Built-in server tool descriptors ──────────────────────────────────────
 
@@ -208,8 +207,7 @@ def check_retired_tool_version(tool_type: str) -> Optional[dict]:
     here, not necessarily current."""
     return RETIRED_TOOL_VERSIONS.get(tool_type)
 
-
-
+def computer_use_tool_for_model(model: str, width: int = 1024, height: int = 768):
     """Return (tool_descriptor, beta_header_or_None) for the computer_use
     tool version this model actually supports. Defaults to the newer
     2025-11-24 pairing; falls back to 2025-01-24 for the older model IDs
@@ -808,7 +806,8 @@ def build_code_tools_registry() -> ToolRegistry:
     reg = ToolRegistry()
 
     def run_python(code: str) -> str:
-        import subprocess, sys
+        import subprocess
+        import sys
         result = subprocess.run(
             [sys.executable, "-c", code],
             capture_output=True, text=True, timeout=30
@@ -944,15 +943,15 @@ def cmd_list_server_tools():
         if retired:
             tag += f" [note: newer version {retired['replacement']} available — {retired['notes']}]"
         print(f"  {name:<18} — {desc}{tag}")
-    print(f"\n  Also available on custom tool definitions (--tool-file), not server tools:")
-    print(f"    input_examples   — Tool Use Examples, worked examples of a correct call.")
+    print("\n  Also available on custom tool definitions (--tool-file), not server tools:")
+    print("    input_examples   — Tool Use Examples, worked examples of a correct call.")
     print(f"                       Use with_input_examples(). [beta: {ADVANCED_TOOL_USE_BETA}]")
-    print(f"    allowed_callers  — Programmatic Tool Calling: callable from code_execution")
-    print(f"                       instead of one round-trip per call. Use")
+    print("    allowed_callers  — Programmatic Tool Calling: callable from code_execution")
+    print("                       instead of one round-trip per call. Use")
     print(f"                       with_allowed_callers(). [beta: {ADVANCED_TOOL_USE_BETA}]")
-    print(f"\n  Context/budget controls, not tools but combine with any of the above:")
-    print(f"    context_management compact edit — server-side conversation summarization.")
+    print("\n  Context/budget controls, not tools but combine with any of the above:")
+    print("    context_management compact edit — server-side conversation summarization.")
     print(f"                       Use build_context_management(compact=True). [beta: {COMPACTION_BETA}]")
-    print(f"    task_budget        — advisory token countdown for a full agentic loop.")
+    print("    task_budget        — advisory token countdown for a full agentic loop.")
     print(f"                       Use build_task_budget(). [beta: {TASK_BUDGET_BETA}, "
           f"models: {sorted(TASK_BUDGET_MODELS)}]")

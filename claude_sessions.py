@@ -6,13 +6,12 @@ AI Model Coder CLI v1.10.0
 """
 
 import json
-import os
 import subprocess
 import uuid
-from pathlib import Path
-from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
 from datetime import datetime
+from pathlib import Path
+from typing import Optional
 
 SESSIONS_DIR    = Path.home() / ".ai-coder" / "sessions"
 CHECKPOINTS_DIR = Path.home() / ".ai-coder" / "checkpoints"
@@ -40,7 +39,7 @@ class Session:
     title:   Optional[str] = None
     model:   str = "claude-sonnet-5"
     persona: Optional[str] = None
-    turns:   List[Turn] = field(default_factory=list)
+    turns:   list[Turn] = field(default_factory=list)
     created: str = field(default_factory=lambda: datetime.now().isoformat())
     updated: str = field(default_factory=lambda: datetime.now().isoformat())
 
@@ -78,7 +77,7 @@ class Checkpoint:
     sid:     str = ""
     label:   str = ""
     n_turns: int = 0
-    snap:    List[Dict] = field(default_factory=list)
+    snap:    list[dict] = field(default_factory=list)
     ts:      str = field(default_factory=lambda: datetime.now().isoformat())
 
     def to_dict(self):
@@ -122,7 +121,7 @@ def latest_session(mode: Optional[str] = None) -> Optional[Session]:
         except Exception: pass
     return max(sessions, key=lambda s: s.updated) if sessions else None
 
-def list_sessions(mode: Optional[str] = None) -> List[Session]:
+def list_sessions(mode: Optional[str] = None) -> list[Session]:
     if not SESSIONS_DIR.exists(): return []
     out = []
     for p in SESSIONS_DIR.glob("*.json"):
@@ -147,7 +146,7 @@ def rewind_to_checkpoint(s: Session, cpid: str) -> Session:
     s.updated = datetime.now().isoformat()
     save_session(s); return s
 
-def list_checkpoints(sid: str) -> List[Checkpoint]:
+def list_checkpoints(sid: str) -> list[Checkpoint]:
     if not CHECKPOINTS_DIR.exists(): return []
     out = []
     for p in CHECKPOINTS_DIR.glob("*.json"):
@@ -165,7 +164,7 @@ def away_summary(cwd: str, since_iso: str) -> str:
     since_dt = datetime.fromisoformat(since_iso)
 
     # git commits since
-    commits: List[str] = []
+    commits: list[str] = []
     try:
         r = subprocess.run(['git', 'log', f'--since={since_iso}', '--oneline'],
                           shell=False, cwd=cwd, capture_output=True, text=True, timeout=5)
@@ -173,7 +172,7 @@ def away_summary(cwd: str, since_iso: str) -> str:
     except Exception: pass
 
     # files modified since
-    modified: List[str] = []
+    modified: list[str] = []
     root = Path(cwd); ts = since_dt.timestamp(); count = 0
     for path in root.rglob("*"):
         if count > 5000: break

@@ -4,15 +4,15 @@ Real-time dashboard backend with subscriptions, RBAC, and metrics aggregation.
 """
 
 import asyncio
-from typing import AsyncGenerator, List, Optional, Dict, Any
+from collections.abc import AsyncGenerator
 from datetime import datetime, timezone
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, HTTPException
-from pydantic import BaseModel, Field
-from strawberry.fastapi import GraphQLRouter
+from typing import Optional
+
 import strawberry
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from strawberry.fastapi import GraphQLRouter
 from strawberry.subscriptions import GRAPHQL_TRANSPORT_WS_PROTOCOL
-from redis.asyncio import Redis
-from app.core.config import settings
+
 from app.core.cache import get_redis_client
 
 # ==================== GraphQL Schema Types ====================
@@ -64,7 +64,7 @@ class HealthStatus:
     status: str
     version: str
     uptime_seconds: float
-    services: Dict[str, str]
+    services: dict[str, str]
 
 # ==================== Input Types ====================
 
@@ -103,7 +103,7 @@ class Query:
         info: strawberry.Info,
         status_filter: Optional[str] = None,
         limit: int = 50
-    ) -> List[UploadSession]:
+    ) -> list[UploadSession]:
         """List active and recent upload sessions."""
         redis = await get_redis_client()
         
@@ -131,7 +131,7 @@ class Query:
         return sessions
     
     @strawberry.field
-    async def feature_flags(self, info: strawberry.Info) -> List[FeatureFlag]:
+    async def feature_flags(self, info: strawberry.Info) -> list[FeatureFlag]:
         """List all feature flags with current state."""
         redis = await get_redis_client()
         flags_data = await redis.hgetall("feature_flags")
@@ -173,7 +173,7 @@ class Query:
         info: strawberry.Info,
         limit: int = 100,
         offset: int = 0
-    ) -> List[ActivityLog]:
+    ) -> list[ActivityLog]:
         """Retrieve recent activity logs."""
         redis = await get_redis_client()
         
@@ -248,7 +248,7 @@ class Mutation:
         self,
         info: strawberry.Info,
         service_name: str
-    ) -> Dict[str, str]:
+    ) -> dict[str, str]:
         """Trigger a graceful restart of a specific service."""
         allowed_services = ["api", "worker", "telemetry"]
         

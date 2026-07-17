@@ -23,15 +23,13 @@ CLI flags:
                            OUTPUT_300K_MODELS)
 """
 
-import os
-import sys
 import json
+import os
 import time
 import uuid
 from pathlib import Path
-from typing import Optional
-import anthropic
 
+import anthropic
 
 BATCH_STORE = Path(os.path.expanduser("~/.ai-coder/batches"))
 

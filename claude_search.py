@@ -27,11 +27,9 @@ CLI flags:
                           web_fetch_20260318, both defaults as of v1.24.0
 """
 
-import sys
-import json
-import anthropic
 from typing import Optional
 
+import anthropic
 
 WEB_SEARCH_TOOL = {
     "type": "web_search_20260318",

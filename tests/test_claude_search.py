@@ -28,6 +28,7 @@ def search_mod(monkeypatch):
     monkeypatch.setitem(sys.modules, "anthropic", fake_anthropic)
 
     import importlib
+
     import claude_search as mod
     importlib.reload(mod)
     return mod

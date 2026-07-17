@@ -5,10 +5,10 @@ AI Model Coder CLI v1.7.0
 Manages full project lifecycles: create, plan, scaffold, track tasks,
 run agents across a project, and maintain a project manifest.
 """
-import os
 import json
-import uuid
+import os
 import shutil
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 

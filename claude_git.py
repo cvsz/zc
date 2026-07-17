@@ -6,7 +6,9 @@ AI Model Coder CLI v1.10.0
 
 import subprocess
 from typing import Optional
+
 import anthropic
+
 from utils import sampling_kwargs
 
 SYS = ("You are a senior software engineer writing git artifacts. "
@@ -92,7 +94,7 @@ def cmd_git_commit(api_key: str, model: str, style: str = "conventional",
     print(msg)
     if write:
         result = subprocess.run(["git", "commit", "-m", msg], cwd=cwd, capture_output=True, text=True)
-        if result.returncode == 0: print(f"\n✓ Committed.")
+        if result.returncode == 0: print("\n✓ Committed.")
         else: print(f"\n✗ Commit failed:\n{result.stderr}")
 
 

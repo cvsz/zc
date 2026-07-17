@@ -57,12 +57,12 @@ CLI flags:
 
 import json
 import os
-import urllib.request
 import urllib.error
+import urllib.request
 from pathlib import Path
 from typing import Optional
 
-from exceptions import AICoderError, AuthenticationError, RateLimitError, APIError
+from exceptions import AICoderError, APIError, AuthenticationError, RateLimitError
 from resilience import CircuitBreaker, retry, urlopen_json
 
 OAUTH_TOKEN_ENDPOINT = "https://api.anthropic.com/v1/oauth/token"

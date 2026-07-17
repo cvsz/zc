@@ -27,14 +27,10 @@ CLI flags:
   --cowork-list         List all cowork task types
 """
 
-import os
-import sys
 import json
-import time
-import urllib.request
 import urllib.error
+import urllib.request
 from pathlib import Path
-from typing import Optional
 
 from exceptions import AICoderError
 from resilience import CircuitBreaker, retry, urlopen_json
@@ -403,7 +399,7 @@ class CoworkAgent:
         if file_content:
             first += f"\n\nATTACHED:{file_content}"
 
-        for i, user_msg in enumerate([first] + follow_ups):
+        for _i, user_msg in enumerate([first] + follow_ups):
             messages.append({"role": "user", "content": user_msg})
             payload = {
                 "model":      self.model,
@@ -451,4 +447,4 @@ def cmd_cowork_list():
     print("  " + "─" * 70)
     for key, task in COWORK_TASKS.items():
         print(f"  {key:<14}{(task['icon']+' '+task['name']):<26}{task['description']}")
-    print(f"\n  Usage: ai-coder --cowork <type> --cowork-prompt \"your task\"")
+    print("\n  Usage: ai-coder --cowork <type> --cowork-prompt \"your task\"")

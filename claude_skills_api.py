@@ -48,9 +48,9 @@ code-execution tool, so callers need to check both).
 """
 
 import json
-import urllib.request
 import urllib.error
-from dataclasses import dataclass, field
+import urllib.request
+from dataclasses import dataclass
 from typing import Optional
 
 from exceptions import AICoderError

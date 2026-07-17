@@ -25,10 +25,10 @@ CLI flags:
 """
 
 import json
-import urllib.request
 import urllib.error
-from typing import Optional
+import urllib.request
 from pathlib import Path
+from typing import Optional
 
 from exceptions import AICoderError
 from resilience import CircuitBreaker, retry, urlopen_json
@@ -193,10 +193,10 @@ def cmd_structured(prompt: str, api_key: str, model: str,
         result = sc.json_schema(prompt, schema)
     elif schema_inline:
         schema = json.loads(schema_inline)
-        print(f"\033[94mℹ Structured output (inline schema)\033[0m\n")
+        print("\033[94mℹ Structured output (inline schema)\033[0m\n")
         result = sc.json_schema(prompt, schema)
     else:
-        print(f"\033[94mℹ Structured output (JSON object mode)\033[0m\n")
+        print("\033[94mℹ Structured output (JSON object mode)\033[0m\n")
         result = sc.json_object(prompt)
 
     indent = 2 if pretty else None

@@ -8,19 +8,20 @@ High-performance endpoints optimized for Wire CLI communication:
 - Distributed tracing hooks
 """
 import time
-from typing import Dict, Any, Optional
-from fastapi import APIRouter, Request, Response, HTTPException, Depends
+from typing import Any
+
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import JSONResponse
 
+from ...core.cache import get_cache
 from ...core.config import get_config
-from ...core.cache import get_cache, CacheKey
-from ...services.upload_manager import get_upload_manager, UploadManager
+from ...services.upload_manager import UploadManager, get_upload_manager
 
 router = APIRouter(prefix="/v1/wire", tags=["Wire CLI"])
 
 
 @router.get("/health/live")
-async def liveness_probe() -> Dict[str, Any]:
+async def liveness_probe() -> dict[str, Any]:
     """Kubernetes liveness probe endpoint."""
     return {
         "status": "alive",
@@ -30,7 +31,7 @@ async def liveness_probe() -> Dict[str, Any]:
 
 
 @router.get("/health/ready")
-async def readiness_probe() -> Dict[str, Any]:
+async def readiness_probe() -> dict[str, Any]:
     """Kubernetes readiness probe endpoint."""
     cache = get_cache()
     upload_mgr = get_upload_manager()
@@ -54,7 +55,7 @@ async def readiness_probe() -> Dict[str, Any]:
 
 
 @router.get("/health/full")
-async def full_health_check() -> Dict[str, Any]:
+async def full_health_check() -> dict[str, Any]:
     """Comprehensive health check including all dependencies."""
     config = get_config()
     cache = get_cache()
@@ -262,7 +263,7 @@ async def upload_chunk(
 async def finalize_upload(
     session_id: str,
     upload_mgr: UploadManager = Depends(lambda: get_upload_manager()),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Finalize an upload by assembling all chunks."""
     try:
         file_path = await upload_mgr.finalize_upload(session_id)
@@ -283,7 +284,7 @@ async def finalize_upload(
 async def get_upload_progress(
     session_id: str,
     upload_mgr: UploadManager = Depends(lambda: get_upload_manager()),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Get real-time upload progress."""
     progress = await upload_mgr.get_progress(session_id)
     return progress
@@ -293,21 +294,21 @@ async def get_upload_progress(
 async def cancel_upload(
     session_id: str,
     upload_mgr: UploadManager = Depends(lambda: get_upload_manager()),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Cancel an active upload session."""
     success = await upload_mgr.cancel_upload(session_id)
     return {"success": success, "session_id": session_id}
 
 
 @router.get("/cache/stats")
-async def cache_stats() -> Dict[str, Any]:
+async def cache_stats() -> dict[str, Any]:
     """Get cache performance statistics."""
     cache = get_cache()
     return await cache.health_check()
 
 
 @router.get("/metrics/performance")
-async def performance_metrics() -> Dict[str, Any]:
+async def performance_metrics() -> dict[str, Any]:
     """Get API performance metrics."""
     from ...core.http_client import get_http_client
     

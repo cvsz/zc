@@ -128,18 +128,17 @@ dream lifecycle events, so a long-running Managed Agents task doesn't
 need a client holding an SSE stream open the whole time. Public beta.
 """
 
-import os
 import json
-import uuid
+import os
 import time
-import urllib.request
 import urllib.error
+import urllib.request
+import uuid
 from pathlib import Path
 from typing import Optional
 
 from exceptions import AICoderError
 from resilience import CircuitBreaker, raise_for_http_error, retry, urlopen_json
-
 
 SESSIONS_DIR = Path(os.path.expanduser("~/.ai-coder/agent_sessions"))
 ENDPOINT     = "https://api.anthropic.com/v1/messages"
@@ -1706,7 +1705,7 @@ def cmd_agent_orchestrate(goal: str, api_key: str, model: str, session_id: str =
     session = AgentSession(session_id=session_id) if session_id else AgentSession()
     agent   = ManagedAgent(api_key=api_key, model=model)
     result  = agent.orchestrate(goal, session)
-    print(f"\n\033[92m✓ Orchestration complete\033[0m\n")
+    print("\n\033[92m✓ Orchestration complete\033[0m\n")
     print(result["final"])
     return result
 

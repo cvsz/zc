@@ -40,6 +40,47 @@ coverage/
 *.swp
 *.swo
 *.tmp
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pyc
+.Python
+*.so
+*.egg-info/
+
+# Dependencies
+venv/
+.venv/
+.env
+.env.local
+.env.*
+
+# Build artifacts
+build/
+dist/
+*.egg
+*.whl
+
+# gRPC/Protobuf
+*_pb2.py
+*_pb2_grpc.py
+
+# Logs
+*.log
+
+# Coverage
+.coverage
+htmlcov/
+coverage/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*.tmp
 
 # OS
 .DS_Store
@@ -48,4 +89,4 @@ Thumbs.db
 # Testing
 .pytest_cache/
 .mypy_cache/
-```
+venv2/

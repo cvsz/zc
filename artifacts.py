@@ -16,11 +16,11 @@ Artifacts can be:
   • Attached to a project                 --artifact-attach <artifact_id> <project_id>
   • Deleted                               --artifact-delete <id>
 """
-import os
-import json
-import uuid
 import hashlib
+import json
+import os
 import shutil
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -314,7 +314,7 @@ class ArtifactManager:
             f"  Project:  {meta['project_id'] or '—'}",
             f"  Updated:  {meta['updated_at'][:19]}",
             f"{'═'*60}",
-            f"\n--- Version History ---",
+            "\n--- Version History ---",
         ]
         for vh in meta["versions"]:
             lines.append(f"  v{vh['v']}  {vh['created_at'][:19]}  {vh.get('note','')[:60]}")
@@ -404,7 +404,7 @@ def cmd_artifact_tag(artifact_id, tag):
 
 def cmd_artifact_attach(artifact_id, project_id):
     am   = ArtifactManager()
-    meta = am.attach_to_project(artifact_id, project_id)
+    am.attach_to_project(artifact_id, project_id)
     print(f"\033[92m✓ Artifact {artifact_id} attached to project {project_id}\033[0m")
 
 

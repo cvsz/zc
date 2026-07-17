@@ -13,14 +13,14 @@ Features:
 - Circuit breaker for Redis failures
 """
 import asyncio
-import json
 import hashlib
-from typing import Any, Optional, TypeVar, Generic
-from datetime import timedelta
+import json
+from typing import Any, Generic, Optional, TypeVar
+
 import redis.asyncio as redis
 from redis.asyncio import ConnectionPool
 
-from .config import get_config, Config
+from .config import Config, get_config
 
 T = TypeVar('T')
 
@@ -134,7 +134,7 @@ class EnterpriseCache:
             await self.redis_client.ping()
             self._connected = True
             self._circuit_open = True
-        except Exception as e:
+        except Exception:
             self._connected = False
             self._circuit_open = False
             raise

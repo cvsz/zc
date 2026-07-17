@@ -20,14 +20,14 @@ import asyncio
 import hashlib
 import os
 import time
-from pathlib import Path
-from typing import Dict, List, Optional, Set, Any
 from dataclasses import dataclass, field
+from typing import Any, Optional
+
 import aiofiles
 import blake3
 
-from ..core.config import get_config, Config
-from ..core.cache import get_cache, CacheKey
+from ..core.cache import CacheKey, get_cache
+from ..core.config import Config, get_config
 
 
 @dataclass
@@ -39,8 +39,8 @@ class UploadSession:
     total_size: int
     chunk_size: int
     total_chunks: int
-    uploaded_chunks: Set[int] = field(default_factory=set)
-    chunk_hashes: Dict[int, str] = field(default_factory=dict)
+    uploaded_chunks: set[int] = field(default_factory=set)
+    chunk_hashes: dict[int, str] = field(default_factory=dict)
     created_at: float = field(default_factory=time.time)
     expires_at: float = field(default_factory=lambda: time.time() + 3600)
     status: str = "pending"  # pending, uploading, completed, failed
@@ -54,10 +54,10 @@ class UploadSession:
             return 100.0
         return (len(self.uploaded_chunks) / self.total_chunks) * 100
     
-    def missing_chunks(self) -> List[int]:
+    def missing_chunks(self) -> list[int]:
         return [i for i in range(self.total_chunks) if i not in self.uploaded_chunks]
     
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             'session_id': self.session_id,
             'file_id': self.file_id,
@@ -107,7 +107,7 @@ class UploadManager:
         self.cache = get_cache()
         
         # In-memory session store (synced with Redis)
-        self._sessions: Dict[str, UploadSession] = {}
+        self._sessions: dict[str, UploadSession] = {}
         self._lock = asyncio.Lock()
         
         # Storage paths
@@ -127,7 +127,7 @@ class UploadManager:
     
     async def _recover_sessions(self) -> None:
         """Recover incomplete upload sessions from Redis."""
-        pattern = CacheKey.build('upload', 'session', '*')
+        CacheKey.build('upload', 'session', '*')
         # In production, scan Redis for incomplete sessions
         pass
     
@@ -136,7 +136,7 @@ class UploadManager:
         file_id: str,
         file_name: str,
         total_size: int,
-        client_chunk_hashes: Optional[Dict[int, str]] = None,
+        client_chunk_hashes: Optional[dict[int, str]] = None,
         chunk_size: Optional[int] = None,
     ) -> UploadSession:
         """
@@ -317,7 +317,7 @@ class UploadManager:
         
         return True
     
-    async def get_progress(self, session_id: str) -> Dict[str, Any]:
+    async def get_progress(self, session_id: str) -> dict[str, Any]:
         """Get upload progress."""
         session = await self._get_session(session_id)
         if not session:
@@ -344,7 +344,7 @@ class UploadManager:
         
         return None
     
-    async def health_check(self) -> Dict[str, Any]:
+    async def health_check(self) -> dict[str, Any]:
         """Check upload manager health."""
         async with self._lock:
             active_sessions = len([

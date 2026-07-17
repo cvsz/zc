@@ -9,7 +9,6 @@ Covers the --agent-context-editing wiring described in claude_code.py:
     via claude_tools.build_context_management(clear_tool_uses=True) and
     forwards it into agent.query() as context_management.
 """
-import json
 
 import pytest
 

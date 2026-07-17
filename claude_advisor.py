@@ -46,13 +46,12 @@ CLI flags:
 """
 
 import json
-import urllib.request
 import urllib.error
+import urllib.request
 from typing import Optional
 
 from exceptions import AICoderError
 from resilience import CircuitBreaker, retry, urlopen_json
-
 
 ADVISOR_TOOL_TYPE = "advisor_20260301"
 ADVISOR_TOOL_BETA = "advisor-tool-2026-03-01"

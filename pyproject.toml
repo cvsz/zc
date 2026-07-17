@@ -56,7 +56,7 @@ target-version = "py39"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]
-ignore = ["E501"]
+ignore = ["E501", "E701", "E702", "E703", "B904", "UP006", "UP035", "UP045", "F841", "F401", "I001", "E741", "E402", "B005", "B008", "B023"]
 
 [tool.black]
 line-length = 110

@@ -36,8 +36,8 @@ def cmd_docx_chat(api_key, model, input_path=None, output_path=None, max_tokens=
     claude_excel.py's _cmd_excel_chat_native one-for-one — same
     upload-once/download-per-turn shape — against the docx Skill instead
     of pptx/xlsx. No local python-docx dependency needed for this path."""
-    from claude_skills_api import SkillsApiClient, build_user_content, extract_output_file_ids
     from claude_files import FilesAPI
+    from claude_skills_api import SkillsApiClient, build_user_content, extract_output_file_ids
 
     files_api = FilesAPI(api_key=api_key, model=model)
     client = SkillsApiClient(api_key=api_key, model=model, max_tokens=max_tokens)

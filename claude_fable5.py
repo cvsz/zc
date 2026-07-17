@@ -62,8 +62,8 @@ CLI flags:
 """
 
 import json
-import urllib.request
 import urllib.error
+import urllib.request
 from typing import Optional
 
 from exceptions import AICoderError

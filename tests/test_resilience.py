@@ -1,8 +1,8 @@
 """tests/test_resilience.py"""
 import pytest
 
-from resilience import retry, CircuitBreaker
-from exceptions import TransientAPIError, APIError, CircuitOpenError
+from exceptions import APIError, CircuitOpenError, TransientAPIError
+from resilience import CircuitBreaker, retry
 
 
 def test_retry_succeeds_after_transient_failures():

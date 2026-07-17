@@ -27,6 +27,7 @@ def thinking_mod(monkeypatch):
     monkeypatch.setitem(sys.modules, "anthropic", fake_anthropic)
 
     import importlib
+
     import claude_thinking as mod
     importlib.reload(mod)
     return mod

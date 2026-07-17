@@ -1,11 +1,7 @@
 # gRPC Package for Wire CLI-to-API Communication
 """High-performance gRPC services with Protobuf serialization."""
 
-from .wire_servicer import (
-    WireServiceServicer,
-    create_grpc_server,
-    run_grpc_server
-)
+from .wire_servicer import WireServiceServicer, create_grpc_server, run_grpc_server
 
 __all__ = [
     "WireServiceServicer",

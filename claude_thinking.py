@@ -39,12 +39,10 @@ CLI flags added in main.py:
   --show-thinking             Print thinking content to stderr
 """
 
-import os
 import sys
-import json
-import anthropic
 from typing import Optional
 
+import anthropic
 
 # ── Effort → budget mapping (legacy manual mode only) ──────────────────────
 EFFORT_BUDGETS = {

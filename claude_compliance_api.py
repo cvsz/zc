@@ -97,11 +97,12 @@ CLI flags:
 
 import json
 import time
-import urllib.request
 import urllib.error
 import urllib.parse
+import urllib.request
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Optional, Iterator, Iterable
+from typing import Optional
 
 COMPLIANCE_BASE = "https://api.anthropic.com/v1/compliance"
 
@@ -312,8 +313,7 @@ class ComplianceApiClient:
                 created_at_gte=created_at_gte, created_at_gt=created_at_gt,
                 created_at_lte=created_at_lte, created_at_lt=created_at_lt,
             )
-            for item in page.get("data", []):
-                yield item
+            yield from page.get("data", [])
             if not page.get("has_more"):
                 return
             cursor = page.get("last_id")
@@ -357,8 +357,7 @@ class ComplianceApiClient:
         cursor = filters.pop("after_id", None)
         while True:
             page = self.list_chats(user_ids, limit=page_size, after_id=cursor, **filters)
-            for item in page.get("data", []):
-                yield item
+            yield from page.get("data", [])
             if not page.get("has_more"):
                 return
             cursor = page.get("last_id")
@@ -496,7 +495,7 @@ def cmd_compliance_activities(api_key: str, since: Optional[str] = None,
                               activity_types: Optional[list] = None,
                               limit: int = 100, all_pages: bool = False):
     client = ComplianceApiClient(api_key)
-    print(f"\n\033[94mActivity Feed\033[0m" + (" (all matching pages)" if all_pages else f" (up to {limit})") + "\n")
+    print("\n\033[94mActivity Feed\033[0m" + (" (all matching pages)" if all_pages else f" (up to {limit})") + "\n")
     try:
         count = 0
         if all_pages:

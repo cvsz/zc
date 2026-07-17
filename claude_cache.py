@@ -50,10 +50,9 @@ Mid-conversation system messages vs. the top-level `system` field:
   which models accept role:"system" in `messages` at all.
 """
 
-import os
 import json
-import urllib.request
 import urllib.error
+import urllib.request
 from typing import Optional
 
 from exceptions import AICoderError
@@ -473,7 +472,7 @@ class CachingCoder:
         inp  = s["input_tokens"]
         out  = s["output_tokens"]
         ratio = f"{hit/(hit+miss+inp)*100:.1f}%" if (hit+miss+inp) > 0 else "—"
-        print(f"\n\033[90m── Cache Stats ─────────────────────────")
+        print("\n\033[90m── Cache Stats ─────────────────────────")
         print(f"  input tokens:        {inp}")
         print(f"  cache write tokens:  {miss}  (billed at 1.25x)")
         print(f"  cache read tokens:   {hit}  (billed at 0.1x)")
@@ -481,7 +480,7 @@ class CachingCoder:
         print(f"  cache hit rate:      {ratio}")
         if s["cache_miss_reason"]:
             print(f"  cache miss reason:   {s['cache_miss_reason']}  (diagnostics beta)")
-        print(f"──────────────────────────────────────\033[0m")
+        print("──────────────────────────────────────\033[0m")
 
 
 # ── CLI entry points ───────────────────────────────────────────────────────

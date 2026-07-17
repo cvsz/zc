@@ -1,4 +1,5 @@
 from utils import sampling_kwargs
+
 """
 claude_prompt_optimizer.py — Prompt Optimizer & A/B Tester
 AI Model Coder CLI v1.9.1
@@ -21,6 +22,7 @@ import os
 import time
 from pathlib import Path
 from typing import Optional
+
 import anthropic
 
 PROMPT_LIB_PATH = Path(os.path.expanduser("~/.ai-coder/prompt_library.json"))
@@ -153,7 +155,7 @@ def cmd_score(prompt: str, api_key: str, model: str):
     if "error" in result:
         print(f"\033[91mError: {result['error']}\033[0m")
         return
-    print(f"\n\033[94mPrompt Score\033[0m")
+    print("\n\033[94mPrompt Score\033[0m")
     print(f"  Clarity:       {result.get('clarity', '?')}/100")
     print(f"  Specificity:   {result.get('specificity', '?')}/100")
     print(f"  Completeness:  {result.get('completeness', '?')}/100")
@@ -165,7 +167,7 @@ def cmd_ab_test(prompt_a: str, prompt_b: str, task: str, api_key: str, model: st
     client = anthropic.Anthropic(api_key=api_key)
     result = ab_test(prompt_a, prompt_b, task, client, model)
     j = result["judgment"]
-    print(f"\n\033[94mA/B Test Results\033[0m")
+    print("\n\033[94mA/B Test Results\033[0m")
     print(f"  Winner:  \033[1m{j.get('winner', '?')}\033[0m  — {j.get('reason', '')}")
     print(f"  Score A: {j.get('score_a', '?')}/100  (response in {result['time_a']}s)")
     print(f"  Score B: {j.get('score_b', '?')}/100  (response in {result['time_b']}s)")

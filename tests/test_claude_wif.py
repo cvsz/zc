@@ -9,7 +9,6 @@ import pytest
 
 import claude_wif as wif
 
-
 # ── resolve_wif_env() ─────────────────────────────────────────────────
 
 FULL_ENV = {

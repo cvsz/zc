@@ -1,5 +1,6 @@
 """config.py — Configuration management"""
-import os, json
+import json
+import os
 
 CONFIG_PATH = os.path.expanduser("~/.ai-coder-config.json")
 

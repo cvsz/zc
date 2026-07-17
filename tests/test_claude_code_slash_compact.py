@@ -6,7 +6,6 @@ CHANGELOG for this fix, and tests/test_claude_code_context_editing.py
 for the sibling --agent-context-editing feature this reuses
 (claude_tools.build_context_management / COMPACTION_BETA).
 """
-import json
 
 import pytest
 

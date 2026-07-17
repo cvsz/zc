@@ -31,13 +31,13 @@ as long as the process does.
 """
 
 import json
-import urllib.request
 import urllib.error
+import urllib.request
 from typing import Optional
-from utils import sampling_kwargs
 
 from exceptions import AICoderError
 from resilience import CircuitBreaker, retry, urlopen_json
+from utils import sampling_kwargs
 
 ENDPOINT = "https://api.anthropic.com/v1/messages"
 _breaker = CircuitBreaker(failure_threshold=5, reset_timeout=30)

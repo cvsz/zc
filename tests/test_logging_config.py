@@ -1,6 +1,7 @@
 """tests/test_logging_config.py"""
-from logging_config import redact, JsonFormatter, new_correlation_id, correlation_id
 import logging
+
+from logging_config import JsonFormatter, correlation_id, new_correlation_id, redact
 
 
 def test_redact_scrubs_api_key():

@@ -27,9 +27,8 @@ CLI flags:
 """
 
 import json
-import sys
-import urllib.request
 import urllib.error
+import urllib.request
 from typing import Optional
 
 from exceptions import AICoderError
@@ -318,9 +317,9 @@ def cmd_model_info(model_id: str, api_key: str):
         print(f"    Was:         {retired['display_name']}")
         print(f"    Migrate to:  {retired['replacement']}")
         print(f"    Notes:       {retired['notes']}")
-        print(f"\n  API calls to this ID will fail — this isn't a live lookup, "
-              f"just the local retirement record. Continuing to check the live "
-              f"API and local catalog below in case the record above is stale:\n")
+        print("\n  API calls to this ID will fail — this isn't a live lookup, "
+              "just the local retirement record. Continuing to check the live "
+              "API and local catalog below in case the record above is stale:\n")
 
     upcoming = check_upcoming_retirement(model_id)
     if upcoming:
@@ -338,7 +337,7 @@ def cmd_model_info(model_id: str, api_key: str):
         print(f"  Created:        {m.get('created_at','')[:10]}")
         caps = m.get("capabilities")
         if caps:
-            print(f"  Capabilities:")
+            print("  Capabilities:")
             print(f"    Vision:              {caps.get('image_input', {}).get('supported')}")
             think = caps.get("thinking", {})
             types = think.get("types", {})
@@ -364,7 +363,7 @@ def cmd_model_info(model_id: str, api_key: str):
                 return
             print(f"[ERROR] {e}")
             return
-        print(f"\n  \033[93m⚠ Live API unreachable — showing local catalog entry\033[0m")
+        print("\n  \033[93m⚠ Live API unreachable — showing local catalog entry\033[0m")
         print(f"  ID:              {model_id}")
         print(f"  Display name:    {info['display_name']}")
         print(f"  Tier:            {info['tier']}")
@@ -401,7 +400,7 @@ def cmd_check_deprecated(path: str):
     hits: dict = {}
     for fp in files:
         try:
-            with open(fp, "r", encoding="utf-8", errors="ignore") as fh:
+            with open(fp, encoding="utf-8", errors="ignore") as fh:
                 for lineno, line in enumerate(fh, 1):
                     for m in pattern.finditer(line):
                         hits.setdefault(m.group(0), []).append((fp, lineno))
@@ -500,7 +499,7 @@ def cmd_upgrade_all(path: str, target: str = "fable5", apply: bool = False,
 
     for fp in _walk_upgrade_candidates(path):
         try:
-            with open(fp, "r", encoding="utf-8", errors="strict") as fh:
+            with open(fp, encoding="utf-8", errors="strict") as fh:
                 text = fh.read()
         except (UnicodeDecodeError, PermissionError, IsADirectoryError):
             continue  # binary / unreadable — skip rather than risk corrupting it
@@ -539,8 +538,8 @@ def cmd_upgrade_all(path: str, target: str = "fable5", apply: bool = False,
         backup_note = "" if no_backup else " (.bak backup written alongside each changed file)"
         print(f"\n\033[92m✓ {files_changed} file(s) updated{backup_note}\033[0m")
     else:
-        print(f"\n\033[93m⚠ Dry run — no files were changed. Re-run with --upgrade-yes to "
-              f"apply (add --upgrade-no-backup to skip .bak files).\033[0m")
+        print("\n\033[93m⚠ Dry run — no files were changed. Re-run with --upgrade-yes to "
+              "apply (add --upgrade-no-backup to skip .bak files).\033[0m")
 
 
 # ── Computer Use ───────────────────────────────────────────────────────────
@@ -642,13 +641,13 @@ class ComputerUseCoder:
 
 
 def cmd_computer_use(task: str, api_key: str, model: str):
-    print(f"\033[94mℹ Computer Use mode\033[0m")
-    print(f"\033[93m⚠ Note: Actual execution requires a virtual display environment.\033[0m\n")
+    print("\033[94mℹ Computer Use mode\033[0m")
+    print("\033[93m⚠ Note: Actual execution requires a virtual display environment.\033[0m\n")
     cu     = ComputerUseCoder(api_key=api_key, model=model)
     result = cu.run_task(task)
     print(result["text"])
     if result["tool_calls"]:
-        print(f"\n\033[90m── Tool calls planned ─────────────────\033[0m")
+        print("\n\033[90m── Tool calls planned ─────────────────\033[0m")
         for tc in result["tool_calls"]:
             print(f"  {tc['name']}: {json.dumps(tc['input'])[:120]}")
     return result

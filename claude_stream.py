@@ -34,8 +34,9 @@ CLI flags:
 
 import json
 import sys
-import anthropic
 from typing import Optional
+
+import anthropic
 
 # Legacy header — GA now, per-tool eager_input_streaming is the current way
 # to opt in, but this still works for requests that send it and leave the
@@ -267,7 +268,7 @@ class StreamCoder:
 
 def cmd_stream(prompt: str, api_key: str, model: str, system: str = None,
                file_content: str = None, show_thinking: bool = False):
-    print(f"\033[94mℹ Streaming response…\033[0m\n")
+    print("\033[94mℹ Streaming response…\033[0m\n")
     sc = StreamCoder(api_key=api_key, model=model)
     if file_content:
         return sc.stream_file_analysis(file_content, prompt, system=system)
@@ -277,7 +278,7 @@ def cmd_stream(prompt: str, api_key: str, model: str, system: str = None,
 def cmd_stream_tools(prompt: str, tools: list[dict], api_key: str, model: str,
                      system: str = None):
     """Stream a turn with fine-grained tool input streaming on."""
-    print(f"\033[94mℹ Streaming with fine-grained tool input…\033[0m\n")
+    print("\033[94mℹ Streaming with fine-grained tool input…\033[0m\n")
     sc = StreamCoder(api_key=api_key, model=model)
     result = sc.stream_with_tools(prompt, tools, system=system)
     if result["tool_calls"]:

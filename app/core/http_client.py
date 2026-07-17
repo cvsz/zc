@@ -11,20 +11,20 @@ Features:
 """
 import asyncio
 import time
-from typing import Any, Dict, Optional, Union
 from dataclasses import dataclass
-import aiohttp
-from aiohttp import ClientSession, TCPConnector, ClientTimeout, ClientError
+from typing import Any, Optional, Union
+
+from aiohttp import ClientSession, ClientTimeout, TCPConnector
 from aiohttp.client_exceptions import ClientConnectionError, ServerTimeoutError
 
-from .config import get_config, Config
+from .config import Config, get_config
 
 
 @dataclass
 class HttpResponse:
     """Unified HTTP response wrapper."""
     status: int
-    headers: Dict[str, str]
+    headers: dict[str, str]
     body: bytes
     elapsed_ms: float
     url: str
@@ -71,7 +71,7 @@ class PerformanceMetrics:
             self.bytes_sent += bytes_sent
             self.bytes_received += bytes_received
     
-    async def get_stats(self) -> Dict[str, Any]:
+    async def get_stats(self) -> dict[str, Any]:
         async with self._lock:
             avg_latency = (
                 self.latency_sum / self.requests_total
@@ -178,10 +178,10 @@ class EnterpriseHTTPClient:
         method: str,
         url: str,
         *,
-        headers: Optional[Dict[str, str]] = None,
-        json: Optional[Dict[str, Any]] = None,
-        data: Optional[Union[bytes, Dict[str, Any]]] = None,
-        params: Optional[Dict[str, str]] = None,
+        headers: Optional[dict[str, str]] = None,
+        json: Optional[dict[str, Any]] = None,
+        data: Optional[Union[bytes, dict[str, Any]]] = None,
+        params: Optional[dict[str, str]] = None,
         timeout: Optional[int] = None,
         max_retries: int = 3,
         retry_on: tuple = (ClientConnectionError, ServerTimeoutError),
@@ -286,8 +286,8 @@ class EnterpriseHTTPClient:
         self,
         url: str,
         *,
-        headers: Optional[Dict[str, str]] = None,
-        params: Optional[Dict[str, str]] = None,
+        headers: Optional[dict[str, str]] = None,
+        params: Optional[dict[str, str]] = None,
         **kwargs,
     ) -> HttpResponse:
         """Make a GET request."""
@@ -297,9 +297,9 @@ class EnterpriseHTTPClient:
         self,
         url: str,
         *,
-        headers: Optional[Dict[str, str]] = None,
-        json: Optional[Dict[str, Any]] = None,
-        data: Optional[Union[bytes, Dict[str, Any]]] = None,
+        headers: Optional[dict[str, str]] = None,
+        json: Optional[dict[str, Any]] = None,
+        data: Optional[Union[bytes, dict[str, Any]]] = None,
         **kwargs,
     ) -> HttpResponse:
         """Make a POST request."""
@@ -309,9 +309,9 @@ class EnterpriseHTTPClient:
         self,
         url: str,
         *,
-        headers: Optional[Dict[str, str]] = None,
-        json: Optional[Dict[str, Any]] = None,
-        data: Optional[Union[bytes, Dict[str, Any]]] = None,
+        headers: Optional[dict[str, str]] = None,
+        json: Optional[dict[str, Any]] = None,
+        data: Optional[Union[bytes, dict[str, Any]]] = None,
         **kwargs,
     ) -> HttpResponse:
         """Make a PUT request."""
@@ -321,9 +321,9 @@ class EnterpriseHTTPClient:
         self,
         url: str,
         *,
-        headers: Optional[Dict[str, str]] = None,
-        json: Optional[Dict[str, Any]] = None,
-        data: Optional[Union[bytes, Dict[str, Any]]] = None,
+        headers: Optional[dict[str, str]] = None,
+        json: Optional[dict[str, Any]] = None,
+        data: Optional[Union[bytes, dict[str, Any]]] = None,
         **kwargs,
     ) -> HttpResponse:
         """Make a PATCH request."""
@@ -333,13 +333,13 @@ class EnterpriseHTTPClient:
         self,
         url: str,
         *,
-        headers: Optional[Dict[str, str]] = None,
+        headers: Optional[dict[str, str]] = None,
         **kwargs,
     ) -> HttpResponse:
         """Make a DELETE request."""
         return await self.request('DELETE', url, headers=headers, **kwargs)
     
-    async def health_check(self) -> Dict[str, Any]:
+    async def health_check(self) -> dict[str, Any]:
         """Check HTTP client health."""
         stats = await self.metrics.get_stats()
         return {

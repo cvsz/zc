@@ -65,14 +65,13 @@ PLUGINS
 CLI flags: see main.py --code-agent-*
 """
 
-import os
-import sys
 import json
+import os
+import subprocess
 import time
 import uuid
-import subprocess
 from pathlib import Path
-from typing import Optional, Callable
+from typing import Callable, Optional
 
 # ── Storage paths ──────────────────────────────────────────────────────────
 SESSIONS_DIR  = Path(os.path.expanduser("~/.ai-coder/code_sessions"))
@@ -665,8 +664,8 @@ class MemoryManager:
 # CORE AGENT (Messages API agentic loop)
 # ══════════════════════════════════════════════════════════════════════════
 
-import urllib.request
 import urllib.error
+import urllib.request
 
 from exceptions import AICoderError
 from resilience import CircuitBreaker, raise_for_http_error, retry, urlopen_json
@@ -827,7 +826,7 @@ class CodeAgent:
                 timeout = inputs.get("timeout", 30)
                 if os.environ.get("AI_CODER_SANDBOX") == "1":
                     try:
-                        from claude_sandbox import enforce, SandboxViolation
+                        from claude_sandbox import SandboxViolation, enforce
                         roots = json.loads(os.environ.get("AI_CODER_SANDBOX_ROOTS", "[]"))
                         allow_net = os.environ.get("AI_CODER_SANDBOX_NET") == "1"
                         enforce(cmd, cwd, allow_net=allow_net, extra_roots=roots)
@@ -1180,7 +1179,7 @@ def cmd_code_agent(
         from claude_tools import build_context_management
         cm = build_context_management(clear_tool_uses=True)
         if not headless:
-            print(f"\033[90m  ⚙ Context editing enabled (clear_tool_uses)\033[0m")
+            print("\033[90m  ⚙ Context editing enabled (clear_tool_uses)\033[0m")
 
     # Run
     agent  = CodeAgent(api_key=api_key, model=model)
@@ -1208,7 +1207,7 @@ def cmd_code_agent(
 
 def cmd_code_subagent(task: str, api_key: str, model: str, cwd: str = "."):
     """Spawn a focused subagent for a sub-task."""
-    print(f"\033[94mℹ Spawning subagent…\033[0m\n")
+    print("\033[94mℹ Spawning subagent…\033[0m\n")
     session = CodeSession(cwd=cwd, model=model, permission_mode="acceptEdits",
                           system_prompt=(
                               "You are a focused subagent. Complete ONLY the specific task. "
@@ -1274,7 +1273,7 @@ def cmd_code_slash(command: str, api_key: str, model: str,
             print(f"\033[91m✗ {e}\033[0m")
             return
 
-        from claude_tools import build_context_management, COMPACTION_BETA
+        from claude_tools import COMPACTION_BETA, build_context_management
         messages = session.messages()
         if not messages:
             print("\033[93m⚠ Session has no turns yet — nothing to compact.\033[0m")
@@ -1481,7 +1480,7 @@ def _run_doctor():
         ("Sessions dir",           SESSIONS_DIR.exists()),
     ]
     try:
-        from claude_plugins import plugin_list, marketplace_list
+        from claude_plugins import marketplace_list, plugin_list
         checks.append(("Plugins installed", len(plugin_list()) > 0))
         checks.append(("Marketplaces registered", len(marketplace_list()) > 0))
     except ImportError:

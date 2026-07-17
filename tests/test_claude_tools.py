@@ -7,10 +7,8 @@ docs/36_upgrade_v1.24.0_audit_and_impl.md Finding 1.
 """
 import json
 
-import pytest
-
 import claude_tools as mod
-from claude_tools import ToolCoder, SERVER_TOOLS, RETIRED_TOOL_VERSIONS
+from claude_tools import RETIRED_TOOL_VERSIONS, SERVER_TOOLS, ToolCoder
 
 
 class _FakeResp:

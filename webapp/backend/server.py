@@ -24,7 +24,6 @@ import sys
 import time
 import uuid
 from pathlib import Path
-from typing import Dict, List, Optional
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -37,14 +36,14 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from coder import Coder                                  # noqa: E402
-from config import Config                                # noqa: E402
-from health import run_health_check                      # noqa: E402
-from personalities import PersonalityManager              # noqa: E402
-from skills import SkillManager                           # noqa: E402
-from main import VERSION, AGENT_SYSTEM_PROMPTS            # noqa: E402
-from claude_models import MODEL_CATALOG                   # noqa: E402
-from logging_config import get_logger                     # noqa: E402
+from claude_models import MODEL_CATALOG  # noqa: E402
+from coder import Coder  # noqa: E402
+from config import Config  # noqa: E402
+from health import run_health_check  # noqa: E402
+from logging_config import get_logger  # noqa: E402
+from main import AGENT_SYSTEM_PROMPTS, VERSION  # noqa: E402
+from personalities import PersonalityManager  # noqa: E402
+from skills import SkillManager  # noqa: E402
 
 logger = get_logger("webapp.server")
 
@@ -69,21 +68,21 @@ _skill_mgr = SkillManager()
 # Process-local and non-persistent by design, same lifetime as the CLI's
 # `--interactive` REPL history -- just reachable over HTTP instead of a
 # terminal. Restarting the server clears all sessions.
-_sessions: Dict[str, List[dict]] = {}
+_sessions: dict[str, list[dict]] = {}
 _SESSION_LIMIT = 200  # oldest session dropped past this to bound memory
 
 
 class ChatRequest(BaseModel):
     prompt: str
-    session_id: Optional[str] = None
+    session_id: str | None = None
     model: str = "claude-sonnet-5"
     temperature: float = 0.3
     max_tokens: int = 4096
-    system: Optional[str] = None
-    personality: Optional[str] = None
-    agent: Optional[str] = None
-    skill: Optional[str] = None
-    api_key: Optional[str] = None
+    system: str | None = None
+    personality: str | None = None
+    agent: str | None = None
+    skill: str | None = None
+    api_key: str | None = None
 
     @field_validator("prompt")
     @classmethod
@@ -123,7 +122,7 @@ class ChatResponse(BaseModel):
 # console from a runaway client loop, not from a determined attacker.
 _RATE_LIMIT = 30          # requests
 _RATE_WINDOW = 60.0       # seconds
-_rate_buckets: Dict[str, List[float]] = {}
+_rate_buckets: dict[str, list[float]] = {}
 
 
 def _check_rate_limit(ip: str) -> None:
@@ -136,12 +135,12 @@ def _check_rate_limit(ip: str) -> None:
 
 
 class ConfigUpdate(BaseModel):
-    api_key: Optional[str] = None
-    model: Optional[str] = None
-    temperature: Optional[float] = None
+    api_key: str | None = None
+    model: str | None = None
+    temperature: float | None = None
 
 
-def _build_system_prompt(req: ChatRequest) -> Optional[str]:
+def _build_system_prompt(req: ChatRequest) -> str | None:
     parts = []
     if req.agent:
         role_prompt = AGENT_SYSTEM_PROMPTS.get(req.agent)
@@ -320,7 +319,7 @@ def chat_stream(req: ChatRequest, request: Request):
                             text = getattr(delta, "text", "")
                             full_text += text
                             yield f"data: {json.dumps({'type': 'token', 'text': text})}\n\n"
-        except Exception as e:
+        except Exception:
             logger.exception("stream_chat_failed", extra={"model": req.model})
             yield f"data: {json.dumps({'type': 'error', 'message': 'An internal error occurred.'})}\n\n"
             return

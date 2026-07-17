@@ -67,9 +67,9 @@ CLI flags:
 """
 
 import json
-import urllib.request
 import urllib.error
 import urllib.parse
+import urllib.request
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -429,7 +429,7 @@ def cmd_claude_code_usage_report(admin_api_key: str, starting_at: str, limit: in
         print("  (no Claude Code activity for this date)")
     for row in rows:
         actor = row.get("user_actor") or row.get("api_actor") or {}
-        actor_label = actor.get("email_address") or actor.get("api_key_id") or actor.get("admin_api_key_id") or "?"
+        actor_label = actor.get("email_address") or actor.get("api_key_name") or actor.get("api_key_id") or actor.get("admin_api_key_id") or "?"
         actor_label_str = str(actor_label)
         if "@" in actor_label_str:
             u, d = actor_label_str.split("@", 1)

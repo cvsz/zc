@@ -35,11 +35,11 @@ CLI flags:
 """
 
 import json
-import urllib.request
 import urllib.error
+import urllib.request
 from typing import Optional
 
-from claude_fable5 import MESSAGES_ENDPOINT, FABLE_MYTHOS_INFO, MYTHOS5_MODEL_ID
+from claude_fable5 import FABLE_MYTHOS_INFO, MESSAGES_ENDPOINT, MYTHOS5_MODEL_ID
 from exceptions import AICoderError, APIError
 from resilience import CircuitBreaker, retry, urlopen_json
 
@@ -130,7 +130,7 @@ def cmd_mythos5_info():
     print(f"    Pricing:          ${info['price_input_per_mtok_usd']}/MTok in, "
          f"${info['price_output_per_mtok_usd']}/MTok out")
     print(f"    Data retention:   {info['data_retention']}")
-    print(f"    Safety classifiers: no (unlike Fable 5 — see claude_fable5.py)")
+    print("    Safety classifiers: no (unlike Fable 5 — see claude_fable5.py)")
     print(f"    Notes:            {info['notes']}")
     print("\n  To request access: contact your Anthropic, AWS, or Google Cloud account team")
     print("  about Project Glasswing. See also: --fable5-info for the publicly available sibling model.\n")

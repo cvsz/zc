@@ -1041,7 +1041,7 @@ def build_parser():
 
 
 def main():
-    from logging_config import setup_logging, new_correlation_id
+    from logging_config import new_correlation_id, setup_logging
     setup_logging()
     new_correlation_id()
 
@@ -1053,6 +1053,7 @@ def main():
 
     if getattr(args, "health_check", False):
         import json as _json
+
         from health import run_health_check
         report = run_health_check(deep=getattr(args, "health_check_deep", False))
         print(_json.dumps(report.to_dict(), indent=2))
@@ -1347,8 +1348,8 @@ def main():
     if args.project_show:
         from projects import cmd_project_show; cmd_project_show(args.project_show); return
     if args.project_delete:
-        from projects import ProjectManager
         from exceptions import SecurityError, ValidationError
+        from projects import ProjectManager
         try:
             ProjectManager().delete_project(args.project_delete)
             print("✓ Deleted.")
@@ -1660,7 +1661,7 @@ def main():
                 execute=args.plan_execute, output=args.output); return
 
     if args.thinking or args.adaptive or args.effort_legacy_budget:
-        from claude_thinking import cmd_thinking, ThinkingModeError
+        from claude_thinking import ThinkingModeError, cmd_thinking
         prompt = args.prompt or (args.file and _read_file(args.file)) or ""
         try:
             cmd_thinking(prompt=prompt, api_key=key, model=model,
@@ -1782,8 +1783,9 @@ def main():
         cmd_embed_similarity(args.embed_similarity[0], args.embed_similarity[1],
                              model=args.embed_model); return
     if args.stream_tools:
-        from claude_stream import cmd_stream_tools
         import json as _json
+
+        from claude_stream import cmd_stream_tools
         tool_defs = _json.loads(_read_file(args.file)) if args.file else []
         if isinstance(tool_defs, dict):
             tool_defs = [tool_defs]
@@ -2042,12 +2044,12 @@ def main():
         cmd_code_cost(key); return
 
     if args.project_plan:
-        from projects import cmd_project_plan
         from coder import Coder
+        from projects import cmd_project_plan
         cmd_project_plan(args.project_plan, Coder(api_key=key, model=model)); return
     if args.project_run:
-        from projects import cmd_project_run
         from coder import Coder
+        from projects import cmd_project_run
         cmd_project_run(args.project_run, args.task or "all",
                         Coder(api_key=key, model=model)); return
     if args.artifact_create:

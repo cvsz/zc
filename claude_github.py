@@ -15,17 +15,16 @@ CLI flags:
   --gh-max-items N              Max issues/commits to process (default: 20)
 """
 
-from utils import sampling_kwargs
-
-import json
 import os
-import urllib.request
 import urllib.error
+import urllib.request
 from typing import Optional
+
 import anthropic
 
 from exceptions import AICoderError
 from resilience import CircuitBreaker, retry, urlopen_json, urlopen_text
+from utils import sampling_kwargs
 
 GITHUB_API = "https://api.github.com"
 # Shared across all GitHub call sites in this module (issues, PRs, commits,

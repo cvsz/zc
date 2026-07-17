@@ -12,11 +12,9 @@ CLI flags:
   --rag QUERY              RAG mode: answer from your local docs
 """
 
-import os
 import json
-import glob
-import urllib.request
 import urllib.error
+import urllib.request
 from pathlib import Path
 from typing import Optional
 
@@ -195,7 +193,7 @@ def cmd_cite(question: str, doc_files: list[str], api_key: str, model: str):
 
     print(result["answer"])
     if result["citations"]:
-        print(f"\n\033[90m── Citations ────────────────────────────\033[0m")
+        print("\n\033[90m── Citations ────────────────────────────\033[0m")
         for i, c in enumerate(result["citations"], 1):
             print(f"\033[90m[{i}] {c['document']}: \"{c['text'][:80]}…\"\033[0m")
     return result
@@ -208,7 +206,7 @@ def cmd_rag(question: str, directory: str, api_key: str, model: str,
     result = cc.rag_from_directory(question, directory, pattern)
     print(result["answer"])
     if result["citations"]:
-        print(f"\n\033[90m── Citations ────────────────────────────\033[0m")
+        print("\n\033[90m── Citations ────────────────────────────\033[0m")
         for i, c in enumerate(result["citations"], 1):
             print(f"\033[90m[{i}] {c['document']}\033[0m")
     return result

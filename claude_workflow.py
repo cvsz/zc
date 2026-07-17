@@ -24,10 +24,11 @@ Example YAML:
 import json
 import re
 import time
-from pathlib import Path
-from typing import Any, Dict, List, Optional
 from dataclasses import dataclass, field
 from datetime import datetime
+from pathlib import Path
+from typing import Optional
+
 import anthropic
 
 try:
@@ -41,7 +42,7 @@ except ImportError:
 class WorkflowStep:
     step_id:    str
     instruction: str
-    depends_on: List[str] = field(default_factory=list)
+    depends_on: list[str] = field(default_factory=list)
     model:      Optional[str] = None
     max_tokens: int = 2048
 
@@ -49,7 +50,7 @@ class WorkflowStep:
 @dataclass
 class Workflow:
     name:  str
-    steps: List[WorkflowStep]
+    steps: list[WorkflowStep]
     model: str = "claude-sonnet-5"
 
 
@@ -65,8 +66,8 @@ class StepResult:
 @dataclass
 class WorkflowRun:
     workflow:  str
-    results:   List[StepResult]
-    variables: Dict[str, str]
+    results:   list[StepResult]
+    variables: dict[str, str]
     elapsed_s: float
     ts:        str = field(default_factory=lambda: datetime.now().isoformat())
 
@@ -99,18 +100,18 @@ def _parse(d: dict) -> Workflow:
                    model=d.get("model","claude-sonnet-5"))
 
 
-def _fill(template: str, variables: Dict[str, str]) -> str:
+def _fill(template: str, variables: dict[str, str]) -> str:
     def replace(m):
         key = m.group(1).strip()
         return variables.get(key, f"{{{{ {key} }}}}")
     return re.sub(r"\{\{\s*(\w+)\s*\}\}", replace, template)
 
 
-def run_workflow(wf: Workflow, api_key: str, initial_vars: Optional[Dict[str, str]] = None,
+def run_workflow(wf: Workflow, api_key: str, initial_vars: Optional[dict[str, str]] = None,
                  verbose: bool = False) -> WorkflowRun:
     client    = anthropic.Anthropic(api_key=api_key)
     variables = dict(initial_vars or {})
-    results: List[StepResult] = []
+    results: list[StepResult] = []
     completed: set = set()
     t_start = time.time()
 

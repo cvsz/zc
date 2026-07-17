@@ -5,12 +5,12 @@ No real network calls are made anywhere in this file.
 import io
 import json
 import urllib.error
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
-from coder import Coder
 import resilience
+from coder import Coder
 
 
 @pytest.fixture(autouse=True)

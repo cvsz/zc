@@ -4,13 +4,14 @@ Enterprise-grade traffic control with token bucket and circuit breaker patterns.
 """
 
 import time
-from typing import Dict, Optional, Callable, Any
 from collections import defaultdict
-from datetime import datetime, timedelta
-from fastapi import Request, Response, HTTPException
+from typing import Any, Callable, Optional
+
+from fastapi import HTTPException, Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
-from redis.asyncio import Redis
+
 from app.core.cache import get_redis_client
+
 
 class TokenBucket:
     """Token bucket rate limiter implementation."""
@@ -123,7 +124,7 @@ class CircuitBreaker:
             result = await func(*args, **kwargs)
             self.record_success()
             return result
-        except Exception as e:
+        except Exception:
             self.record_failure()
             raise
 
@@ -134,7 +135,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
     def __init__(self, app, requests_per_minute: int = 100, burst: int = 20):
         super().__init__(app)
         self.bucket = TokenBucket(capacity=burst, refill_rate=requests_per_minute / 60.0)
-        self.client_buckets: Dict[str, TokenBucket] = defaultdict(
+        self.client_buckets: dict[str, TokenBucket] = defaultdict(
             lambda: TokenBucket(capacity=burst, refill_rate=requests_per_minute / 60.0)
         )
     
@@ -166,7 +167,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
 
 # Global circuit breakers for different services
-circuit_breakers: Dict[str, CircuitBreaker] = {
+circuit_breakers: dict[str, CircuitBreaker] = {
     "database": CircuitBreaker(failure_threshold=5, recovery_timeout=30.0),
     "redis": CircuitBreaker(failure_threshold=3, recovery_timeout=10.0),
     "external_api": CircuitBreaker(failure_threshold=5, recovery_timeout=60.0),

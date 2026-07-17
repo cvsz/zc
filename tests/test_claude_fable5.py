@@ -9,11 +9,11 @@ Covers both fallback patterns documented in claude_fable5.py:
 import pytest
 
 from claude_fable5 import (
+    FABLE5_MODEL_ID,
     Fable5Client,
     RefusalError,
     estimate_cost_usd,
     parse_fallback_chain,
-    FABLE5_MODEL_ID,
 )
 
 

@@ -10,22 +10,21 @@ Implements distributed tracing, metrics, and logging correlation.
 """
 
 import os
-import asyncio
-from typing import Optional, Dict, Any
-from contextlib import asynccontextmanager
 import time
+from contextlib import asynccontextmanager
+from typing import Optional
 
 try:
-    from opentelemetry import trace, metrics, context
-    from opentelemetry.sdk.trace import TracerProvider
-    from opentelemetry.sdk.trace.export import BatchSpanProcessor
+    from opentelemetry import context, metrics, trace
+    from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
+    from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+    from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
     from opentelemetry.sdk.metrics import MeterProvider
     from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
-    from opentelemetry.sdk.resources import Resource, SERVICE_NAME, SERVICE_VERSION
-    from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
-    from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
+    from opentelemetry.sdk.resources import SERVICE_NAME, SERVICE_VERSION, Resource
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.trace.export import BatchSpanProcessor
     from opentelemetry.semconv.trace import SpanAttributes
-    from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
     HAS_OTEL = True
 except ImportError:
     HAS_OTEL = False

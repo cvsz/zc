@@ -12,9 +12,8 @@ CLI flags:
 """
 
 import json
-import sys
-import urllib.request
 import urllib.error
+import urllib.request
 from pathlib import Path
 from typing import Optional
 

@@ -38,19 +38,19 @@ CLI flags:
   --plugin-validate PATH    (lint a plugin directory/manifest before installing)
 """
 
-import os
-import sys
 import json
+import os
 import shutil
-import zipfile
+import sys
 import tempfile
-import urllib.request
 import urllib.error
+import urllib.request
+import zipfile
 from pathlib import Path
 from typing import Optional
 
-from resilience import retry
 from exceptions import AICoderError, TransientAPIError
+from resilience import retry
 
 PLUGINS_ROOT     = Path(os.path.expanduser("~/.claude/plugins"))
 MARKETPLACES_DIR = PLUGINS_ROOT / "marketplaces"

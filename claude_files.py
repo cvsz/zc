@@ -14,12 +14,11 @@ CLI flags:
   --file-download ID OUT    Download file content
 """
 
-import os
-import sys
 import json
 import mimetypes
-import urllib.request
+import os
 import urllib.error
+import urllib.request
 from pathlib import Path
 from typing import Optional
 
@@ -108,7 +107,6 @@ class FilesAPI:
 
         # Multipart/form-data encoding
         boundary = "---AICLIBoundary"
-        crlf     = b"\r\n"
 
         body = (
             f"--{boundary}\r\n"

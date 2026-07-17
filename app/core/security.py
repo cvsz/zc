@@ -4,19 +4,18 @@ JWT Authentication, mTLS, OAuth2, and Advanced Security Controls
 2026 Enterprise Standards for Wire CLI-to-API System
 """
 
-import os
-import jwt
 import hashlib
+import os
 import secrets
 from datetime import datetime, timedelta, timezone
-from typing import Optional, Dict, List, Set, Any
 from pathlib import Path
-from cryptography import x509
-from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import rsa, padding
-from cryptography.x509.oid import NameOID
-from pydantic import BaseModel, Field, validator
+from typing import Any, Optional
+
+import jwt
 import redis.asyncio as redis
+from cryptography import x509
+from cryptography.hazmat.primitives.asymmetric import padding
+from pydantic import BaseModel, Field
 
 
 class TokenClaims(BaseModel):
@@ -27,10 +26,10 @@ class TokenClaims(BaseModel):
     iat: int  # Issued at
     exp: int  # Expiration
     jti: str  # JWT ID (unique identifier)
-    roles: List[str] = []  # RBAC roles
-    permissions: List[str] = []  # Fine-grained permissions
+    roles: list[str] = []  # RBAC roles
+    permissions: list[str] = []  # Fine-grained permissions
     client_id: Optional[str] = None  # CLI client identifier
-    scope: List[str] = []  # OAuth2 scopes
+    scope: list[str] = []  # OAuth2 scopes
     mtls_verified: bool = False  # mTLS verification status
     cert_fingerprint: Optional[str] = None  # Client cert fingerprint
 
@@ -48,7 +47,7 @@ class SecurityConfig(BaseModel):
     client_cert_required: bool = os.getenv("CLIENT_CERT_REQUIRED", "true").lower() == "true"
     
     # OAuth2 Configuration
-    oauth2_providers: Dict[str, Dict] = {
+    oauth2_providers: dict[str, dict] = {
         "github": {
             "client_id": os.getenv("GITHUB_CLIENT_ID", ""),
             "client_secret": os.getenv("GITHUB_CLIENT_SECRET", ""),
@@ -68,7 +67,7 @@ class SecurityConfig(BaseModel):
     }
     
     # Rate Limiting per Role
-    rate_limits: Dict[str, Dict] = {
+    rate_limits: dict[str, dict] = {
         "admin": {"requests_per_minute": 1000, "burst": 100},
         "developer": {"requests_per_minute": 500, "burst": 50},
         "cli_service": {"requests_per_minute": 2000, "burst": 200},
@@ -76,7 +75,7 @@ class SecurityConfig(BaseModel):
     }
     
     # Security Headers
-    security_headers: Dict[str, str] = {
+    security_headers: dict[str, str] = {
         "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
         "X-Content-Type-Options": "nosniff",
         "X-Frame-Options": "DENY",
@@ -92,7 +91,7 @@ class JWTManager:
     
     def __init__(self, config: SecurityConfig):
         self.config = config
-        self._token_blacklist: Set[str] = set()
+        self._token_blacklist: set[str] = set()
         self._redis: Optional[redis.Redis] = None
     
     async def initialize(self, redis_client: redis.Redis):
@@ -189,7 +188,7 @@ class mTLSValidator:
     def __init__(self, config: SecurityConfig):
         self.config = config
         self.ca_cert: Optional[x509.Certificate] = None
-        self.revoked_serials: Set[int] = set()
+        self.revoked_serials: set[int] = set()
         
         if config.mtls_enabled and config.ca_cert_path.exists():
             self._load_ca_cert()
@@ -199,7 +198,7 @@ class mTLSValidator:
         with open(self.config.ca_cert_path, "rb") as f:
             self.ca_cert = x509.load_pem_x509_certificate(f.read())
     
-    def validate_client_cert(self, cert_der: bytes) -> Dict[str, Any]:
+    def validate_client_cert(self, cert_der: bytes) -> dict[str, Any]:
         """Validate client certificate against CA"""
         if not self.config.mtls_enabled:
             return {"valid": True, "mtls_verified": False}
@@ -258,7 +257,7 @@ class OAuth2Handler:
     
     def __init__(self, config: SecurityConfig):
         self.config = config
-        self._state_cache: Dict[str, str] = {}  # state -> user_id mapping
+        self._state_cache: dict[str, str] = {}  # state -> user_id mapping
     
     def generate_authorization_url(self, provider: str, redirect_uri: str, user_id: str) -> str:
         """Generate OAuth2 authorization URL"""
@@ -282,7 +281,7 @@ class OAuth2Handler:
         query = "&".join(f"{k}={v}" for k, v in params.items())
         return f"{prov_config['authorize_url']}?{query}"
     
-    async def exchange_code_for_token(self, provider: str, code: str, redirect_uri: str) -> Dict[str, Any]:
+    async def exchange_code_for_token(self, provider: str, code: str, redirect_uri: str) -> dict[str, Any]:
         """Exchange authorization code for access token"""
         import aiohttp
         
@@ -308,7 +307,7 @@ class OAuth2Handler:
                 
                 return await response.json()
     
-    async def get_user_info(self, provider: str, access_token: str) -> Dict[str, Any]:
+    async def get_user_info(self, provider: str, access_token: str) -> dict[str, Any]:
         """Fetch user information from OAuth2 provider"""
         import aiohttp
         
@@ -377,7 +376,7 @@ class RBACManager:
     }
     
     @classmethod
-    def get_effective_permissions(cls, roles: List[str]) -> Set[str]:
+    def get_effective_permissions(cls, roles: list[str]) -> set[str]:
         """Calculate effective permissions from role hierarchy"""
         permissions = set()
         visited = set()
@@ -406,7 +405,7 @@ class RBACManager:
         return permissions
     
     @classmethod
-    def check_permission(cls, user_roles: List[str], required_permission: str) -> bool:
+    def check_permission(cls, user_roles: list[str], required_permission: str) -> bool:
         """Check if user has required permission"""
         effective_perms = cls.get_effective_permissions(user_roles)
         
@@ -429,7 +428,7 @@ class SecurityMiddleware:
         self.mtls_validator = mtls_validator
         self.rbac_manager = rbac_manager
     
-    async def authenticate_request(self, headers: Dict[str, str], client_cert: Optional[bytes] = None) -> TokenClaims:
+    async def authenticate_request(self, headers: dict[str, str], client_cert: Optional[bytes] = None) -> TokenClaims:
         """Authenticate incoming request"""
         # Extract Authorization header
         auth_header = headers.get("authorization", "")
@@ -457,7 +456,7 @@ class SecurityMiddleware:
 
 
 # Factory function to create configured security components
-def create_security_components(config: Optional[SecurityConfig] = None) -> Dict[str, Any]:
+def create_security_components(config: Optional[SecurityConfig] = None) -> dict[str, Any]:
     """Create and configure all security components"""
     cfg = config or SecurityConfig()
     

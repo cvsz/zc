@@ -11,16 +11,18 @@ Provides high-performance bidirectional streaming with Protobuf serialization.
 
 import asyncio
 import time
-from typing import AsyncIterator, Optional, Dict, Any
+from collections.abc import AsyncIterator
+from concurrent import futures
 from pathlib import Path
+from typing import Any, Optional
+
 import grpc
 from grpc.aio import Server, ServicerContext
 
 # Import generated protobuf classes
 from app.proto import wire_pb2, wire_pb2_grpc
-
-from app.services.upload_manager import UploadManager
 from app.services.delta.sync_service import DeltaSyncService
+from app.services.upload_manager import UploadManager
 from app.telemetry.otel_service import get_telemetry
 
 
@@ -45,7 +47,7 @@ class WireServiceServicer:
         self.telemetry = get_telemetry()
         
         # Active session tracking
-        self._active_sessions: Dict[str, Dict[str, Any]] = {}
+        self._active_sessions: dict[str, dict[str, Any]] = {}
     
     async def InitUpload(
         self,
@@ -291,7 +293,6 @@ async def create_grpc_server(
     Returns:
         Configured gRPC aio server
     """
-    from app.proto import wire_pb2_grpc
     
     # Create server with optimization options
     options = [

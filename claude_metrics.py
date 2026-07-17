@@ -15,9 +15,8 @@ CLI flags:
 
 import json
 import os
-import time
+from datetime import date, datetime
 from pathlib import Path
-from datetime import datetime, date
 from typing import Optional
 
 LOG_PATH = Path(os.path.expanduser("~/.ai-coder/metrics.jsonl"))
@@ -143,7 +142,7 @@ def cmd_metrics_show(today_only: bool = False, model_filter: Optional[str] = Non
     print(f"  Input tokens:   {s['total_input_tokens']:,}")
     print(f"  Output tokens:  {s['total_output_tokens']:,}")
     if s.get("by_model"):
-        print(f"\n  \033[1mBy model:\033[0m")
+        print("\n  \033[1mBy model:\033[0m")
         for model, ms in sorted(s["by_model"].items()):
             print(f"    {model:<40} {ms['calls']} calls  "
                   f"${ms['cost_usd']:.4f}  avg {ms['avg_latency_seconds']}s")

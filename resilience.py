@@ -101,7 +101,7 @@ def raise_for_http_error(exc: BaseException) -> None:
     raise exc
 
 
-def urlopen_json(req: "urllib.request.Request", timeout: float) -> dict:
+def urlopen_json(req: urllib.request.Request, timeout: float) -> dict:
     """`urllib.request.urlopen(req)` that returns parsed JSON and translates
     failures via `raise_for_http_error`. Call this from inside a function
     decorated with `@retry(...)` — it does not retry by itself."""
@@ -112,7 +112,7 @@ def urlopen_json(req: "urllib.request.Request", timeout: float) -> dict:
         raise_for_http_error(e)
 
 
-def urlopen_text(req: "urllib.request.Request", timeout: float) -> str:
+def urlopen_text(req: urllib.request.Request, timeout: float) -> str:
     """Like `urlopen_json` but returns the raw decoded body (for endpoints
     that don't return JSON, e.g. fetching a diff or a web page)."""
     try:
@@ -177,7 +177,7 @@ def retry(
     max_attempts: int = 3,
     base_delay: float = 1.0,
     max_delay: float = 20.0,
-    breaker: "CircuitBreaker | None" = None,
+    breaker: CircuitBreaker | None = None,
     sleep: Callable[[float], None] = time.sleep,
 ):
     """Decorator: retry a callable on retryable AICoderError subclasses.
