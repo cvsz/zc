@@ -59,7 +59,7 @@ class MythosAccessError(Exception):
 
 
 class Mythos5Client:
-    """Minimal Messages API client for claude-mythos-5. No refusal/fallback
+    """Minimal Messages API client for zc-mythos-5. No refusal/fallback
     handling — see module docstring for why. Follows the same _post() pattern
     as Fable5Client in zc_fable5.py for consistency."""
 
@@ -87,10 +87,10 @@ class Mythos5Client:
             if e.status_code in (403, 404):
                 body = e.details.get("body", "")
                 raise MythosAccessError(
-                    f"HTTP {e.status_code} calling claude-mythos-5 — this looks like an "
+                    f"HTTP {e.status_code} calling zc-mythos-5 — this looks like an "
                     "access-gate rejection rather than a normal API error. Mythos 5 "
                     "requires approved Project Glasswing access; most accounts will "
-                    "see this. Use claude-fable-5 instead unless you've confirmed "
+                    "see this. Use zc-fable-5 instead unless you've confirmed "
                     f"access with Anthropic. Raw response: {body}"
                 )
             return {"error": e.message, "status": e.status_code}

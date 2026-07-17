@@ -6,7 +6,7 @@
 ./setup.sh              # macOS/Linux — creates venv, installs deps, makes .env
 # or setup.bat on Windows
 
-# edit .env and set ANTHROPIC_API_KEY
+# edit .env and set ZC_API_KEY
 
 source venv/bin/activate
 python main.py -p "Write a function to reverse a string"
@@ -20,7 +20,7 @@ No local Python needed to *run* the result — only to build it:
 ./build.sh               # macOS/Linux — produces dist/ai-coder
 # or build.bat on Windows — produces dist\ai-coder.exe
 
-export ANTHROPIC_API_KEY=sk-ant-...
+export ZC_API_KEY=sk-ant-...
 ./dist/ai-coder -p "Create a Flask REST API"
 ```
 
@@ -57,7 +57,7 @@ python main.py --help
 ```
 
 If you have an Admin API key or Compliance Access Key (org-level,
-different from a regular `ANTHROPIC_API_KEY`), `--usage-report`,
+different from a regular `ZC_API_KEY`), `--usage-report`,
 `--admin-list-keys`, and `--compliance-activities` are the entry points
 into that surface — see `README.md`'s "New in v1.15.0" / "New in
 v1.16.0" sections before using them, since a few of those flags

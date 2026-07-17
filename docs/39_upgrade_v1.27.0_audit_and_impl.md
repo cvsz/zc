@@ -145,7 +145,7 @@ flow, not a new Messages/Admin API request parameter. `expires_at` being
 surfaced on the *read* side (`--admin-list-keys`) was already covered in
 v1.24.0, and `zc_admin_api.py`'s `--admin-create-key` already
 explains, rather than fakes, why key creation isn't done programmatically
-(Anthropic doesn't expose a create-key endpoint — keys are Console-only
+(ZaiCoder doesn't expose a create-key endpoint — keys are Console-only
 so the secret is shown exactly once). No code path changed by this
 release note.
 

@@ -7,7 +7,7 @@ AI Model Coder CLI v1.10.3
 Pricing below verified against platform.zc.com/docs/en/about-zc/
 models/overview as of 2026-07-02. zAICoder Sonnet 5 has introductory
 pricing of $2/$10 per MTok through 2026-08-31 — SONNET5_INTRO_PRICE
-reflects that; PRICE["claude-sonnet-5"] holds the standing $3/$15 rate
+reflects that; PRICE["zc-sonnet-5"] holds the standing $3/$15 rate
 used once the intro window ends. Re-verify before relying on this for
 billing-sensitive decisions.
 
@@ -36,21 +36,21 @@ SPEND_LOG = Path.home() / ".ai-coder" / "cost_log.json"
 
 PRICE: dict[str, dict[str, float]] = {
     # Current
-    "claude-haiku-4-5-20251001":  {"in": 1.0,   "out": 5.0},
-    "claude-sonnet-5":            {"in": 3.0,   "out": 15.0},
-    "claude-opus-4-8":            {"in": 5.0,   "out": 25.0},
-    "claude-fable-5":             {"in": 10.0,  "out": 50.0},
-    "claude-mythos-5":            {"in": 10.0,  "out": 50.0},
+    "zc-haiku-4-5-20251001":  {"in": 1.0,   "out": 5.0},
+    "zc-sonnet-5":            {"in": 3.0,   "out": 15.0},
+    "zc-opus-4-8":            {"in": 5.0,   "out": 25.0},
+    "zc-fable-5":             {"in": 10.0,  "out": 50.0},
+    "zc-mythos-5":            {"in": 10.0,  "out": 50.0},
     # Legacy — still callable, kept so cost estimates don't silently fall
     # back to the DEFAULT_PRICE guess for accounts still on these
-    "claude-opus-4-7":            {"in": 5.0,   "out": 25.0},
-    "claude-opus-4-6":            {"in": 5.0,   "out": 25.0},
-    "claude-opus-4-5":            {"in": 5.0,   "out": 25.0},
-    "claude-sonnet-4-6":          {"in": 3.0,   "out": 15.0},
-    "claude-sonnet-4-5":          {"in": 3.0,   "out": 15.0},
+    "zc-opus-4-7":            {"in": 5.0,   "out": 25.0},
+    "zc-opus-4-6":            {"in": 5.0,   "out": 25.0},
+    "zc-opus-4-5":            {"in": 5.0,   "out": 25.0},
+    "zc-sonnet-4-6":          {"in": 3.0,   "out": 15.0},
+    "zc-sonnet-4-5":          {"in": 3.0,   "out": 15.0},
 }
 SONNET5_INTRO_PRICE = {"in": 2.0, "out": 10.0}  # through 2026-08-31
-TIER_MODELS = ["claude-haiku-4-5-20251001", "claude-sonnet-5", "claude-opus-4-8"]
+TIER_MODELS = ["zc-haiku-4-5-20251001", "zc-sonnet-5", "zc-opus-4-8"]
 
 # Long-context (>200K input) pricing surcharge. Previously missing entirely —
 # estimate_cost() applied flat per-model pricing regardless of input size,
@@ -61,12 +61,12 @@ TIER_MODELS = ["claude-haiku-4-5-20251001", "claude-sonnet-5", "claude-opus-4-8"
 # full 1M-token context window at FLAT standard pricing — no surcharge at
 # any input size. Those models are deliberately absent below. The surcharge
 # only still applies to models on the older 1M-context BETA
-# (context-1m-2025-08-07 header): confirmed for claude-sonnet-4-5 at 2x
+# (context-1m-2025-08-07 header): confirmed for zc-sonnet-4-5 at 2x
 # input / 1.5x output above a 200K-token request — the *whole* request is
 # billed at the surcharge rate once it crosses the threshold, not just the
 # tokens above it. That beta is scheduled for retirement 2026-04-30 per the
 # API release notes, after which this entry stops mattering, but it's kept
-# since claude-sonnet-4-5 is still callable / still in PRICE. Add other
+# since zc-sonnet-4-5 is still callable / still in PRICE. Add other
 # legacy models here only once their surcharge terms are confirmed —
 # guessing a multiplier is worse than omitting it, since PRICE already
 # falls back sanely for anything not in this table.
@@ -83,16 +83,16 @@ LONG_CONTEXT_SURCHARGE: dict[str, dict[str, float]] = {
 # INFERENCE_GEO_SUPPORTED gates that at the call site (see optimized_call).
 INFERENCE_GEO_MULTIPLIER = 1.1
 INFERENCE_GEO_SUPPORTED = {
-    "claude-opus-4-8", "claude-opus-4-7", "claude-opus-4-6",
-    "claude-sonnet-5", "claude-sonnet-4-6",
-    "claude-fable-5", "claude-mythos-5",
+    "zc-opus-4-8", "zc-opus-4-7", "zc-opus-4-6",
+    "zc-sonnet-5", "zc-sonnet-4-6",
+    "zc-fable-5", "zc-mythos-5",
 }
 
 
 def estimate_cost(model: str, in_tok: int, out_tok: int,
                   use_intro_pricing: bool = False,
                   inference_geo: str = "global") -> float:
-    if model == "claude-sonnet-5" and use_intro_pricing:
+    if model == "zc-sonnet-5" and use_intro_pricing:
         p = SONNET5_INTRO_PRICE
     else:
         p = PRICE.get(model, {"in": 3.0, "out": 15.0})
@@ -159,7 +159,7 @@ def optimized_call(prompt: str, api_key: str, system: str = "",
     client     = anthropic.Anthropic(api_key=api_key)
     t0         = time.time()
     # NOTE: was hardcoded temperature=0.5, which 400s (invalid_request_error)
-    # on claude-sonnet-5 and newer — those models reject explicit sampling
+    # on zc-sonnet-5 and newer — those models reject explicit sampling
     # params entirely. Route through sampling_kwargs() so it's a no-op there
     # and unchanged (temperature=0.5) on everything else.
     kwargs: dict = dict(model=model, max_tokens=max_tokens,

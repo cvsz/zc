@@ -118,7 +118,7 @@ tool, matching the docs' worked example for analyzing an uploaded CSV.
 ## Non-gaps checked this cycle
 
 - **`purpose` param on upload** — a third-party gateway's SDK docs mention
-  `purpose: Literal["batch", "user_data"]`. The current official Anthropic
+  `purpose: Literal["batch", "user_data"]`. The current official ZaiCoder
   upload example and response schema (`id`, `type`, `filename`, `mime_type`,
   `size_bytes`, `created_at`, `downloadable`) have no `purpose` field at
   all. Not implementing this — it doesn't match the primary docs.

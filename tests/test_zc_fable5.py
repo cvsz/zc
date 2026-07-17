@@ -33,7 +33,7 @@ def _response(text="ok", stop_reason="end_turn", model=None, category=None):
 
 
 def test_fallback_chain_no_refusal_reports_primary_served(monkeypatch):
-    client = Fable5Client(api_key="k", fallback_chain=["claude-opus-4-8"])
+    client = Fable5Client(api_key="k", fallback_chain=["zc-opus-4-8"])
     monkeypatch.setattr(client, "_post", lambda payload, extra_headers=None: _response(
         text="hello", stop_reason="end_turn", model=FABLE5_MODEL_ID))
 
@@ -53,9 +53,9 @@ def test_fallback_chain_refusal_served_by_fallback_model_single_call(monkeypatch
         # Platform handled the refusal+retry server-side; the response
         # reports the fallback model actually served the request.
         return _response(text="handled by fallback", stop_reason="refusal",
-                         model="claude-opus-4-8", category="cyber")
+                         model="zc-opus-4-8", category="cyber")
 
-    client = Fable5Client(api_key="k", fallback_chain=["claude-opus-4-8"])
+    client = Fable5Client(api_key="k", fallback_chain=["zc-opus-4-8"])
     monkeypatch.setattr(client, "_post", fake_post)
 
     result = client.call_with_fallback("do something risky")
@@ -65,14 +65,14 @@ def test_fallback_chain_refusal_served_by_fallback_model_single_call(monkeypatch
     assert payload_has_fallbacks(calls[0])
     assert result["refused"] is True
     assert result["fell_back"] is True
-    assert result["served_by"] == "claude-opus-4-8"
+    assert result["served_by"] == "zc-opus-4-8"
     assert result["classifier"] == "cyber"
     assert result["category"] == "cyber"
     assert result["text"] == "handled by fallback"
 
 
 def test_fallback_chain_attached_to_call_payload():
-    client = Fable5Client(api_key="k", fallback_chain=["claude-opus-4-8", "claude-sonnet-5"])
+    client = Fable5Client(api_key="k", fallback_chain=["zc-opus-4-8", "zc-sonnet-5"])
     captured = {}
 
     def fake_post(payload, extra_headers=None):
@@ -83,16 +83,16 @@ def test_fallback_chain_attached_to_call_payload():
     client._post = fake_post
     client.call("hi")
 
-    assert captured["payload"]["fallbacks"] == ["claude-opus-4-8", "claude-sonnet-5"]
+    assert captured["payload"]["fallbacks"] == ["zc-opus-4-8", "zc-sonnet-5"]
     assert captured["headers"] is None  # no fallback-credit beta on the primary call
 
 
 def test_fallback_chain_not_attached_on_explicit_model_override():
-    client = Fable5Client(api_key="k", fallback_chain=["claude-opus-4-8"])
+    client = Fable5Client(api_key="k", fallback_chain=["zc-opus-4-8"])
     captured = {}
     client._post = lambda payload, extra_headers=None: (captured.update(payload=payload) or _response())
 
-    client.call("hi", model="claude-sonnet-5")
+    client.call("hi", model="zc-sonnet-5")
 
     assert "fallbacks" not in captured["payload"]
 
@@ -117,7 +117,7 @@ def test_manual_retry_no_refusal_returns_primary_response(monkeypatch):
 
 
 def test_manual_retry_falls_back_on_refusal_with_second_call(monkeypatch):
-    client = Fable5Client(api_key="k", fallback_model="claude-opus-4-8")
+    client = Fable5Client(api_key="k", fallback_model="zc-opus-4-8")
     calls = []
 
     def fake_post(payload, extra_headers=None):
@@ -133,14 +133,14 @@ def test_manual_retry_falls_back_on_refusal_with_second_call(monkeypatch):
     first_payload, first_headers = calls[0]
     second_payload, second_headers = calls[1]
     assert first_payload["model"] == FABLE5_MODEL_ID
-    assert second_payload["model"] == "claude-opus-4-8"
+    assert second_payload["model"] == "zc-opus-4-8"
     # Fallback-credit beta only sent on the manual retry call, not the primary.
     assert first_headers is None
     assert second_headers == {"anthropic-beta": "fallback-credit-2026-06-01"}
 
     assert result["refused"] is True
     assert result["fell_back"] is True
-    assert result["served_by"] == "claude-opus-4-8"
+    assert result["served_by"] == "zc-opus-4-8"
     assert result["classifier"] == "bio"
     assert result["text"] == "fallback answer"
 
@@ -201,8 +201,8 @@ def test_primary_call_transport_error_short_circuits():
 
 
 def test_parse_fallback_chain_splits_and_strips():
-    assert parse_fallback_chain(" claude-opus-4-8 , claude-sonnet-5 ") == [
-        "claude-opus-4-8", "claude-sonnet-5"
+    assert parse_fallback_chain(" zc-opus-4-8 , zc-sonnet-5 ") == [
+        "zc-opus-4-8", "zc-sonnet-5"
     ]
 
 

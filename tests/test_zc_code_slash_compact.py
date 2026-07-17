@@ -28,7 +28,7 @@ def _compaction_response(summary="Compacted summary of prior turns."):
     }
 
 
-def _session_with_turns(model="claude-sonnet-5"):
+def _session_with_turns(model="zc-sonnet-5"):
     s = CodeSession(cwd=".", model=model)
     s.add_turn("user", "do a big task", usage={"input_tokens": 1000, "output_tokens": 0})
     s.add_turn("assistant", "done", usage={"input_tokens": 0, "output_tokens": 500})
@@ -41,14 +41,14 @@ def test_compact_without_session_id_does_not_call_api(monkeypatch, capsys):
     monkeypatch.setattr(
 "wire.zc_code.CodeAgent._post", lambda *a, **k: called.__setitem__("n", called["n"] + 1))
 
-    cmd_code_slash("/compact", "key", "claude-sonnet-5", session_id=None)
+    cmd_code_slash("/compact", "key", "zc-sonnet-5", session_id=None)
 
     assert called["n"] == 0
     assert "needs an active session" in capsys.readouterr().out
 
 
 def test_compact_missing_session_reports_not_found(capsys):
-    cmd_code_slash("/compact", "key", "claude-sonnet-5", session_id="does-not-exist")
+    cmd_code_slash("/compact", "key", "zc-sonnet-5", session_id="does-not-exist")
     assert "not found" in capsys.readouterr().out.lower()
 
 

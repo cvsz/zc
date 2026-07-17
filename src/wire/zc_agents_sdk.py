@@ -634,7 +634,7 @@ class ManagedAgentsClient:
         import anthropic
         self.client = anthropic.Anthropic(api_key=api_key)
 
-    def create_agent(self, name: str, model: str = "claude-opus-4-8",
+    def create_agent(self, name: str, model: str = "zc-opus-4-8",
                      system: str = "You are a helpful coding assistant.",
                      tools: Optional[list] = None,
                      multiagent: Optional[dict] = None) -> dict:
@@ -1088,7 +1088,7 @@ class ManagedAgentsClient:
 
     # ── Dreaming (v1.20.0, research preview) ────────────────────────────
     def create_dream(self, memory_store_id: str, session_ids: Optional[list] = None,
-                     model: str = "claude-opus-4-8", instructions: Optional[str] = None) -> dict:
+                     model: str = "zc-opus-4-8", instructions: Optional[str] = None) -> dict:
         """Start a dream: curate `memory_store_id` (optionally alongside past
         `session_ids` transcripts) into a new output memory store. The input
         store is never modified — the dream produces a separate output store
@@ -1258,7 +1258,7 @@ class ManagedAgentsClient:
         return {"id": webhook.id, "url": url, "event_types": event_types}
 
 
-def cmd_managed_agent_run(task: str, api_key: str, model: str = "claude-opus-4-8",
+def cmd_managed_agent_run(task: str, api_key: str, model: str = "zc-opus-4-8",
                           memory_store: Optional[str] = None,
                           outcome_description: Optional[str] = None,
                           outcome_rubric: Optional[str] = None,
@@ -1500,7 +1500,7 @@ def cmd_agent_vault_list(api_key: str) -> list:
     return vaults
 
 
-def cmd_agent_dream(store_id: str, api_key: str, model: str = "claude-opus-4-8",
+def cmd_agent_dream(store_id: str, api_key: str, model: str = "zc-opus-4-8",
                     session_ids: Optional[list] = None, instructions: Optional[str] = None) -> dict:
     """Start a Dreaming pass over a memory store (research preview) and
     print the pending dream's id — dreams run asynchronously, poll with
@@ -1616,7 +1616,7 @@ def cmd_agent_webhook_register(url: str, api_key: str, events: Optional[list] = 
 
 
 def cmd_agent_review_multiagent(path: str, specialists: list, api_key: str,
-                                model: str = "claude-opus-4-8") -> dict:
+                                model: str = "zc-opus-4-8") -> dict:
     """Native Multiagent orchestration (v1.21.0, un-deferred from
     v1.20.0): run named specialist code reviewers (see
     REVIEW_SPECIALIST_PRESETS) as parallel subagents that share one

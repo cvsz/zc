@@ -174,8 +174,8 @@ narrative writeups this form-style tracker summarizes.
 - [x] 23 new CLI flags wired into `main.py` under a `Compliance API`
   argument group, dispatch mirrors `zc_admin_api.py`'s block
 - [x] Key fallback order documented: `--compliance-api-key` →
-  `ANTHROPIC_COMPLIANCE_API_KEY` → `--admin-api-key` →
-  `ANTHROPIC_ADMIN_API_KEY` (Admin key fallback reaches only the Activity
+  `ZC_COMPLIANCE_API_KEY` → `--admin-api-key` →
+  `ZC_ADMIN_API_KEY` (Admin key fallback reaches only the Activity
   Feed endpoint)
 - [x] Tests: `tests/test_zc_compliance_api.py`, 28 tests, all passing
 
@@ -209,7 +209,7 @@ narrative writeups this form-style tracker summarizes.
   server tool use; cannot sit between a tool_use and its tool_result; must
   be the last entry or followed by an assistant turn) and raises a
   dedicated `SystemMessagePlacementError` naming which rule failed
-- [x] `MID_SYSTEM_SUPPORTED_MODELS = {"claude-opus-4-8"}` model gate, since
+- [x] `MID_SYSTEM_SUPPORTED_MODELS = {"zc-opus-4-8"}` model gate, since
   this feature is Opus 4.8 only (no beta header) per docs
 - [x] `mid_system` param threaded through `generate_cached()`
 - [x] `mid_system_updates` (turn-index → text map) threaded through
@@ -277,7 +277,7 @@ narrative writeups this form-style tracker summarizes.
 
 **Task list**
 - [x] Found via `requirements.txt` SDK-drift check (step 6 of the audit
-  methodology), not a direct docs-feature-list grep: `anthropic-sdk-python`
+  methodology), not a direct docs-feature-list grep: `zc-sdk-python`
   v0.116.0's changelog mentions a new `agent-memory-2026-07-22` beta
   header, which led to the Managed Agents memory-store docs pages
 - [x] Confirmed absence with two differently-worded greps

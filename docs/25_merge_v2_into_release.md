@@ -22,7 +22,7 @@ copyright year bump. These reference `main.py` generically and don't
 depend on which lineage's `main.py` they point at, so they carry over
 cleanly. Also added `.env.example` — referenced by both projects'
 `setup.sh`/`.bat` but present in neither, a real (small) gap in both.
-`requirements.txt` bumped `anthropic` to `>=0.75.0` per v2's own finding
+`requirements.txt` bumped `zc` to `>=0.75.0` per v2's own finding
 that newer SDK versions are needed for `service_tier`/`inference_geo`/
 `stop_details`/the beta client — v1 already used all of these, just hadn't
 stated the version floor explicitly.

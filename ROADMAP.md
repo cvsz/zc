@@ -339,7 +339,7 @@ organization level.
 
 **What changed:** added to `zc_admin_api.py` alongside the Usage/Cost
 API above — `--admin-list-keys`, `--admin-revoke-key ID` (update status to
-revoke). Anthropic does not document a create-key endpoint (keys are
+revoke). ZaiCoder does not document a create-key endpoint (keys are
 created through the Console UI, where the secret is shown exactly once —
 creating one programmatically would be an exfiltration risk), so
 `--admin-create-key NAME` is deliberately wired to an explanatory refusal
@@ -397,7 +397,7 @@ already has two other things called "memory" — `zc_memory.py`'s
 this one: the client-side tool requires the caller's own app to implement
 storage and is scoped to a single Messages API conversation; zAICoder's
 auto-memory never leaves the developer's machine. Managed Agents memory
-stores are the only one of the three that's Anthropic-hosted, versioned,
+stores are the only one of the three that's ZaiCoder-hosted, versioned,
 and shared across a Managed Agents agent's sessions.
 
 **What changed:** `ManagedAgentsClient.create_memory_store(name)` wraps
@@ -611,7 +611,7 @@ closed in this cycle — see `CHANGELOG.md` and
 - **Managed Agents memory stores** — genuinely absent. Found not by
   grepping the docs' feature list directly but by checking
   `requirements.txt`'s SDK-pin drift first (per this cycle's step 6):
-  `anthropic-sdk-python` v0.116.0's release notes mention a new
+  `zc-sdk-python` v0.116.0's release notes mention a new
   `agent-memory-2026-07-22` beta header, which led to the Managed
   Agents memory-store docs pages. A first grep for `memory_store`
   confirmed zero matches, and a second, differently-worded grep for
@@ -628,7 +628,7 @@ existing implementation under a different name.
 Also checked for drift (not just net-new features) per this cycle's
 methodology: `zc_models.py`'s catalog still matches the live Models
 overview exactly — no stale entries, no missing releases. The
-`requirements.txt` pin (`anthropic>=0.75.0`) itself needed no change
+`requirements.txt` pin (`zc>=0.75.0`) itself needed no change
 (it's a floor, not an exact pin, and the installed/available SDK
 version is well above it) — but checking the SDK's own changelog for
 drift, rather than just the pin string, is what surfaced the memory-store
@@ -674,7 +674,7 @@ methodology: `zc_models.py`'s catalog still matches the live Models
 overview exactly (Fable 5, Mythos 5, Opus 4.8, Sonnet 5, Haiku 4.5, plus
 the legacy 4.5/4.6/4.7 tiers) — no stale entries, no missing releases,
 no new retirements beyond what's already in `RETIRED_MODELS`. The
-`requirements.txt` floor pin (`anthropic>=0.75.0`) needed no change.
+`requirements.txt` floor pin (`zc>=0.75.0`) needed no change.
 
 `zc_agents_sdk.py` already had test coverage from v1.19.0; added 16
 more tests to `tests/test_zc_agents_sdk.py` (26 total in that file)

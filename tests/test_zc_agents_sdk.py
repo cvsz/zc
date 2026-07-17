@@ -308,7 +308,7 @@ def test_create_dream_sends_expected_inputs_and_betas(agents_sdk):
     client.client.beta.dreams.create.return_value = fake_dream
 
     result = client.create_dream("store_1", session_ids=["sesn_1", "sesn_2"],
-                                  model="claude-opus-4-8", instructions="focus on prefs")
+                                  model="zc-opus-4-8", instructions="focus on prefs")
 
     _, kwargs = client.client.beta.dreams.create.call_args
     assert kwargs["inputs"] == [
@@ -522,14 +522,14 @@ def test_create_session_without_overrides_sends_bare_agent_id(agents_sdk):
 def test_create_session_with_overrides_builds_agent_with_overrides(agents_sdk):
     client = agents_sdk.ManagedAgentsClient(api_key="sk-test")
     client.client.beta.sessions.create.return_value = MagicMock(id="sess_2")
-    overrides = {"model": {"id": "claude-sonnet-5"}, "system": None, "tools": []}
+    overrides = {"model": {"id": "zc-sonnet-5"}, "system": None, "tools": []}
 
     result = client.create_session("agent_1", "env_1", title="t", agent_overrides=overrides)
 
     _, kwargs = client.client.beta.sessions.create.call_args
     assert kwargs["agent"] == {
         "type": "agent_with_overrides", "id": "agent_1",
-        "model": {"id": "claude-sonnet-5"}, "system": None, "tools": [],
+        "model": {"id": "zc-sonnet-5"}, "system": None, "tools": [],
     }
     assert result["agent_overrides"] == overrides
 
@@ -544,11 +544,11 @@ def test_cmd_managed_agent_run_merges_override_model_and_system(agents_sdk, monk
 
     agents_sdk.cmd_managed_agent_run(
         "task", api_key="sk-test",
-        agent_overrides={"model": "claude-sonnet-5", "system": "be terse"},
+        agent_overrides={"model": "zc-sonnet-5", "system": "be terse"},
     )
 
     _, kwargs = mac.create_session.call_args
-    assert kwargs["agent_overrides"] == {"model": "claude-sonnet-5", "system": "be terse"}
+    assert kwargs["agent_overrides"] == {"model": "zc-sonnet-5", "system": "be terse"}
 
 
 def test_cmd_managed_agent_run_without_overrides_passes_none(agents_sdk, monkeypatch):

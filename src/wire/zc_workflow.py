@@ -6,7 +6,7 @@ AI Model Coder CLI v1.10.0
 
 Example YAML:
   name: "Refactor + Document"
-  model: claude-sonnet-5
+  model: zc-sonnet-5
   steps:
     - id: refactor
       instruction: "Refactor this code for readability: {{input}}"
@@ -97,7 +97,7 @@ def _parse(d: dict) -> Workflow:
         max_tokens = s.get("max_tokens", 2048),
     ) for s in d.get("steps", [])]
     return Workflow(name=d.get("name","Untitled"), steps=steps,
-                   model=d.get("model","claude-sonnet-5"))
+                   model=d.get("model","zc-sonnet-5"))
 
 
 def _fill(template: str, variables: dict[str, str]) -> str:
@@ -178,7 +178,7 @@ def cmd_workflow_run(path: str, api_key: str, input_text: str = "",
 def cmd_workflow_scaffold(output: str):
     sample = {
         "name": "Example Workflow",
-        "model": "claude-sonnet-5",
+        "model": "zc-sonnet-5",
         "steps": [
             {"id": "draft",   "instruction": "Write a short essay about: {{input}}"},
             {"id": "improve", "instruction": "Improve this essay:\n{{draft}}",

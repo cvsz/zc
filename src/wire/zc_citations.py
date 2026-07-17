@@ -31,7 +31,7 @@ _breaker = CircuitBreaker(failure_threshold=5, reset_timeout=30)
 class CitationsCoder:
     """zAICoder client with source-grounded citations."""
 
-    def __init__(self, api_key: str, model: str = "claude-sonnet-5",
+    def __init__(self, api_key: str, model: str = "zc-sonnet-5",
                  max_tokens: int = 4096):
         self.api_key    = api_key
         self.model      = model

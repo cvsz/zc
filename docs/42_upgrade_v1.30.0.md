@@ -34,8 +34,8 @@ Cross-referencing `zc_models.MODEL_CATALOG`, that first list covers
 5 of wire's 9 cataloged models — meaning `--thinking` was broken
 outright on every current-tier and mythos-tier model in the catalog,
 and silently deprecated (would eventually break) on both legacy-tier
-4.6 models. Only `claude-opus-4-5`, `claude-haiku-4-5-20251001`, and
-`claude-sonnet-4-5` were actually working as intended.
+4.6 models. Only `zc-opus-4-5`, `zc-haiku-4-5-20251001`, and
+`zc-sonnet-4-5` were actually working as intended.
 
 The `adaptive=True` path made this worse, not better: it sent
 `{"type": "adaptive", "budget_tokens": N}` — but adaptive thinking
@@ -56,11 +56,11 @@ The old code always printed `thinking=0`.
 **Third finding, `zc_structured.py`:** structured outputs went GA
 on January 29, 2026 (confirmed via `platform.zc.com/docs/en/release-notes/overview`)
 — "a simplified integration path with no beta header required." The
-code still sent `anthropic-beta: structured-outputs-2025-11-13`
+code still sent `zc-beta: structured-outputs-2025-11-13`
 unconditionally on every request, plus an entirely unused
 `BETA = "output-128k-2025-02-19"` class attribute (grep confirmed zero
 references anywhere in the codebase). The old header still works during
-Anthropic's transition period, so this wasn't a hard break like the
+ZaiCoder's transition period, so this wasn't a hard break like the
 thinking issue — just dead weight worth cleaning up now that GA doesn't
 need it.
 
@@ -72,7 +72,7 @@ The official `effort` docs page, fetched directly, lists only
 `"low" | "medium" | "high" (default) | "max"` — no "xhigh" anywhere.
 Since this couldn't be confirmed against the primary source, it was
 **not** added to `EFFORT_BUDGETS`, argparse's `--effort` choices, or
-anywhere else. If Anthropic documents it later, add it then.
+anywhere else. If ZaiCoder documents it later, add it then.
 
 ## The fix — `zc_thinking.py`
 
@@ -118,11 +118,11 @@ anywhere else. If Anthropic documents it later, add it then.
 - `ThinkingModeError` is caught at the dispatch site and printed as a
   clean one-line error + `sys.exit(1)`, verified end-to-end with a real
   argparse + dispatch run (`--thinking --effort-legacy-budget --model
-  claude-sonnet-5` → clean exit code 1, no traceback).
+  zc-sonnet-5` → clean exit code 1, no traceback).
 
 ## The fix — `zc_structured.py`
 
-- Removed the unconditional `anthropic-beta: structured-outputs-2025-11-13`
+- Removed the unconditional `zc-beta: structured-outputs-2025-11-13`
   header from `_call()`.
 - Removed the unused `BETA = "output-128k-2025-02-19"` class attribute.
 - No behavioral change to `json_object()` / `json_schema()` / `extract()`

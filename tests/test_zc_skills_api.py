@@ -69,7 +69,7 @@ def test_build_user_content_with_file_ids():
 
 
 def test_call_with_skills_sends_expected_betas_and_container(monkeypatch):
-    client = SkillsApiClient(api_key="k", model="claude-sonnet-5")
+    client = SkillsApiClient(api_key="k", model="zc-sonnet-5")
     captured = {}
 
     def fake_post(payload, betas):

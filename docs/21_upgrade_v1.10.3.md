@@ -2,7 +2,7 @@
 
 Follow-up to v1.10.2's ID cleanup. That release fixed *which strings*
 were used; this release fixes the *data attached to them* — pricing
-had drifted from Anthropic's actual published rates, and the CLI had
+had drifted from ZaiCoder's actual published rates, and the CLI had
 no local record of legacy-but-still-callable models at all.
 
 ## What changed

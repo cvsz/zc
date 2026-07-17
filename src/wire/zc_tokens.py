@@ -27,7 +27,7 @@ _breaker = CircuitBreaker(failure_threshold=5, reset_timeout=30)
 class TokenCounter:
     """Count tokens without sending to the model."""
 
-    def __init__(self, api_key: str, model: str = "claude-sonnet-5"):
+    def __init__(self, api_key: str, model: str = "zc-sonnet-5"):
         self.api_key = api_key
         self.model   = model
 
@@ -74,16 +74,16 @@ class TokenCounter:
         # MTok prices (input) — verified against platform.zc.com/docs
         # as of 2026-07-02. Re-verify before relying on this for billing.
         prices_per_mtok = {
-            "claude-opus-4-8":            5.0,
-            "claude-sonnet-5":            3.0,
-            "claude-haiku-4-5-20251001":  1.0,
-            "claude-fable-5":            10.0,
-            "claude-mythos-5":           10.0,
-            "claude-opus-4-7":            5.0,
-            "claude-opus-4-6":            5.0,
-            "claude-opus-4-5":            5.0,
-            "claude-sonnet-4-6":          3.0,
-            "claude-sonnet-4-5":          3.0,
+            "zc-opus-4-8":            5.0,
+            "zc-sonnet-5":            3.0,
+            "zc-haiku-4-5-20251001":  1.0,
+            "zc-fable-5":            10.0,
+            "zc-mythos-5":           10.0,
+            "zc-opus-4-7":            5.0,
+            "zc-opus-4-6":            5.0,
+            "zc-opus-4-5":            5.0,
+            "zc-sonnet-4-6":          3.0,
+            "zc-sonnet-4-5":          3.0,
         }
         price = prices_per_mtok.get(m, 3.0)
         cost  = (token_count / 1_000_000) * price

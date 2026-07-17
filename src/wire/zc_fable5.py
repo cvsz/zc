@@ -41,7 +41,7 @@ What this module adds, concretely:
         the platform to handle it.
       - Client-side manual retry (legacy, still supported): on a refusal,
         this module retries the same prompt itself against a separate
-        fallback model (default: claude-opus-4-8) with a second HTTP
+        fallback model (default: zc-opus-4-8) with a second HTTP
         call. Use this when you want to change the prompt/system before
         retrying, or don't want the fallbacks beta. This path only runs
         when --fable5-fallback-chain is *not* given.
@@ -58,7 +58,7 @@ CLI flags:
                                     --fable5-fallback-chain is set — that's already
                                     server-side and applies before this flag is checked).
   --fallback-model ID               Override the manual-retry fallback model
-                                    (default: claude-opus-4-8). No effect when
+                                    (default: zc-opus-4-8). No effect when
                                     --fable5-fallback-chain is set.
 """
 
@@ -73,8 +73,8 @@ from wire.resilience import CircuitBreaker, retry, urlopen_json
 MESSAGES_ENDPOINT = "https://api.anthropic.com/v1/messages"
 _breaker = CircuitBreaker(failure_threshold=5, reset_timeout=30)
 
-FABLE5_MODEL_ID = "claude-fable-5"
-MYTHOS5_MODEL_ID = "claude-mythos-5"
+FABLE5_MODEL_ID = "zc-fable-5"
+MYTHOS5_MODEL_ID = "zc-mythos-5"
 
 # Verified against platform.zc.com/docs/en/build-with-zc/refusals-and-fallback
 # (checked 2026-07-04). We build the retry ourselves with raw urllib rather than an
@@ -143,7 +143,7 @@ class Fable5Client:
     zc_*.py modules for consistency."""
 
     def __init__(self, api_key: str, model: str = FABLE5_MODEL_ID,
-                 fallback_model: str = "claude-opus-4-8", max_tokens: int = 4096,
+                 fallback_model: str = "zc-opus-4-8", max_tokens: int = 4096,
                  fallback_chain: Optional[list] = None):
         self.api_key = api_key
         self.model = model
@@ -323,7 +323,7 @@ def cmd_fable5_info():
         print()
 
 
-def cmd_fable5_call(prompt: str, api_key: str, fallback_model: str = "claude-opus-4-8",
+def cmd_fable5_call(prompt: str, api_key: str, fallback_model: str = "zc-opus-4-8",
                     allow_fallback: bool = True, system: Optional[str] = None,
                     fallback_chain: Optional[list] = None):
     client = Fable5Client(api_key=api_key, fallback_model=fallback_model,

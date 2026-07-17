@@ -57,20 +57,20 @@ EFFORT_BUDGETS = {
 # accepted (--effort-legacy-budget can still target these). On every
 # other model in this set, manual budget_tokens is a hard 400 error.
 ADAPTIVE_THINKING_MODELS = {
-    "claude-mythos-5", "claude-fable-5",
-    "claude-opus-4-8", "claude-opus-4-7",
-    "claude-sonnet-5",
-    "claude-opus-4-6", "claude-sonnet-4-6",
-    "claude-mythos-preview",
+    "zc-mythos-5", "zc-fable-5",
+    "zc-opus-4-8", "zc-opus-4-7",
+    "zc-sonnet-5",
+    "zc-opus-4-6", "zc-sonnet-4-6",
+    "zc-mythos-preview",
 }
 
 # Models where budget_tokens is a hard 400 — adaptive is the *only*
 # working mode, --effort-legacy-budget must refuse rather than fail late.
 BUDGET_TOKENS_UNSUPPORTED_MODELS = {
-    "claude-mythos-5", "claude-fable-5",
-    "claude-opus-4-8", "claude-opus-4-7",
-    "claude-sonnet-5",
-    "claude-mythos-preview",
+    "zc-mythos-5", "zc-fable-5",
+    "zc-opus-4-8", "zc-opus-4-7",
+    "zc-sonnet-5",
+    "zc-mythos-preview",
 }
 
 
@@ -105,7 +105,7 @@ class ThinkingModeError(ValueError):
 class ThinkingCoder:
     """zAICoder client with extended / adaptive thinking support."""
 
-    def __init__(self, api_key: str, model: str = "claude-sonnet-4-6",
+    def __init__(self, api_key: str, model: str = "zc-sonnet-4-6",
                  max_tokens: int = 8000):
         self.client = anthropic.Anthropic(api_key=api_key)
         self.model   = model

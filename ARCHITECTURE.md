@@ -37,8 +37,8 @@ the CLI; see "Admin & Compliance APIs" below.
               │  exceptions.py     │  typed error hierarchy
               └─────────┬──────────┘
                         ▼
-              api.anthropic.com (HTTPS, urllib — no SDK
-              dependency for the core path; the `anthropic`
+              api.zc.com (HTTPS, urllib — no SDK
+              dependency for the core path; the `zc`
               package is only required for the Managed
               Agents beta client)
 
@@ -96,7 +96,7 @@ calls, and each has its own documented retry contract (429 + retryable
 5xx back off exponentially; 400/401/403/404/409 never retry) implemented
 directly in the module rather than reusing `resilience.retry()` — the
 two contracts happen to look similar but are specified independently in
-Anthropic's docs, so keeping them separate avoids a false coupling if
+ZaiCoder's docs, so keeping them separate avoids a false coupling if
 one changes later.
 
 Key model, since it's easy to get wrong and the failure mode is a 403,

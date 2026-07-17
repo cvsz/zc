@@ -96,14 +96,14 @@ def test_cmd_cost_report_prints_rows(monkeypatch, capsys):
     monkeypatch.setattr("wire.zc_admin_api.AdminApiClient", lambda admin_api_key: client)
     monkeypatch.setattr(client, "get_cost_report",
                         lambda start, end, group_by="model": {
-                            "data": [{"model": "claude-sonnet-5", "amount": "12.50", "currency": "usd"}]
+                            "data": [{"model": "zc-sonnet-5", "amount": "12.50", "currency": "usd"}]
                         })
 
     result = cmd_cost_report("k", start="2026-06-01", end="2026-07-01")
 
     assert result["data"][0]["amount"] == "12.50"
     out = capsys.readouterr().out
-    assert "claude-sonnet-5" in out
+    assert "zc-sonnet-5" in out
     assert "12.50" in out
 
 
@@ -185,9 +185,9 @@ def test_get_org_rate_limits_includes_model_when_given(monkeypatch):
         captured.update(path=path, params=params) or {"data": []}
     ))
 
-    client.get_org_rate_limits(model="claude-opus-4-8")
+    client.get_org_rate_limits(model="zc-opus-4-8")
 
-    assert captured["params"] == {"model": "claude-opus-4-8"}
+    assert captured["params"] == {"model": "zc-opus-4-8"}
 
 
 def test_get_workspace_rate_limits_builds_path(monkeypatch):
@@ -480,7 +480,7 @@ def test_cmd_zc_code_usage_report_prints_named_user_and_metrics(monkeypatch, cap
                                 "pull_requests_by_zc_code": 1,
                             },
                             "model_breakdown": [
-                                {"model": "claude-opus-4-8",
+                                {"model": "zc-opus-4-8",
                                  "estimated_cost": {"currency": "USD", "amount": 1025}},
                             ],
                         }]})

@@ -59,8 +59,8 @@ since v1.11.1.
 `--check-deprecated` (existing, unchanged) only *flags* retired model IDs
 and never touches the filesystem — it has no concept of "upgrade
 everything to the best available model" and wouldn't touch a perfectly
-callable-but-superseded `claude-sonnet-4-6` or a plain
-`claude-haiku-4-5-20251001` reference, since neither is retired.
+callable-but-superseded `zc-sonnet-4-6` or a plain
+`zc-haiku-4-5-20251001` reference, since neither is retired.
 
 New in `zc_models.py`, wired into `main.py`'s existing Models API
 group:
@@ -68,8 +68,8 @@ group:
 ```
 --upgrade-all PATH             Rewrite every known zAICoder model ID under PATH
                                 to --upgrade-target. Dry-run by default.
---upgrade-target {fable5,opus} fable5 -> claude-fable-5 (default)
-                                opus   -> claude-opus-4-8
+--upgrade-target {fable5,opus} fable5 -> zc-fable-5 (default)
+                                opus   -> zc-opus-4-8
 --upgrade-yes                  Actually write changes (default: preview only)
 --upgrade-no-backup            Skip the .bak backup normally written per changed file
 ```
@@ -78,13 +78,13 @@ Implementation notes:
 
 - Source ID set is every key in `RETIRED_MODELS` + every key in
   `MODEL_CATALOG` + a small `MODEL_ID_ALIASES` table (currently just
-  `claude-haiku-4-5` -> the dated ID, per `MODEL_CATALOG`'s own alias
+  `zc-haiku-4-5` -> the dated ID, per `MODEL_CATALOG`'s own alias
   note) — minus the chosen target, so re-running against an
   already-upgraded tree is a correct no-op instead of matching its own
   output.
 - Matched longest-first with a manual `(?<![\w-])...(?![\w-])` boundary
   (not `\b`, which treats `-` as a boundary itself and would let a
-  substring like `claude-opus-4-5` match inside a longer, unrelated ID) so
+  substring like `zc-opus-4-5` match inside a longer, unrelated ID) so
   IDs are never partially rewritten.
 - Files are read with `errors="strict"`; anything that isn't valid UTF-8
   (binaries, e.g. a PyInstaller `dist/` output) is skipped rather than
@@ -109,7 +109,7 @@ Implementation notes:
   separate feature decision (which one wins if a project template and
   `--agent` disagree?) rather than a bug fix. Flagging for a future pass
   if wanted.
-- The `docs/claude-api-gap-audit-v1.10.5.md` gap list (advisor tool
+- The `docs/zc-api-gap-audit-v1.10.5.md` gap list (advisor tool
   real implementation follow-through, task budgets, embeddings module
   usage, etc.) was re-read but not re-audited this pass — this pass's
   scope was "what's broken", not "what's still missing from the API

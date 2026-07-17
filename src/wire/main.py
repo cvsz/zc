@@ -58,7 +58,7 @@ def _api_key(args):
     return k
 
 def _model(args):
-    return getattr(args, "model", "claude-sonnet-5") or "claude-sonnet-5"
+    return getattr(args, "model", "zc-sonnet-5") or "zc-sonnet-5"
 
 def _read_file(path):
     try:
@@ -83,7 +83,7 @@ def build_parser():
     g.add_argument("--tui", action="store_true",
                    help="Launch the full-screen Textual TUI (see tui.py) — model/personality/"
                         "agent/skill sidebar plus a streaming chat transcript, in the terminal")
-    g.add_argument("--model", default="claude-sonnet-5")
+    g.add_argument("--model", default="zc-sonnet-5")
     g.add_argument("--temperature", type=float, default=0.3)
     g.add_argument("--max-tokens", type=int, default=4096, dest="max_tokens")
     g.add_argument("--api-key", default="", dest="api_key")
@@ -286,8 +286,8 @@ def build_parser():
     adv.add_argument("--advisor", metavar="PROMPT", dest="advisor",
                      help="Run PROMPT with an advisor model consulted mid-generation "
                           "(advisor_20260301 beta)")
-    adv.add_argument("--advisor-model", default="claude-opus-4-8", dest="advisor_model",
-                     help="Advisor model (default: claude-opus-4-8)")
+    adv.add_argument("--advisor-model", default="zc-opus-4-8", dest="advisor_model",
+                     help="Advisor model (default: zc-opus-4-8)")
     adv.add_argument("--advisor-max-uses", type=int, default=0, dest="advisor_max_uses",
                      help="Cap on advisor tool definition's max_uses (unset = no cap)")
     adv.add_argument("--advisor-max-tokens", type=int, default=0, dest="advisor_max_tokens",
@@ -354,8 +354,8 @@ def build_parser():
                          "--check-deprecated this actually edits files. Dry-run by default.")
     mo.add_argument("--upgrade-target", choices=sorted(UPGRADE_TARGETS), default="fable5",
                     dest="upgrade_target",
-                    help="Target for --upgrade-all: fable5 (claude-fable-5) or opus "
-                         "(claude-opus-4-8). Default: fable5")
+                    help="Target for --upgrade-all: fable5 (zc-fable-5) or opus "
+                         "(zc-opus-4-8). Default: fable5")
     mo.add_argument("--upgrade-yes", action="store_true", dest="upgrade_yes",
                     help="With --upgrade-all: actually write changes (default is a dry-run preview)")
     mo.add_argument("--upgrade-no-backup", action="store_true", dest="upgrade_no_backup",
@@ -370,8 +370,8 @@ def build_parser():
                     help="With --fable5: disable automatic fallback on refusal (just report it). "
                          "Only affects the manual retry path; no effect if "
                          "--fable5-fallback-chain is set.")
-    f5.add_argument("--fallback-model", default="claude-opus-4-8", dest="fallback_model",
-                    help="Manual-retry fallback model (default: claude-opus-4-8). "
+    f5.add_argument("--fallback-model", default="zc-opus-4-8", dest="fallback_model",
+                    help="Manual-retry fallback model (default: zc-opus-4-8). "
                          "No effect if --fable5-fallback-chain is set.")
     f5.add_argument("--fable5-fallback-chain", metavar="MODEL1,MODEL2", dest="fable5_fallback_chain",
                     help="Server-side fallback (beta `fallbacks` param): comma-separated "
@@ -941,7 +941,7 @@ def build_parser():
 
     gh = p.add_argument_group("GitHub Integration")
     gh.add_argument("--gh-review-pr", metavar="REPO/NUMBER", dest="gh_review_pr",
-                    help="AI review of a pull request diff, e.g. anthropics/claude-code/42")
+                    help="AI review of a pull request diff, e.g. zaicoder/zc-code/42")
     gh.add_argument("--gh-triage-issues", metavar="REPO", dest="gh_triage_issues",
                     help="Triage open issues and suggest labels/owners")
     gh.add_argument("--gh-summarise-commits", metavar="REPO", dest="gh_summarise_commits",
@@ -1551,7 +1551,7 @@ def main():
         # --temperature was accepted by the parser but never reached cmd_live,
         # so live mode always used LiveSession's 0.7 default regardless of the
         # flag. Now threaded through (still safely dropped by sampling_kwargs()
-        # for claude-sonnet-5 and later, which reject it).
+        # for zc-sonnet-5 and later, which reject it).
         cmd_live(key, model=model, temperature=args.temperature); return
 
     # ── Deep Research ──

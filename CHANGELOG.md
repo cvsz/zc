@@ -238,7 +238,7 @@ the webapp backend, per the requested "TUI / Frontend / Backend" scope:
   dependency; skipped cleanly via `importorskip` if `textual` isn't
   installed) and `tests/test_webapp_server.py` (FastAPI `TestClient`,
   covering the new streaming/sessions/validation/rate-limit behaviour
-  with the `anthropic` SDK and `Coder.generate` mocked out — no real
+  with the `zc` SDK and `Coder.generate` mocked out — no real
   network calls). Full suite: 248 tests, regression-clean.
 - **Also fixed in passing**: `pyproject.toml`'s `version` had drifted
   to `1.20.0` while `main.py`'s `VERSION` had moved on through
@@ -327,10 +327,10 @@ in this release — full detail in
 `docs/38_upgrade_v1.26.0_audit_and_impl.md`.
 
 **Self-hosted sandboxes** (public beta, new): run Managed Agents tool
-execution on infrastructure you control instead of Anthropic's cloud
+execution on infrastructure you control instead of ZaiCoder's cloud
 sandbox — your own worker, or a managed provider (Cloudflare, Daytona,
 Modal, Vercel, and others). The agent loop, context management, and
-error recovery stay on Anthropic's side; only tool execution moves.
+error recovery stay on ZaiCoder's side; only tool execution moves.
 Added `ManagedAgentsClient.create_environment(env_type="self_hosted")`
 (sends `config={"type": "self_hosted"}`, with no networking sub-field,
 unlike the existing `"cloud"` config) and
@@ -409,7 +409,7 @@ in this release — full detail in `docs/32_upgrade_v1.19.0.md`.
 scoped, persistent, versioned file directory (`memory_store`) that can
 be mounted into a hosted Managed Agents session via `resources`, so an
 agent's work survives past one session. Found by checking the
-`anthropic` Python SDK's own changelog for drift (v0.116.0 added an
+`zc` Python SDK's own changelog for drift (v0.116.0 added an
 `agent-memory-2026-07-22` beta header) rather than the docs' feature
 list directly. Added to `zc_agents_sdk.py`:
 `ManagedAgentsClient.create_memory_store()`, a `memory_store_id` param
@@ -533,9 +533,9 @@ the itemized task list this release closes out.
   `zc_admin_api.py`, combined per the roadmap's own suggested
   grouping): new `--usage-report` and `--admin-list-keys` /
   `--admin-revoke-key` flags. Both require an Admin API key
-  (`--admin-api-key` or `ANTHROPIC_ADMIN_API_KEY`), not a regular one.
+  (`--admin-api-key` or `ZC_ADMIN_API_KEY`), not a regular one.
   `--admin-create-key` intentionally explains why key creation isn't
-  exposed via the API rather than faking it — Anthropic doesn't document a
+  exposed via the API rather than faking it — ZaiCoder doesn't document a
   create-key endpoint (Console-only, secret shown once).
 - **P2 — Compliance API**: left as a documented gap, not built, per the
   roadmap's recommendation (enterprise-only surface, no concrete use case

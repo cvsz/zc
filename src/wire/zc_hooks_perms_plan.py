@@ -233,7 +233,7 @@ class Plan:
 
 
 class PlanModeAgent:
-    def __init__(self, api_key: str, model: str = "claude-sonnet-4-6"):
+    def __init__(self, api_key: str, model: str = "zc-sonnet-4-6"):
         self.client = _anthropic.Anthropic(api_key=api_key)
         self.model  = model
 

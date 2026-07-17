@@ -9,10 +9,10 @@ previous audit was dated 2026-07-08; this one is also dated 2026-07-08
 
 **How it was found:** not from a direct grep against the docs' feature
 list, but from step 6 of the audit methodology — checking for drift in
-the pinned `anthropic` SDK. `requirements.txt` pins `anthropic>=0.75.0`,
+the pinned `zc` SDK. `requirements.txt` pins `zc>=0.75.0`,
 which is a floor rather than an exact version, so the pin string itself
 hadn't drifted. But checking the SDK's *own* changelog turned up
-`anthropic-sdk-python` v0.116.0's release note: "api: add
+`zc-sdk-python` v0.116.0's release note: "api: add
 agent-memory-2026-07-22 beta header." That led to the Managed Agents
 memory-store docs pages, which describe a workspace-scoped, persistent,
 FUSE-mounted file directory (`memory_store`) that can be attached to a
@@ -39,7 +39,7 @@ to rule both out before concluding this was new:
 
 Neither implements a `memory_store` resource type or talks to a
 `memory_stores` endpoint. The new feature is the only one of the three
-that's Anthropic-hosted, versioned, and shared across a Managed Agents
+that's ZaiCoder-hosted, versioned, and shared across a Managed Agents
 agent's sessions — genuinely additive, not a rename of something already
 there.
 
@@ -90,7 +90,7 @@ methodology: `zc_models.py`'s catalog (Fable 5, Mythos 5, Opus 4.8,
 Sonnet 5, Haiku 4.5, legacy tiers) still matches the live Models overview
 exactly — no stale entries, no missing releases, no deprecation-date
 changes. Nothing to fix there this cycle. The `requirements.txt` pin
-itself (`anthropic>=0.75.0`) needed no edit — it's a floor, and the
+itself (`zc>=0.75.0`) needed no edit — it's a floor, and the
 installed SDK is well above it — but it was the process of checking the
 SDK's changelog for drift, rather than trusting the pin string alone,
 that surfaced the finding above.

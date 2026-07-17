@@ -131,8 +131,8 @@ held back in v1.15.0 pending a concrete request, which has since arrived
       `--compliance-group-members`, `--compliance-yes`,
       `--compliance-output`
 - [x] Key fallback order: `--compliance-api-key` →
-      `ANTHROPIC_COMPLIANCE_API_KEY` → `--admin-api-key` →
-      `ANTHROPIC_ADMIN_API_KEY` (Admin key fallback only reaches the
+      `ZC_COMPLIANCE_API_KEY` → `--admin-api-key` →
+      `ZC_ADMIN_API_KEY` (Admin key fallback only reaches the
       Activity Feed; every other flag 403s with a clear message)
 - [x] Module docstring documents both key types and the endpoint-reach
       table, and cross-links `zc_admin_api.py` explaining how the two
@@ -176,7 +176,7 @@ held back in v1.15.0 pending a concrete request, which has since arrived
 ## 🟠 P1 — Managed Agents memory stores ✅ DONE (v1.19.0)
 
 > New feature, found in the v1.19.0 audit cycle (2026-07-08) by checking
-> the `anthropic` SDK's own changelog for drift, which surfaced the
+> the `zc` SDK's own changelog for drift, which surfaced the
 > `agent-memory-2026-07-22` beta header. Genuinely absent — zero matches
 > for `memory_store` or a `resources` param anywhere in
 > `zc_agents_sdk.py`.

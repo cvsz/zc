@@ -42,8 +42,8 @@ BATCH_STORE = Path(os.path.expanduser("~/.ai-coder/batches"))
 # synchronous Messages API max_output values are unaffected.
 OUTPUT_300K_BETA = "output-300k-2026-03-24"
 OUTPUT_300K_MODELS = {
-    "claude-opus-4-8", "claude-opus-4-7", "claude-opus-4-6",
-    "claude-sonnet-5", "claude-sonnet-4-6",
+    "zc-opus-4-8", "zc-opus-4-7", "zc-opus-4-6",
+    "zc-sonnet-5", "zc-sonnet-4-6",
 }
 OUTPUT_300K_MAX_TOKENS = 300_000
 
@@ -51,7 +51,7 @@ OUTPUT_300K_MAX_TOKENS = 300_000
 class BatchCoder:
     """zAICoder Batch API client."""
 
-    def __init__(self, api_key: str, model: str = "claude-sonnet-5",
+    def __init__(self, api_key: str, model: str = "zc-sonnet-5",
                  use_300k_output: bool = False):
         self.client = anthropic.Anthropic(api_key=api_key)
         self.model  = model

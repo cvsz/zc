@@ -16,7 +16,7 @@ auth failures, refusals, unexpected exceptions) goes through
   `new_correlation_id()` at startup), attached to every line automatically
   so you can filter one invocation's logs out of a shared stream.
 - **Redaction**: `RedactingFilter` scrubs `sk-ant-...` key shapes and
-  `Authorization`/`x-api-key`/`ANTHROPIC_API_KEY`-shaped values from every
+  `Authorization`/`x-api-key`/`ZC_API_KEY`-shaped values from every
   record, regardless of what a call site logs.
 - **Where it goes**: stderr only, by design — stdout stays reserved for
   the actual CLI output (model responses, `--health-check` JSON, etc) so

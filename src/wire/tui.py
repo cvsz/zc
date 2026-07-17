@@ -54,7 +54,7 @@ from wire.personalities import PersonalityManager
 from wire.skills import SkillManager
 from wire.tui_streaming import StreamRenderGate
 
-DEFAULT_MODEL = "claude-sonnet-5"
+DEFAULT_MODEL = "zc-sonnet-5"
 
 
 def _agent_prompts() -> dict:

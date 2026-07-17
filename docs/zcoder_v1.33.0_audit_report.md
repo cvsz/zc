@@ -2,7 +2,7 @@
 
 **Scope:** `wire-v1_33_0.zip` (current release), diffed against `wire-v1_32_0.zip` (previous release)
 **Method:** Static analysis (AST + grep across all 91 Python files / ~26,200 LOC), manual line-by-line review of every security- and correctness-critical module, independent re-derivation of the project's own CLI-wiring test, and a full file-level diff between the two supplied archives.
-**Not done, and why:** This sandbox has no network access, so `anthropic`, `pytest`, `fastapi`, `pydantic`, and `uvicorn` could not be installed. I could not execute the test suite or actually run the FastAPI backend. Every finding below is either (a) confirmed by direct code inspection with exact file:line citations, or (b) explicitly marked as inferred/unverified. Nothing here is a guess dressed up as a fact.
+**Not done, and why:** This sandbox has no network access, so `zc`, `pytest`, `fastapi`, `pydantic`, and `uvicorn` could not be installed. I could not execute the test suite or actually run the FastAPI backend. Every finding below is either (a) confirmed by direct code inspection with exact file:line citations, or (b) explicitly marked as inferred/unverified. Nothing here is a guess dressed up as a fact.
 
 ---
 
@@ -33,7 +33,7 @@ Full detail, file:line citations, and a prioritized fix list follow.
 No git history shipped with either archive — comparisons below are file-level diffs of the two zips.
 ```
 
-No database. No server the CLI talks to. No user accounts, sessions, or multi-tenant model. `pip`-installable dependencies (`anthropic`, `fastapi`, `pydantic`, `uvicorn`, `textual`) were unavailable in this sandbox (no network egress), which is itself relevant — see Finding **BUG-4**.
+No database. No server the CLI talks to. No user accounts, sessions, or multi-tenant model. `pip`-installable dependencies (`zc`, `fastapi`, `pydantic`, `uvicorn`, `textual`) were unavailable in this sandbox (no network egress), which is itself relevant — see Finding **BUG-4**.
 
 ---
 
@@ -61,7 +61,7 @@ Extracted directly from `main.py`'s argument parser (the ground truth for what's
 | 3 | Feature Projects | 16 | Local project workspaces: create/list/show/plan/run/archive/delete, task tracking |
 | 4 | Artifacts | 21 | Versioned code/doc artifacts: create/iterate/diff/tag/export/delete |
 | 5 | Extended Thinking | 8 | Thinking-budget/effort control, interleaved thinking, adaptive effort |
-| 6 | Web Search & Fetch | 6 | Anthropic's hosted web_search / web_fetch tools |
+| 6 | Web Search & Fetch | 6 | ZaiCoder's hosted web_search / web_fetch tools |
 | 7 | Vision | 7 | Image/PDF vision, OCR, code-from-screenshot, visual diffing |
 | 8 | Batch API | 8 | Async batch message submission/status/results/cancel |
 | 9 | Prompt Caching | 10 | Cache control, TTL, warm-up, diagnostics, multi-turn caching |
@@ -70,7 +70,7 @@ Extracted directly from `main.py`'s argument parser (the ground truth for what's
 | 12 | Embeddings | 5 | Voyage embeddings + similarity |
 | 13 | Structured Outputs | 5 | JSON-schema-constrained generation, extraction |
 | 14 | Files API | 7 | Upload/list/delete/download/ask-about files |
-| 15 | Code Execution | 4 | Anthropic's hosted code-execution tool |
+| 15 | Code Execution | 4 | ZaiCoder's hosted code-execution tool |
 | 16 | Token Counting | 2 | Pre-flight token counting |
 | 17 | Citations & RAG | 3 | Citations-enabled responses |
 | 18 | Models API | 8 | List/inspect models, deprecation checks, guided model upgrades |
@@ -80,7 +80,7 @@ Extracted directly from `main.py`'s argument parser (the ground truth for what's
 | 22 | Workload Identity Federation | 13 | OIDC token exchange, service accounts, issuers, trust rules |
 | 23 | Compliance API | 25 | Activity feed, chat/file/project export & delete, org/group directory |
 | 24 | Agent Skills API | 2 | Platform skill_id listing/info |
-| 25 | Computer Use | 1 | Anthropic's hosted computer-use tool |
+| 25 | Computer Use | 1 | ZaiCoder's hosted computer-use tool |
 | 26 | Agent SDK | 61 | Sessions, orchestration, managed runs, memory stores, dreams, outcomes, webhooks, vault/credentials, scheduling, multi-agent review |
 | 27 | Cowork | 6 | Multi-file/multi-step batch task runner |
 | 28 | Excel / Data Chat | 4 | Spreadsheet chat (native + local fallback) |
@@ -238,7 +238,7 @@ There is no `elif permission == "acceptEdits"` anywhere in the file. The mode th
 - Zero auth mechanism on any of the 12 endpoints — no API key check, no session, no bearer token.
 - `POST /api/config` (lines 206-215) accepts `{"api_key": "..."}` and calls `cfg.set("api_key", update.api_key)`, which (`config.py:19-22`) writes straight to `~/.ai-coder-config.json` — **the same file the CLI itself reads.**
 
-Put together: anyone on the same network — or, per the well-documented "malicious webpage reaches a localhost service" pattern (which wildcard CORS actively opts into allowing, rather than merely failing to block), anyone whose page the user's browser merely loads while the server happens to be running — can silently replace the user's real Anthropic API key with an attacker-controlled one via a single unauthenticated `POST`. Every subsequent chat, in the web UI *and the CLI*, then routes through the attacker's account, giving them a live feed of the user's prompts. The 30-req/min rate limiter (line 124-135) is explicitly scoped by its own comment to "a runaway client loop, not... a determined attacker," and doesn't apply to this at all since config writes aren't rate-limited the same way chat is (rate limiting is only invoked inside `/api/chat` and `/api/chat/stream`, not `/api/config`).
+Put together: anyone on the same network — or, per the well-documented "malicious webpage reaches a localhost service" pattern (which wildcard CORS actively opts into allowing, rather than merely failing to block), anyone whose page the user's browser merely loads while the server happens to be running — can silently replace the user's real ZaiCoder API key with an attacker-controlled one via a single unauthenticated `POST`. Every subsequent chat, in the web UI *and the CLI*, then routes through the attacker's account, giving them a live feed of the user's prompts. The 30-req/min rate limiter (line 124-135) is explicitly scoped by its own comment to "a runaway client loop, not... a determined attacker," and doesn't apply to this at all since config writes aren't rate-limited the same way chat is (rate limiting is only invoked inside `/api/chat` and `/api/chat/stream`, not `/api/config`).
 
 ---
 
@@ -283,7 +283,7 @@ version = "1.33.0"
 ...
 # no `dependencies = [...]` key anywhere in the file
 ```
-This is a real `[build-system]` + `[project]` table (setuptools-backed), i.e. `pip install .` is meant to work. It currently installs a package with **none** of `anthropic`, `fastapi`, `pydantic`, `uvicorn`, `pandas`, `openpyxl`, `python-pptx`, `PyYAML`, or `python-dotenv` — all genuinely imported by the codebase per `requirements.txt` and direct grep of `import` statements. The only place dependencies are actually declared is `requirements.txt`, which `pip install .` does not consult. This is precisely the "clean dependency installation" step the uploaded validation checklist calls for as step 1 of final repo-wide validation, and it would fail immediately.
+This is a real `[build-system]` + `[project]` table (setuptools-backed), i.e. `pip install .` is meant to work. It currently installs a package with **none** of `zc`, `fastapi`, `pydantic`, `uvicorn`, `pandas`, `openpyxl`, `python-pptx`, `PyYAML`, or `python-dotenv` — all genuinely imported by the codebase per `requirements.txt` and direct grep of `import` statements. The only place dependencies are actually declared is `requirements.txt`, which `pip install .` does not consult. This is precisely the "clean dependency installation" step the uploaded validation checklist calls for as step 1 of final repo-wide validation, and it would fail immediately.
 
 ---
 

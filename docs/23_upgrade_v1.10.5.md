@@ -12,7 +12,7 @@ code_execution, bash, text_editor, and computer_use — but not:
 1. **The memory tool** (`memory_20250818`) — GA since 2025-09-29, no beta
    header required. This project already has `zc_memory.py`, but
    that's a custom database-backed memory system this CLI invented, not
-   Anthropic's server-declared/client-executed memory tool. Different
+   ZaiCoder's server-declared/client-executed memory tool. Different
    thing, same name is coincidental.
 2. **Context editing** (`context-management-2025-06-27` beta) — automatic
    clearing of stale tool results (`clear_tool_uses_20250919`) and old
@@ -46,7 +46,7 @@ code_execution, bash, text_editor, and computer_use — but not:
   against a local directory. Every path is resolved via `_resolve()` and
   checked to stay inside the configured base directory before any disk
   access — including bare `/memories` and `../` traversal attempts —
-  matching Anthropic's documented path-traversal-protection requirement.
+  matching ZaiCoder's documented path-traversal-protection requirement.
 - New `ToolCoder.run_agent_with_memory()` — a full tool-use agent loop
   wired specifically to `MemoryToolHandler`, so `memory` tool_use blocks
   get dispatched automatically instead of requiring the caller to

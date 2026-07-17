@@ -28,7 +28,7 @@ three that gives a real widget/layout/event model.
 **What's new:** the streaming path doesn't go through `coder.Coder`
 (which is non-streaming only) or `zc_stream.StreamCoder` (which
 prints to stdout, wrong for a TUI widget) — `tui.py` has its own
-`_stream_reply()` using the `anthropic` SDK directly, structurally
+`_stream_reply()` using the `zc` SDK directly, structurally
 identical to `StreamCoder.stream()`'s `content_block_delta`/`text_delta`
 event handling, but pushing each delta into a `ChatMessage` widget via
 `call_from_thread()` instead of `print()`. Generation runs on a Textual
@@ -74,7 +74,7 @@ in the installed `textual==8.2.8`; toggling now goes through the
 - **Validation** — `ChatRequest` gained three `field_validator`s:
   `temperature` in `[0.0, 1.0]`, `max_tokens` in `[1, 64000]`, `prompt`
   under 200k chars. Previously any float/int went straight into the
-  Messages API payload and surfaced as an opaque 400 from Anthropic;
+  Messages API payload and surfaced as an opaque 400 from ZaiCoder;
   now it's a same-process 422 with a field-level message.
 - **Rate limiting** — `_check_rate_limit()`, a fixed-window counter
   keyed by `request.client.host`, 30 req/min, 429 past that. In-memory
@@ -120,13 +120,13 @@ CLI's own environment, not the web console's `.web-venv/`.
   (`pytest-asyncio` added to `requirements-dev.txt`, `asyncio_mode =
   "auto"` set in `pyproject.toml`). Covers: sidebar/transcript mount,
   missing-API-key warning, a full submit → user+assistant message
-  round trip (generation mocked via a fake `anthropic.Anthropic`),
+  round trip (generation mocked via a fake `zc_sdk.ZaiCoder`),
   new-session reset, combined system-prompt building from
   agent+skill+personality, temperature-input fallback/clamping, and
   the missing-`textual` `ImportError` message.
 - `tests/test_webapp_server.py` — FastAPI `TestClient`. Covers the
   new streaming/sessions endpoints, validation 422s, rate-limit 429,
-  and (for streaming) a fake `anthropic` module injected via
+  and (for streaming) a fake `zc` module injected via
   `monkeypatch.setitem(sys.modules, ...)` so no real SDK/network call
   happens.
 - Full suite after this cycle: **248 tests, regression-clean.**

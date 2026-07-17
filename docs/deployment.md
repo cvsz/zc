@@ -20,7 +20,7 @@ why env vars are preferred).
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-export ANTHROPIC_API_KEY=sk-ant-...
+export ZC_API_KEY=sk-ant-...
 python main.py -p "explain this repo"
 ```
 
@@ -83,7 +83,7 @@ that's stable for the lifetime of one CLI invocation, so you can trace a
 single `--agent-orchestrate` run's log lines across modules.
 
 API keys, `Authorization`/`x-api-key` header values, and known env var
-names (`ANTHROPIC_API_KEY`, `GITHUB_TOKEN`, `VOYAGE_API_KEY`) are redacted
+names (`ZC_API_KEY`, `GITHUB_TOKEN`, `VOYAGE_API_KEY`) are redacted
 automatically before any log line is emitted — see `logging_config.py`.
 
 See `docs/observability.md` for metrics/tracing hooks (`zc_metrics.py`,
@@ -109,4 +109,4 @@ within a major version (flat JSON files, no schema migrations as of
 | `--health-check` exits 1, `api_key_configured: false` | Env var not propagated to container | Check `docker inspect` env, secrets manager wiring |
 | Every call returns `[API ERROR 429]` | Rate limited, retries exhausted | Check `retry_after` in logs; consider `--service-tier auto` if you have a Priority Tier commitment |
 | Every call returns `[API ERROR 401]` | Key rotated/revoked | Rotate key in secrets manager, redeploy |
-| Circuit breaker open (`circuit_breaker_open` in logs) | Sustained upstream errors | Check Anthropic status page before assuming a local bug |
+| Circuit breaker open (`circuit_breaker_open` in logs) | Sustained upstream errors | Check ZaiCoder status page before assuming a local bug |

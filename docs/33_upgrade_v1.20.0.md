@@ -63,7 +63,7 @@ individual entries one at a time.
 
 ```python
 ManagedAgentsClient.create_dream(memory_store_id, session_ids=None,
-                                  model="claude-opus-4-8", instructions=None)
+                                  model="zc-opus-4-8", instructions=None)
 ManagedAgentsClient.get_dream(dream_id)
 ManagedAgentsClient.list_dreams(include_archived=False)
 ManagedAgentsClient.cancel_dream(dream_id)
@@ -201,7 +201,7 @@ methodology: `zc_models.py`'s catalog (Fable 5, Mythos 5, Opus 4.8,
 Sonnet 5, Haiku 4.5, legacy 4.5/4.6/4.7 tiers) still matches the live
 Models overview exactly — no stale entries, no missing releases, no new
 deprecation dates beyond what's already recorded in `RETIRED_MODELS`.
-The `requirements.txt` floor pin (`anthropic>=0.75.0`) needed no change.
+The `requirements.txt` floor pin (`zc>=0.75.0`) needed no change.
 
 ## Tests
 

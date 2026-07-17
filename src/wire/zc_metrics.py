@@ -27,17 +27,17 @@ LOG_PATH = Path(os.path.expanduser("~/.ai-coder/metrics.jsonl"))
 # as of 2026-07-02. Sonnet 5 has $2/$10 intro pricing through 2026-08-31 —
 # not modeled here; this table uses the standing post-intro rate.
 PRICE_TABLE = {
-    "claude-fable-5":               (10.0, 50.0),
-    "claude-mythos-5":              (10.0, 50.0),
-    "claude-opus-4-8":               (5.0, 25.0),
-    "claude-sonnet-5":                (3.0, 15.0),
-    "claude-haiku-4-5-20251001":      (1.0,  5.0),
+    "zc-fable-5":               (10.0, 50.0),
+    "zc-mythos-5":              (10.0, 50.0),
+    "zc-opus-4-8":               (5.0, 25.0),
+    "zc-sonnet-5":                (3.0, 15.0),
+    "zc-haiku-4-5-20251001":      (1.0,  5.0),
     # Legacy — still callable
-    "claude-opus-4-7":               (5.0, 25.0),
-    "claude-opus-4-6":               (5.0, 25.0),
-    "claude-opus-4-5":               (5.0, 25.0),
-    "claude-sonnet-4-6":              (3.0, 15.0),
-    "claude-sonnet-4-5":              (3.0, 15.0),
+    "zc-opus-4-7":               (5.0, 25.0),
+    "zc-opus-4-6":               (5.0, 25.0),
+    "zc-opus-4-5":               (5.0, 25.0),
+    "zc-sonnet-4-6":              (3.0, 15.0),
+    "zc-sonnet-4-5":              (3.0, 15.0),
 }
 DEFAULT_PRICE = (3.0, 15.0)
 
@@ -62,7 +62,7 @@ def record(model: str, input_tokens: int, output_tokens: int,
     LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
     not_billed = stop_reason == "refusal" and output_tokens == 0
     entry = {
-        "ts": datetime.utcnow().isoformat() + "Z",
+        "ts": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "model": model,
         "input_tokens": input_tokens,
         "output_tokens": output_tokens,

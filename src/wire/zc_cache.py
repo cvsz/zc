@@ -67,7 +67,7 @@ _breaker = CircuitBreaker(failure_threshold=5, reset_timeout=30)
 # only, no beta header required. wire only talks to the direct zAICoder API,
 # so the AWS/Foundry-vs-Bedrock/Google-Cloud split isn't relevant here, but
 # the model gate is.
-MID_SYSTEM_SUPPORTED_MODELS = {"claude-opus-4-8"}
+MID_SYSTEM_SUPPORTED_MODELS = {"zc-opus-4-8"}
 
 
 class SystemMessagePlacementError(ValueError):
@@ -189,7 +189,7 @@ class CachingCoder:
 
     ENDPOINT = "https://api.anthropic.com/v1/messages"
 
-    def __init__(self, api_key: str, model: str = "claude-sonnet-5",
+    def __init__(self, api_key: str, model: str = "zc-sonnet-5",
                  max_tokens: int = 4096, ttl: str = "5m"):
         self.api_key    = api_key
         self.model      = model

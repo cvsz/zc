@@ -43,7 +43,7 @@ become relevant later, without invalidating everything cached before it.
   misplaced system message fails fast with a specific message instead of
   spending a round trip on the API's 400.
 
-- `MID_SYSTEM_SUPPORTED_MODELS = {"claude-opus-4-8"}` — a model gate.
+- `MID_SYSTEM_SUPPORTED_MODELS = {"zc-opus-4-8"}` — a model gate.
   Everything else raises `ValueError` pointing at `--cache-system`
   instead.
 - `mid_system` param on `generate_cached()`, `mid_system_updates`
@@ -56,7 +56,7 @@ become relevant later, without invalidating everything cached before it.
 ```bash
 python main.py --cache --cache-multi-turn "First question" "Follow-up question" \
     --cache-mid-system "From now on, answer in bullet points." \
-    --cache-mid-system-after 0 --model claude-opus-4-8
+    --cache-mid-system-after 0 --model zc-opus-4-8
 ```
 
 Security note carried through from the general operator-authority

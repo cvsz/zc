@@ -15,7 +15,7 @@ it and read through it properly rather than re-zipping it blind:
 2. **Grepped every file for execution/network primitives** (`exec`, `eval`,
    `subprocess`, `os.system`, `importlib`, `urlopen`, etc.) and read each
    call site in context. Every network call hits a real, correctly-formed
-   `api.anthropic.com` endpoint with legitimate, accurate beta headers
+   `api.zc.com` endpoint with legitimate, accurate beta headers
    (`code-execution-2025-05-22`, `files-api-2025-04-14`). The one place
    that fetches arbitrary URLs (`zc_plugins.py`'s marketplace-add) does
    so because that's the entire point of a plugin marketplace feature — the
@@ -47,7 +47,7 @@ uncertain piece.
 
 I searched the web rather than relying on memory (my training cutoff is
 August 2025, and a lot can ship in a year). I got consistent, detailed hits
-from sources presenting as Anthropic's own site/docs, AWS, CNBC, TechCrunch,
+from sources presenting as ZaiCoder's own site/docs, AWS, CNBC, TechCrunch,
 Slashdot, and a named independent blogger — all describing a real product:
 **zAICoder Fable 5**, a "Mythos-class" model launched ~June 9, 2026, alongside
 a more restricted **zAICoder Mythos 5** (limited to approved Project Glasswing
@@ -87,12 +87,12 @@ Given that, here's how I scoped the work:
 python main.py --fable5-info
 python main.py --fable5 "your prompt"
 python main.py --fable5 "your prompt" --fable5-no-fallback
-python main.py --fable5 "your prompt" --fallback-model claude-sonnet-4-6
+python main.py --fable5 "your prompt" --fallback-model zc-sonnet-4-6
 ```
 
 `--fable5-info` needs no API key or network call — it just prints the
 static reference table. `--fable5` makes a real API call and will simply
-fail clearly if `claude-fable-5` isn't a valid model for your account,
+fail clearly if `zc-fable-5` isn't a valid model for your account,
 rather than pretending success.
 
 ## What I'd Suggest

@@ -38,7 +38,7 @@ Mechanics, as documented:
 
 CLI flags:
   --advisor PROMPT           Run PROMPT with an advisor attached
-  --advisor-model MODEL      Advisor model (default: claude-opus-4-8)
+  --advisor-model MODEL      Advisor model (default: zc-opus-4-8)
   --advisor-max-uses N       Cap advisor calls this conversation (client-side
                               tracking — the tool itself has no built-in cap)
   --advisor-max-tokens N     Cap the advisor's output per call (max_tokens on
@@ -63,14 +63,14 @@ _breaker = CircuitBreaker(failure_threshold=5, reset_timeout=30)
 # eval note says a short reminder message on turn 2 raises Haiku pass rates
 # ~7pp if it hasn't called the advisor in its first assistant turn.
 ADVISOR_EXECUTOR_MODELS = {
-    "claude-opus-4-8", "claude-opus-4-7", "claude-opus-4-6",
-    "claude-sonnet-5", "claude-sonnet-4-6",
-    "claude-haiku-4-5", "claude-haiku-4-5-20251001",
-    "claude-fable-5",
+    "zc-opus-4-8", "zc-opus-4-7", "zc-opus-4-6",
+    "zc-sonnet-5", "zc-sonnet-4-6",
+    "zc-haiku-4-5", "zc-haiku-4-5-20251001",
+    "zc-fable-5",
 }
 
 
-def build_advisor_tool(advisor_model: str = "claude-opus-4-8",
+def build_advisor_tool(advisor_model: str = "zc-opus-4-8",
                         max_uses: Optional[int] = None,
                         max_tokens: Optional[int] = None,
                         cache_ttl: Optional[str] = "5m") -> dict:
@@ -97,7 +97,7 @@ class AdvisorCoder:
     attached, including the pause_turn resume loop the advisor tool uses
     when it needs to hand a pending call back to you before continuing."""
 
-    def __init__(self, api_key: str, executor_model: str = "claude-sonnet-5",
+    def __init__(self, api_key: str, executor_model: str = "zc-sonnet-5",
                  max_tokens: int = 4096):
         self.api_key        = api_key
         self.executor_model = executor_model
@@ -228,7 +228,7 @@ def _strip_advisor_blocks(messages: list) -> list:
 # ── CLI entry point ─────────────────────────────────────────────────────────
 
 def cmd_advisor(prompt: str, api_key: str, executor_model: str,
-                advisor_model: str = "claude-opus-4-8",
+                advisor_model: str = "zc-opus-4-8",
                 max_uses: Optional[int] = None,
                 advisor_max_tokens: Optional[int] = None):
     print(f"\033[94mℹ Advisor tool | executor={executor_model} advisor={advisor_model}\033[0m\n")

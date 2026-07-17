@@ -229,8 +229,8 @@ re-flag it as newly discovered, and doesn't accidentally build it into
 > limit: int = 20)` printing a per-user table (date, actor
 > email/api_key_name, num_sessions, lines added/removed,
 > commits/PRs, estimated cost) — follow `cmd_usage_report()`'s existing
-> table-printing style in this file. Add `--claude-code-usage-report`
-> and `--claude-code-usage-report-start DATE` CLI flags.
+> table-printing style in this file. Add `--zc-code-usage-report`
+> and `--zc-code-usage-report-start DATE` CLI flags.
 >
 > Tests: request sends `starting_at` and optional `limit`/`page`;
 > 401/403 responses print the existing wrong-key-type hint (same

@@ -89,7 +89,7 @@ MODEL_CATALOG: dict = {
         "price_in": 1.0, "price_out": 5.0,
         "thinking": "extended", "effort_default": None,
         "notes": "Fastest, most cost-effective. Extended (manual budget_tokens) "
-                 "thinking, not adaptive. Alias: claude-haiku-4-5.",
+                 "thinking, not adaptive. Alias: zc-haiku-4-5.",
     },
     # Legacy — still callable, superseded by the row above in the same tier.
     "claude-opus-4-7": {
@@ -140,8 +140,8 @@ TIER_ORDER = ["mythos", "current", "legacy"]
 # MTok on Opus 4.8 vs. its $5/$25 standard rate). Deprecated on Opus 4.7
 # (removed 2026-07-24); Opus 4.8 is the current supported target. Not
 # available on the Batch API.
-FAST_MODE_SUPPORTED = {"claude-opus-4-8"}
-FAST_MODE_DEPRECATED = {"claude-opus-4-7"}  # still works but removed 2026-07-24
+FAST_MODE_SUPPORTED = {"zc-opus-4-8"}
+FAST_MODE_DEPRECATED = {"zc-opus-4-7"}  # still works but removed 2026-07-24
 
 # ── Priority Tier / service_tier ────────────────────────────────────────────
 # Was entirely absent from the project. Per platform.zc.com/docs/en/
@@ -161,9 +161,9 @@ SERVICE_TIER_UNSUPPORTED = {"claude-sonnet-5", "claude-mythos-preview", "claude-
 # (default, standard pricing). Only supported on zAICoder Opus 4.6, Sonnet
 # 4.6, and later models — earlier models 400 if it's set at all.
 INFERENCE_GEO_SUPPORTED = {
-    "claude-opus-4-8", "claude-opus-4-7", "claude-opus-4-6",
-    "claude-sonnet-5", "claude-sonnet-4-6",
-    "claude-fable-5", "claude-mythos-5", "claude-mythos-preview",
+    "zc-opus-4-8", "zc-opus-4-7", "zc-opus-4-6",
+    "zc-sonnet-5", "zc-sonnet-4-6",
+    "zc-fable-5", "zc-mythos-5", "zc-mythos-preview",
 }
 INFERENCE_GEO_PRICING_MULTIPLIER = 1.1
 
@@ -179,33 +179,33 @@ RETIRED_MODELS: dict = {
     "claude-opus-4-20250514": {
         "display_name": "zAICoder Opus 4 (original 4.0)",
         "retired": "2026-06-15",
-        "replacement": "claude-opus-4-8",
-        "notes": "Dateless alias claude-opus-4-0 retired alongside it.",
+        "replacement": "zc-opus-4-8",
+        "notes": "Dateless alias zc-opus-4-0 retired alongside it.",
     },
     "claude-opus-4-0": {
         "display_name": "zAICoder Opus 4 (original 4.0, dateless alias)",
         "retired": "2026-06-15",
-        "replacement": "claude-opus-4-8",
-        "notes": "Alias for claude-opus-4-20250514.",
+        "replacement": "zc-opus-4-8",
+        "notes": "Alias for zc-opus-4-20250514.",
     },
     "claude-sonnet-4-20250514": {
         "display_name": "zAICoder Sonnet 4 (original 4.0)",
         "retired": "2026-06-15",
-        "replacement": "claude-sonnet-5",
-        "notes": "Dateless alias claude-sonnet-4-0 retired alongside it. Anthropic's "
-                 "own migration notes point to claude-sonnet-4-6; claude-sonnet-5 is "
+        "replacement": "zc-sonnet-5",
+        "notes": "Dateless alias zc-sonnet-4-0 retired alongside it. Anthropic's "
+                 "own migration notes point to zc-sonnet-4-6; zc-sonnet-5 is "
                  "the current recommendation as of this catalog's last check.",
     },
     "claude-sonnet-4-0": {
         "display_name": "zAICoder Sonnet 4 (original 4.0, dateless alias)",
         "retired": "2026-06-15",
-        "replacement": "claude-sonnet-5",
-        "notes": "Alias for claude-sonnet-4-20250514.",
+        "replacement": "zc-sonnet-5",
+        "notes": "Alias for zc-sonnet-4-20250514.",
     },
     "claude-haiku-3-20240307": {
         "display_name": "zAICoder Haiku 3",
         "retired": "2026-02-19",
-        "replacement": "claude-haiku-4-5-20251001",
+        "replacement": "zc-haiku-4-5-20251001",
         "notes": "Retired well before this catalog's other entries; flagged in case "
                  "of very old pinned config.",
     },
@@ -436,8 +436,8 @@ def cmd_check_deprecated(path: str):
 # unless told not to.
 
 UPGRADE_TARGETS = {
-    "fable5": "claude-fable-5",
-    "opus":   "claude-opus-4-8",
+    "fable5": "zc-fable-5",
+    "opus":   "zc-opus-4-8",
 }
 
 # Known alternate spellings that aren't literal MODEL_CATALOG/RETIRED_MODELS
@@ -446,7 +446,7 @@ UPGRADE_TARGETS = {
 # "Alias: claude-haiku-4-5." Included so --upgrade-all catches the alias
 # form too, not just the dated ID.
 MODEL_ID_ALIASES = {
-    "claude-haiku-4-5": "claude-haiku-4-5-20251001",
+    "zc-haiku-4-5": "zc-haiku-4-5-20251001",
 }
 
 
@@ -568,7 +568,7 @@ COMPUTER_USE_BETA = "computer-use-2025-01-24"
 class ComputerUseCoder:
     """zAICoder with computer use tools."""
 
-    def __init__(self, api_key: str, model: str = "claude-sonnet-5",
+    def __init__(self, api_key: str, model: str = "zc-sonnet-5",
                  max_tokens: int = 4096,
                  width: int = 1024, height: int = 768):
         self.api_key    = api_key
@@ -661,7 +661,7 @@ EFFORT_BUDGETS = {"low": 2000, "medium": 8000, "high": 16000, "max": 32000}
 class AdaptiveThinkingCoder:
     """Extended thinking with adaptive / interleaved modes."""
 
-    def __init__(self, api_key: str, model: str = "claude-sonnet-5",
+    def __init__(self, api_key: str, model: str = "zc-sonnet-5",
                  max_tokens: int = 8000):
         self.api_key    = api_key
         self.model      = model

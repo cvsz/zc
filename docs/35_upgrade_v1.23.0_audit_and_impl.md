@@ -20,9 +20,9 @@ using a long-lived static API key. Mechanically: `POST /v1/oauth/token`
 with an RFC 7523 jwt-bearer grant; the response is a standard OAuth 2.0
 token response. First-party SDKs auto-detect a full federation
 configuration from five environment variables
-(`ANTHROPIC_FEDERATION_RULE_ID`, `ANTHROPIC_ORGANIZATION_ID`,
-`ANTHROPIC_SERVICE_ACCOUNT_ID`, `ANTHROPIC_WORKSPACE_ID`, and one of
-`ANTHROPIC_IDENTITY_TOKEN_FILE`/`ANTHROPIC_IDENTITY_TOKEN`) and refresh
+(`ZC_FEDERATION_RULE_ID`, `ZC_ORGANIZATION_ID`,
+`ZC_SERVICE_ACCOUNT_ID`, `ZC_WORKSPACE_ID`, and one of
+`ZC_IDENTITY_TOKEN_FILE`/`ZC_IDENTITY_TOKEN`) and refresh
 the token before it expires. Setup itself (service accounts, federation
 issuers, federation rules) is a separate Admin-API-adjacent surface that
 requires an `org:admin` OAuth bearer token rather than a regular Admin
@@ -38,7 +38,7 @@ exchanges a JWT for anything.
 **Priority: 🔴 P0.** This is the flagship "keyless auth" story Anthropic
 is pushing across the whole platform (SDKs, zAICoder, GitHub Actions)
 — a CLI wrapper that only supports static keys is missing the auth
-pattern Anthropic itself now recommends leading with.
+pattern ZaiCoder itself now recommends leading with.
 
 ## Finding 2 — Spend Limits API (zAICoder Enterprise)
 
@@ -75,7 +75,7 @@ Usage and Cost API.
 retry/backoff logic in the tree: zero matches for this specific API
 surface (this codebase's `resilience.py` handles *client-side* 429
 backoff, which is a different, already-solved problem — this finding is
-about reading Anthropic's *configured* limits, not reacting to them).
+about reading ZaiCoder's *configured* limits, not reacting to them).
 
 **Priority: 🟡 P2.** Small, read-only, no side effects — a natural
 companion to `zc_admin_api.py`'s existing usage/cost reporting for
@@ -85,7 +85,7 @@ building gateways/dashboards, per the docs' own stated use cases.
 
 **zAICoder Managed Agents vault credential background refresh for
 `mcp_oauth` credentials** — a release-note line item alongside these
-three. Not a gap: this is server-side behavior (Anthropic now refreshes
+three. Not a gap: this is server-side behavior (ZaiCoder now refreshes
 a stored OAuth credential's access token automatically instead of it
 going stale), not a new request shape or parameter wire's
 `add_credential()` needs to send. Nothing to build.
@@ -115,7 +115,7 @@ separate architectural question outside a single audit finding.
 >                  service_account_id: str, identity_token: str,
 >                  workspace_id: Optional[str] = None,
 >                  token_lifetime_seconds: Optional[int] = None) -> dict:
->         # POST https://api.anthropic.com/v1/oauth/token with
+>         # POST https://api.zc.com/v1/oauth/token with
 >         # grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer,
 >         # assertion=identity_token, plus the rule/org/service-account/
 >         # workspace identifiers. Returns the OAuth 2.0 token response
@@ -125,9 +125,9 @@ separate architectural question outside a single audit finding.
 >         # own FederationExchangeError.
 >
 > def resolve_wif_env() -> Optional[dict]:
->     # Reads ANTHROPIC_FEDERATION_RULE_ID, ANTHROPIC_ORGANIZATION_ID,
->     # ANTHROPIC_SERVICE_ACCOUNT_ID, ANTHROPIC_WORKSPACE_ID (optional),
->     # and one of ANTHROPIC_IDENTITY_TOKEN_FILE / ANTHROPIC_IDENTITY_TOKEN.
+>     # Reads ZC_FEDERATION_RULE_ID, ZC_ORGANIZATION_ID,
+>     # ZC_SERVICE_ACCOUNT_ID, ZC_WORKSPACE_ID (optional),
+>     # and one of ZC_IDENTITY_TOKEN_FILE / ZC_IDENTITY_TOKEN.
 >     # Returns None (not a partial dict) unless rule_id, organization_id,
 >     # service_account_id, and an identity token are ALL present — the
 >     # direct env-var federation path "activates only when all are set,"
@@ -174,13 +174,13 @@ separate architectural question outside a single audit finding.
 > `--wif-create-issuer NAME --wif-issuer-url URL`, `--wif-list-issuers`,
 > `--wif-create-rule NAME --wif-rule-issuer ID --wif-rule-service-account
 > ID --wif-rule-subject-prefix PREFIX`, `--wif-list-rules` — all requiring
-> a new `--org-admin-token` flag (or `ANTHROPIC_ORG_ADMIN_TOKEN` env var),
+> a new `--org-admin-token` flag (or `ZC_ORG_ADMIN_TOKEN` env var),
 > kept separate from `--admin-api-key` throughout.
 >
 > Tests: `resolve_wif_env()` returns `None` when any required var is
 > missing (parametrize over each of the four required vars individually
 > absent) and a full dict when all are set, preferring
-> `ANTHROPIC_IDENTITY_TOKEN_FILE` (reading the file) when both token
+> `ZC_IDENTITY_TOKEN_FILE` (reading the file) when both token
 > sources are set; `exchange()` posts the correct jwt-bearer grant body
 > and never leaks the assertion or access token in a raised exception's
 > message; `WIFAdminClient` sends `Authorization: Bearer` (not

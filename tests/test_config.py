@@ -17,15 +17,15 @@ def test_set_and_get_roundtrip(isolated_config):
 
 def test_set_persists_to_disk(isolated_config):
     cfg = Config()
-    cfg.set("model", "claude-sonnet-5")
+    cfg.set("model", "zc-sonnet-5")
     on_disk = json.loads(isolated_config.read_text())
-    assert on_disk["model"] == "claude-sonnet-5"
+    assert on_disk["model"] == "zc-sonnet-5"
 
 
 def test_new_instance_reads_persisted_value(isolated_config):
-    Config().set("model", "claude-opus-4-8")
+    Config().set("model", "zc-opus-4-8")
     fresh = Config()
-    assert fresh.get("model") == "claude-opus-4-8"
+    assert fresh.get("model") == "zc-opus-4-8"
 
 
 def test_all_returns_copy_not_reference(isolated_config):

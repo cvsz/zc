@@ -45,7 +45,7 @@ WEB_FETCH_TOOL: dict[str, Any] = {
 class SearchCoder:
     """zAICoder with web search and fetch tools."""
 
-    def __init__(self, api_key: str, model: str = "claude-sonnet-4-6",
+    def __init__(self, api_key: str, model: str = "zc-sonnet-4-6",
                  max_tokens: int = 4096):
         self.client     = anthropic.Anthropic(api_key=api_key)
         self.model      = model

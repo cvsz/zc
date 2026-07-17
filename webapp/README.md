@@ -22,7 +22,7 @@ From the project root:
 
 ```bash
 make build      # create .web-venv/ and install requirements.txt + webapp/requirements-web.txt
-export ANTHROPIC_API_KEY=sk-ant-...   # or paste it into the sidebar once running
+export ZC_API_KEY=sk-ant-...   # or paste it into the sidebar once running
 make start      # launch in the background, http://localhost:8420
 make status     # check whether it's up
 make logs       # tail logs/web.log

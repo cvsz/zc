@@ -15,16 +15,16 @@ files were already open.
 
 ## Finding 1 — Self-hosted sandboxes for zAICoder Managed Agents (public beta)
 
-**What it is:** An alternative to Anthropic's cloud sandbox for Managed
+**What it is:** An alternative to ZaiCoder's cloud sandbox for Managed
 Agents tool execution. `client.beta.environments.create(config={"type":
 "self_hosted"})` creates an environment whose sessions enter a work
-queue instead of an Anthropic-run container; a worker you operate (the
+queue instead of an ZaiCoder-run container; a worker you operate (the
 `EnvironmentWorker` SDK helper in Python/TypeScript/Go, or `ant beta:worker
 poll`/`run`) polls that queue with a Console-generated environment key,
 executes tool calls on infrastructure you control (bare metal, or a
 managed provider — Cloudflare, Daytona, Modal, Vercel, and several
 others), and posts results back. The agent loop itself — orchestration,
-context management, error recovery — stays on Anthropic's side either
+context management, error recovery — stays on ZaiCoder's side either
 way; only tool execution moves. A separate read endpoint,
 `client.beta.environments.work.stats(environment_id)`, reports queue
 depth, in-flight count, oldest-queued timestamp, and `workers_polling`

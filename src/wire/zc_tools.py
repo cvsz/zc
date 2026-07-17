@@ -124,9 +124,9 @@ COMPUTER_USE_TOOL_VERSIONS = {
     "2025-01-24": {"type": "computer_20250124", "beta": "computer-use-2025-01-24"},
 }
 _COMPUTER_USE_2025_01_24_MODELS = {
-    "claude-sonnet-4-5", "claude-haiku-4-5", "claude-haiku-4-5-20251001",
-    "claude-sonnet-4-20250514", "claude-sonnet-4-0",
-    "claude-opus-4-20250514", "claude-opus-4-0",
+    "zc-sonnet-4-5", "zc-haiku-4-5", "zc-haiku-4-5-20251001",
+    "zc-sonnet-4-20250514", "zc-sonnet-4-0",
+    "zc-opus-4-20250514", "zc-opus-4-0",
 }
 
 
@@ -249,8 +249,8 @@ COMPACTION_BETA = "compact-2026-01-12"
 # on zAICoder or Cowork surfaces, Messages API only.
 TASK_BUDGET_BETA = "task-budgets-2026-03-13"
 TASK_BUDGET_MODELS = {
-    "claude-fable-5", "claude-mythos-5",
-    "claude-opus-4-8", "claude-opus-4-7",
+    "zc-fable-5", "zc-mythos-5",
+    "zc-opus-4-8", "zc-opus-4-7",
 }
 
 # Programmatic Tool Calling (allowed_callers) and Tool Use Examples
@@ -494,7 +494,7 @@ class ToolCoder:
     ENDPOINT = "https://api.anthropic.com/v1/messages"
     _breaker = CircuitBreaker(failure_threshold=5, reset_timeout=30)
 
-    def __init__(self, api_key: str, model: str = "claude-sonnet-5",
+    def __init__(self, api_key: str, model: str = "zc-sonnet-5",
                  max_tokens: int = 4096):
         self.api_key    = api_key
         self.model      = model

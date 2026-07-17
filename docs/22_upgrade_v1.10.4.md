@@ -34,7 +34,7 @@ API happened to return.
   reports every hit with `file:line` and the suggested replacement.
   Text-based matching, not an AST — deliberately, since the point is to
   catch these strings wherever they appear (API calls, env files, CI
-  YAML, database seed data), matching Anthropic's own migration guidance
+  YAML, database seed data), matching ZaiCoder's own migration guidance
   to check the whole codebase rather than just the primary call site.
 - `cmd_model_info()`'s live-API branch now also prints the response's
   `capabilities.effort` block (supported levels + default) when present,
@@ -61,9 +61,9 @@ no network call.
 
 - `python3 -m py_compile *.py` — all modules compile after the edits.
 - `--check-deprecated` smoke-tested against a scratch file containing
-  `claude-sonnet-4-20250514`, `claude-opus-4-0`, and a current ID —
+  `zc-sonnet-4-20250514`, `zc-opus-4-0`, and a current ID —
   correctly flagged the two retired strings with file:line and replacement,
   and did not flag the current one.
-- `--model-info claude-sonnet-4-20250514` smoke-tested — prints the
+- `--model-info zc-sonnet-4-20250514` smoke-tested — prints the
   retirement notice with the correct replacement ID before falling
   through to the (expected-to-fail) live lookup.

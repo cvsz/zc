@@ -128,7 +128,7 @@ def test_cmd_code_exec_threads_code_exec_version(monkeypatch, capsys):
     captured = {}
     _install_fake_urlopen(monkeypatch, captured)
 
-    mod.cmd_code_exec("do something", api_key="sk-test", model="claude-sonnet-5",
+    mod.cmd_code_exec("do something", api_key="sk-test", model="zc-sonnet-5",
                       code_exec_version="code_execution_20250522")
 
     header_map_lower = {k.lower(): v for k, v in captured.items()}

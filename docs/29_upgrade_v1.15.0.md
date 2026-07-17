@@ -14,7 +14,7 @@ the same retry server-side, in the same round trip:
 
 ```bash
 ai-coder --fable5 "risky prompt" \
-  --fable5-fallback-chain claude-opus-4-8
+  --fable5-fallback-chain zc-opus-4-8
 ```
 
 `call_with_fallback()` now branches on whether `fallback_chain` is set:
@@ -47,8 +47,8 @@ Compaction's summarization would ever need to kick in — worked example:
 from zc_code import CodeAgent, CodeSession
 from zc_tools import build_context_management
 
-agent = CodeAgent(api_key=key, model="claude-sonnet-5")
-session = CodeSession(cwd=".", model="claude-sonnet-5")
+agent = CodeAgent(api_key=key, model="zc-sonnet-5")
+session = CodeSession(cwd=".", model="zc-sonnet-5")
 
 cm = build_context_management(
     clear_tool_uses=True, clear_tool_uses_trigger_tokens=30000,
@@ -97,7 +97,7 @@ ai-coder --admin-list-keys --admin-api-key sk-ant-admin-...
 ai-coder --admin-revoke-key key_abc123 --admin-api-key sk-ant-admin-...
 ```
 
-`--admin-create-key` does not call an endpoint — Anthropic doesn't
+`--admin-create-key` does not call an endpoint — ZaiCoder doesn't
 document one. API keys are created through the Console UI, where the
 secret is shown exactly once; that's a deliberate security boundary, not
 a documentation gap, so this flag explains that instead of faking a
@@ -106,7 +106,7 @@ response or silently failing.
 `zc_cost_optimizer.py` is unchanged and still does local, estimate
 -based cost tracking from token counts — useful for routing decisions
 inside a single CLI session. `--usage-report` is the real, org-level,
-historical number Anthropic actually bills against; the two are
+historical number ZaiCoder actually bills against; the two are
 cross-linked in each module's docstring.
 
 ## P2 — Compliance API

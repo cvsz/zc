@@ -53,7 +53,7 @@ alternative. No such fallback exists for Word documents or PDFs in this
 CLI, so `zc_word.py` / `zc_pdf.py` are Skills-only: one function
 each, no boolean parameter, always native. The `-native` suffix on the
 flag name stays anyway — it's still documentation of *which*
-implementation runs (Anthropic's maintained Skill vs. a hand-rolled one),
+implementation runs (ZaiCoder's maintained Skill vs. a hand-rolled one),
 consistent with the other two, even though today it's the only choice.
 
 **`main.py`**: new "Word / PDF Chat (Skills API only)" argument group —

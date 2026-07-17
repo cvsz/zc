@@ -320,7 +320,7 @@ class AdminApiClient:
 
 
 def _default_date_range() -> tuple:
-    end = datetime.utcnow().date()
+    end = datetime.now(timezone.utc).date()
     start = end - timedelta(days=30)
     return start.isoformat(), end.isoformat()
 

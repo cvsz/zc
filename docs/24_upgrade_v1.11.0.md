@@ -5,10 +5,10 @@ Two passes, both prompted by fresh audits against platform.zc.com/docs
 v1.11.0" section before it existed — it's the missing doc that closes that
 loop, plus the smaller v1.11.1 follow-up pass.
 
-## v1.11.0 — closing the `claude-api-gap-audit-v1.10.5` list
+## v1.11.0 — closing the `zc-api-gap-audit-v1.10.5` list
 
 Everything below was "missing entirely" or "present but stale" per
-`docs/claude-api-gap-audit-v1.10.5.md`. Confirmed against the live docs
+`docs/zc-api-gap-audit-v1.10.5.md`. Confirmed against the live docs
 before implementing (see that file's own citations) — none of this was
 taken on faith from the audit text alone.
 
@@ -24,7 +24,7 @@ taken on faith from the audit text alone.
 | `stop_details` on refusals | `zc_stream.py` — `handle_refusal()` | Reads `category` (`cyber`/`bio`/null) + `explanation` off a refusal response. |
 | Refusal billing exemption | `zc_metrics.py` | `stop_reason:"refusal"` with no generated output isn't billed; metrics stopped counting cost for it. |
 
-Not done in this pass (see `claude-api-gap-audit-v1.10.5.md` §1 for why):
+Not done in this pass (see `zc-api-gap-audit-v1.10.5.md` §1 for why):
 MCP tunnels — picked up in v1.11.1 below.
 
 ## v1.11.1 — follow-up pass

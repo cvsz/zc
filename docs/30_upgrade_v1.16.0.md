@@ -71,7 +71,7 @@ exactly rather than using a generic retry wrapper:
 
 ## Key fallback order
 
-`--compliance-api-key` → `ANTHROPIC_COMPLIANCE_API_KEY` →
-`--admin-api-key` → `ANTHROPIC_ADMIN_API_KEY`. The Admin API key
+`--compliance-api-key` → `ZC_COMPLIANCE_API_KEY` →
+`--admin-api-key` → `ZC_ADMIN_API_KEY`. The Admin API key
 fallback only unlocks `--compliance-activities`; every other flag will
 hit a 403 with an Admin API key and the error message says so.

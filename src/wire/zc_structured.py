@@ -41,7 +41,7 @@ class StructuredCoder:
 
     ENDPOINT = "https://api.anthropic.com/v1/messages"
 
-    def __init__(self, api_key: str, model: str = "claude-sonnet-5",
+    def __init__(self, api_key: str, model: str = "zc-sonnet-5",
                  max_tokens: int = 4096):
         self.api_key    = api_key
         self.model      = model
