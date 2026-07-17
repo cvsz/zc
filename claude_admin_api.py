@@ -429,7 +429,13 @@ def cmd_claude_code_usage_report(admin_api_key: str, starting_at: str, limit: in
         print("  (no Claude Code activity for this date)")
     for row in rows:
         actor = row.get("user_actor") or row.get("api_actor") or {}
-        actor_label = actor.get("email_address") or actor.get("api_key_name") or "?"
+        actor_label = actor.get("email_address") or actor.get("api_key_id") or actor.get("admin_api_key_id") or "?"
+        actor_label_str = str(actor_label)
+        if "@" in actor_label_str:
+            u, d = actor_label_str.split("@", 1)
+            actor_label = f"{u[:2]}***@{d}" if len(u) > 2 else f"***@{d}"
+        elif len(actor_label_str) > 6:
+            actor_label = f"{actor_label_str[:3]}***{actor_label_str[-3:]}"
         core = row.get("core_metrics", {})
         num_sessions = core.get("num_sessions", "?")
         loc = core.get("lines_of_code", {})

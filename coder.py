@@ -27,7 +27,8 @@ class Coder:
                  service_tier=None, inference_geo=None, fast_mode=False):
         self.config = Config()
         self.api_key = api_key or self.config.get("api_key") or os.getenv("ANTHROPIC_API_KEY", "")
-        self.model = model or self.config.get("model") or "claude-sonnet-5"
+        _m = model or self.config.get("model") or "claude-sonnet-5"
+        self.model = _m.replace("\n", "").replace("\r", "")
         self.temperature = temperature
         self.max_tokens = max_tokens
         self.provider = provider or "anthropic"

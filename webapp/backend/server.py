@@ -322,7 +322,7 @@ def chat_stream(req: ChatRequest, request: Request):
                             yield f"data: {json.dumps({'type': 'token', 'text': text})}\n\n"
         except Exception as e:
             logger.exception("stream_chat_failed", extra={"model": req.model})
-            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+            yield f"data: {json.dumps({'type': 'error', 'message': 'An internal error occurred.'})}\n\n"
             return
 
         new_history = history + [
