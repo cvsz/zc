@@ -38,6 +38,7 @@ aioquic>=1.2.0
 cryptography>=43.0.0
 pyjwt>=2.9.0
 python-jose[cryptography]>=3.3.0
+ecdsa>=0.19.3
 
 # === System Monitoring ===
 psutil>=6.0.0
