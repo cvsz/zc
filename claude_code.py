@@ -323,8 +323,10 @@ class HooksEngine:
             if not cmd:
                 continue
             try:
+                import shlex
+                cmd_args = shlex.split(cmd) if isinstance(cmd, str) else cmd
                 result = subprocess.run(
-                    cmd, shell=True, input=stdin_data,
+                    cmd_args, shell=False, input=stdin_data,
                     capture_output=True, text=True, timeout=30, env=env,
                 )
                 if result.returncode == 2:
@@ -833,7 +835,7 @@ class CodeAgent:
                         return f"[SANDBOX BLOCKED] {e}"
                     except ImportError:
                         pass
-                r = subprocess.run(cmd, shell=True, cwd=cwd,
+                r = subprocess.run(["/bin/bash", "-c", cmd], shell=False, cwd=cwd,
                                    capture_output=True, text=True, timeout=timeout)
                 out = r.stdout.strip()
                 err = r.stderr.strip()

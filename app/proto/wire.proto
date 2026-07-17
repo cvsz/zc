@@ -163,3 +163,24 @@ message UploadProgressStream {
     float transfer_rate_mbps = 5;
     uint64 eta_seconds = 6;
 }
+
+message UploadProgressRequest {
+    string session_id = 1;
+}
+
+service WireService {
+    // Initialize an upload session
+    rpc InitUpload(UploadInitRequest) returns (UploadInitResponse);
+    
+    // Upload a single chunk
+    rpc UploadChunk(ChunkUploadRequest) returns (ChunkUploadResponse);
+    
+    // Stream progress updates for an upload
+    rpc StreamUploadProgress(UploadProgressRequest) returns (stream UploadProgressStream);
+    
+    // Sync file using delta updates
+    rpc SyncDelta(DeltaSyncRequest) returns (DeltaSyncResponse);
+    
+    // Health check
+    rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
+}

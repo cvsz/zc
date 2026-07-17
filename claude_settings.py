@@ -125,8 +125,10 @@ def render_status_line(session_state: dict) -> str:
 
     if isinstance(sl, dict) and sl.get("command"):
         try:
+            import shlex
+            cmd_args = shlex.split(sl["command"]) if isinstance(sl["command"], str) else sl["command"]
             r = subprocess.run(
-                sl["command"], shell=True,
+                cmd_args, shell=False,
                 input=json.dumps(session_state),
                 capture_output=True, text=True, timeout=5,
             )

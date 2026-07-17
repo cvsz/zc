@@ -41,7 +41,7 @@ class CacheKey:
     @classmethod
     def build(cls, namespace: str, *parts: str) -> str:
         """Build a namespaced cache key."""
-        prefix = cls.PREFIXS.get(namespace, 'gen')
+        prefix = cls.PREFIXES.get(namespace, 'gen')
         key_parts = [prefix] + list(parts)
         return ':'.join(key_parts)
     

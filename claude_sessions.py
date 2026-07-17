@@ -167,8 +167,8 @@ def away_summary(cwd: str, since_iso: str) -> str:
     # git commits since
     commits: List[str] = []
     try:
-        r = subprocess.run(f'git log --since="{since_iso}" --oneline',
-                          shell=True, cwd=cwd, capture_output=True, text=True, timeout=5)
+        r = subprocess.run(['git', 'log', f'--since={since_iso}', '--oneline'],
+                          shell=False, cwd=cwd, capture_output=True, text=True, timeout=5)
         commits = [l for l in r.stdout.splitlines() if l.strip()]
     except Exception: pass
 

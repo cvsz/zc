@@ -14,7 +14,9 @@ SYS = ("You are a senior software engineer writing git artifacts. "
 
 
 def _git(cmd: str, cwd: str = ".") -> str:
-    r = subprocess.run(cmd, shell=True, cwd=cwd, capture_output=True, text=True, timeout=30)
+    import shlex
+    cmd_args = shlex.split(cmd) if isinstance(cmd, str) else cmd
+    r = subprocess.run(cmd_args, shell=False, cwd=cwd, capture_output=True, text=True, timeout=30)
     return r.stdout.strip() or r.stderr.strip()
 
 

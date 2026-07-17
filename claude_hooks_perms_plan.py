@@ -86,7 +86,9 @@ class HookManager:
         for h in [h for h in self.hooks if h.event == event]:
             if h.tool_match and tool_name and h.tool_match not in tool_name: continue
             try:
-                p = subprocess.run(h.command, shell=True, capture_output=True,
+                import shlex
+                cmd_args = shlex.split(h.command) if isinstance(h.command, str) else h.command
+                p = subprocess.run(cmd_args, shell=False, capture_output=True,
                                    text=True, timeout=30, env=env)
                 blocked = (event == HookEvent.PRE_TOOL_USE and p.returncode != 0)
                 results.append(HookResult(hook=h, returncode=p.returncode,
