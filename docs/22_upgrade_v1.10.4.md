@@ -8,14 +8,14 @@ cause a production failure.
 
 ## What changed
 
-**`claude_models.py`** — added `RETIRED_MODELS`, a dict distinct from
+**`zc_models.py`** — added `RETIRED_MODELS`, a dict distinct from
 `MODEL_CATALOG`'s `legacy` tier:
 
 - `MODEL_CATALOG["...']["tier"] == "legacy"` means superseded but still
   callable (Opus 4.5/4.6/4.7, Sonnet 4.5/4.6) — these keep working.
-- `RETIRED_MODELS` means the ID now errors: the original Claude 4.0
+- `RETIRED_MODELS` means the ID now errors: the original zAICoder 4.0
   releases (`claude-opus-4-20250514`, `claude-sonnet-4-20250514`, and
-  their dateless `-4-0` aliases — retired 2026-06-15) and Claude Haiku 3
+  their dateless `-4-0` aliases — retired 2026-06-15) and zAICoder Haiku 3
   (`claude-haiku-3-20240307` — retired 2026-02-19), each with a
   recommended replacement ID.
 

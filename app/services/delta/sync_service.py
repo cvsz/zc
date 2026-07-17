@@ -1,5 +1,5 @@
 """
-Enterprise-grade Delta Sync Service for Wire CLI.
+Enterprise-grade Delta Sync Service for wire CLI.
 Implements binary diffing (BSDiff/VCDIFF) for bandwidth-optimized file updates.
 
 2026 Standards:
@@ -12,7 +12,7 @@ Implements binary diffing (BSDiff/VCDIFF) for bandwidth-optimized file updates.
 import asyncio
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Any
 
 import blake3
 
@@ -73,8 +73,8 @@ class DeltaSyncService:
             return None
         
         async with asyncio.Lock():
-            async with open(cas_path, 'rb') as f:
-                return await f.read()
+            with open(cas_path, 'rb') as f:
+                return f.read()
     
     async def store_file(self, content: bytes) -> str:
         """Store file in CAS and return BLAKE3 hash."""
@@ -85,8 +85,8 @@ class DeltaSyncService:
             return content_hash  # Already stored (deduplication)
         
         async with asyncio.Lock():
-            async with open(cas_path, 'wb') as f:
-                await f.write(content)
+            with open(cas_path, 'wb') as f:
+                f.write(content)
         
         return content_hash
     
@@ -282,7 +282,7 @@ class DeltaSyncService:
         self,
         base_hash: str,
         target_size: int
-    ) -> dict[str, float]:
+    ) -> dict[str, Any]:
         """
         Estimate potential bandwidth savings without computing full delta.
         Uses heuristics based on file size difference.

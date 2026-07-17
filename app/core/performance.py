@@ -161,7 +161,8 @@ class ParallelHasher:
             tasks.append((offset, size))
         
         # Execute in thread pool
-        with asyncio.ThreadPoolExecutor(max_workers=actual_workers) as executor:
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor(max_workers=actual_workers) as executor:
             chunk_hashes = await loop.run_in_executor(
                 executor,
                 lambda: list(executor.map(_hash_chunk, tasks))

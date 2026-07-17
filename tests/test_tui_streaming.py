@@ -1,7 +1,7 @@
 """Unit tests for streaming render coalescing (no Textual dependency)."""
 import pytest
 
-from tui_streaming import StreamRenderGate
+from wire.tui_streaming import StreamRenderGate
 
 
 def test_first_delta_renders_immediately():

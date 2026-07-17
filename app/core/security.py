@@ -1,7 +1,7 @@
 """
 Enterprise Security Module - Phase 4
 JWT Authentication, mTLS, OAuth2, and Advanced Security Controls
-2026 Enterprise Standards for Wire CLI-to-API System
+2026 Enterprise Standards for wire CLI-to-API System
 """
 
 import hashlib
@@ -142,6 +142,11 @@ class JWTManager:
         if self._redis:
             await self._redis.setex(f"revoked:{token}", ttl_seconds, "1")
     
+    async def _revoke_token_family(self, family: str) -> None:
+        """Revoke an entire family of refresh tokens"""
+        if self._redis:
+            await self._redis.setex(f"revoked_family:{family}", self.config.jwt_refresh_expiration_days * 86400, "1")
+
     async def rotate_refresh_token(self, old_refresh_token: str, user_id: str) -> tuple[str, str]:
         """Refresh token rotation with family tracking"""
         try:
@@ -151,8 +156,8 @@ class JWTManager:
                 raise jwt.InvalidTokenError("Not a refresh token")
             
             # Check if token family is compromised
-            family = payload.get("family")
-            jti = payload.get("jti")
+            family = str(payload.get("family", ""))
+            jti = str(payload.get("jti", ""))
             
             if self._redis:
                 used_key = f"refresh_used:{jti}"
@@ -190,7 +195,7 @@ class mTLSValidator:
         self.ca_cert: Optional[x509.Certificate] = None
         self.revoked_serials: set[int] = set()
         
-        if config.mtls_enabled and config.ca_cert_path.exists():
+        if config.mtls_enabled and config.ca_cert_path and config.ca_cert_path.exists():
             self._load_ca_cert()
     
     def _load_ca_cert(self):
@@ -217,7 +222,10 @@ class mTLSValidator:
             
             # Verify signature against CA
             try:
-                self.ca_cert.public_key().verify(
+                if self.ca_cert is None:
+                    return {"valid": False, "error": "CA certificate not loaded"}
+                public_key: Any = self.ca_cert.public_key()
+                public_key.verify(
                     client_cert.signature,
                     client_cert.tbs_certificate_bytes,
                     padding.PKCS1v15(),

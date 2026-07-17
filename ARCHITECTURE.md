@@ -2,12 +2,12 @@
 
 ## Overview
 
-zcoder is a single-process Python CLI that wraps the Anthropic Messages
-API, plus a modular set of feature areas (one `claude_*.py` file per API
+wire is a single-process Python CLI that wraps the Anthropic Messages
+API, plus a modular set of feature areas (one `zc_*.py` file per API
 surface: files, batches, vision, RAG, agents, etc). `main.py` is the only
 entrypoint; every feature is reachable as a CLI flag, there is no
 long-running server component. Two of those modules —
-`claude_admin_api.py` and `claude_compliance_api.py` — talk to
+`zc_admin_api.py` and `zc_compliance_api.py` — talk to
 organization-level endpoints under different key types than the rest of
 the CLI; see "Admin & Compliance APIs" below.
 
@@ -20,7 +20,7 @@ the CLI; see "Admin & Compliance APIs" below.
               ┌─────────────────┼─────────────────────┐
               ▼                 ▼                      ▼
         ┌───────────┐   ┌──────────────┐      ┌────────────────┐
-        │ coder.py  │   │ claude_*.py  │      │ projects.py /   │
+        │ coder.py  │   │ zc_*.py  │      │ projects.py /   │
         │ (core     │   │ (one file    │      │ artifacts.py /  │
         │  generate │   │  per API     │      │ personalities.py│
         │  call)    │   │  feature)    │      │ (local state)   │
@@ -44,8 +44,8 @@ the CLI; see "Admin & Compliance APIs" below.
 
               Most modules hit /v1/messages (or /v1/files,
               /v1/batches, ...) with a regular API key.
-              claude_admin_api.py hits /v1/organizations/*
-              and claude_compliance_api.py hits /v1/compliance/*
+              zc_admin_api.py hits /v1/organizations/*
+              and zc_compliance_api.py hits /v1/compliance/*
               — both need an Admin API key (sk-ant-admin01-...)
               or, for the Compliance module, a Compliance
               Access Key (sk-ant-api01-... with compliance
@@ -65,17 +65,17 @@ for free instead of re-implementing it:
   and `CircuitBreaker` (fail-fast during an outage), plus
   `raise_for_http_error()` / `urlopen_json()` / `urlopen_text()`, shared
   helpers that translate a raw `urllib` HTTP/network exception into the
-  `AICoderError` hierarchy `retry()` reads. Wired into every module that
-  makes direct HTTP calls (`coder.py`, `claude_files.py`,
-  `claude_tools.py`, `claude_code.py`, `claude_models.py`, and 15 others
+  `AICoderError` hierarchy `retry()` reads. wired into every module that
+  makes direct HTTP calls (`coder.py`, `zc_files.py`,
+  `zc_tools.py`, `zc_code.py`, `zc_models.py`, and 15 others
   — one `CircuitBreaker` per module/downstream, since a GitHub outage
   shouldn't trip the breaker that guards Anthropic API calls, or vice
-  versa). Two exceptions by design: `claude_batch.py` and
-  `claude_rag.py` call through the `anthropic` SDK client, which retries
+  versa). Two exceptions by design: `zc_batch.py` and
+  `zc_rag.py` call through the `anthropic` SDK client, which retries
   internally, so there's nothing to wire. A handful of call sites that
   fetch an arbitrary caller-supplied URL rather than one fixed dependency
-  (`claude_chrome.py`'s page fetch, `claude_research.py`'s source fetch,
-  `claude_code.py`'s `WebFetch` tool, `claude_plugins.py`'s marketplace
+  (`zc_chrome.py`'s page fetch, `zc_research.py`'s source fetch,
+  `zc_code.py`'s `WebFetch` tool, `zc_plugins.py`'s marketplace
   fetch) use `retry()` without a `CircuitBreaker`, since a breaker keyed
   on "this one dependency is down" doesn't mean anything when every call
   targets a different host.
@@ -90,7 +90,7 @@ for free instead of re-implementing it:
 
 ## Admin & Compliance APIs — a deliberately separate contract
 
-`claude_admin_api.py` and `claude_compliance_api.py` don't route through
+`zc_admin_api.py` and `zc_compliance_api.py` don't route through
 `coder.py` or `resilience.py`. They're org-level surfaces, not model
 calls, and each has its own documented retry contract (429 + retryable
 5xx back off exponentially; 400/401/403/404/409 never retry) implemented
@@ -104,19 +104,19 @@ not a crash:
 - A regular API key (`sk-ant-api03-...`) — everything else in this CLI
   — cannot call either module.
 - An **Admin API key** (`sk-ant-admin01-...`) unlocks all of
-  `claude_admin_api.py`, plus *only* the Activity Feed endpoint
-  (`--compliance-activities`) in `claude_compliance_api.py`.
-- A **Compliance Access Key** (`sk-ant-api01-...`, created in claude.ai
+  `zc_admin_api.py`, plus *only* the Activity Feed endpoint
+  (`--compliance-activities`) in `zc_compliance_api.py`.
+- A **Compliance Access Key** (`sk-ant-api01-...`, created in zc.ai
   with specific scopes at creation time — scopes are immutable
-  afterward) unlocks the rest of `claude_compliance_api.py`: reading or
+  afterward) unlocks the rest of `zc_compliance_api.py`: reading or
   hard-deleting chats, files, and projects, plus directory endpoints.
-  It cannot call `claude_admin_api.py`.
+  It cannot call `zc_admin_api.py`.
 
-`claude_compliance_api.py`'s destructive operations (chat/file/project
+`zc_compliance_api.py`'s destructive operations (chat/file/project
 hard-delete) are permanent with no recovery window, so every `cmd_*` that
 deletes something is dry-run unless the caller passes `yes=True`
 (`--compliance-yes` on the CLI) — the same opt-in-execution pattern
-`claude_models.py` uses for `--upgrade-all`/`--upgrade-yes`, rather than
+`zc_models.py` uses for `--upgrade-all`/`--upgrade-yes`, rather than
 a new confirmation convention. Pagination in both modules only advances
 its cursor after a page is *successfully* fetched, so a failed request
 never silently skips data on retry.
@@ -126,7 +126,7 @@ never silently skips data on retry.
 `Coder.generate()` returns `"[ERROR] ..."` / `"[API ERROR 429] ..."` /
 `"[REFUSED] ..."` strings rather than raising, even though the new
 internals (`exceptions.py`) are exception-based. This preserves the
-existing contract every call site in `main.py` and the `claude_*.py`
+existing contract every call site in `main.py` and the `zc_*.py`
 modules already depends on (`result = c.generate(...); print(result)`).
 Internally, the network call raises typed exceptions so retry/circuit-
 breaking/logging can key off `error_code` and `RETRYABLE`; they're caught

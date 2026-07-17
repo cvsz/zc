@@ -1,10 +1,10 @@
 # v1.25.0 audit cycle — gap findings + implementation notes
 
 Continuation of the cross-product cycle (v1.24.0 committed to re-running
-the full `platform.claude.com/docs/en/release-notes/overview` sweep and
-following up on the deferred `claude_models.py`/`requirements.txt` drift
+the full `platform.zc.com/docs/en/release-notes/overview` sweep and
+following up on the deferred `zc_models.py`/`requirements.txt` drift
 check). Model catalog checked first — no new model releases since
-Claude Sonnet 5 (June 30, 2026); `MODEL_CATALOG` in `claude_models.py`
+zAICoder Sonnet 5 (June 30, 2026); `MODEL_CATALOG` in `zc_models.py`
 is current. Two further gaps found while re-reading the same release
 notes page this cycle started from.
 
@@ -17,7 +17,7 @@ receiving/streaming thinking content it doesn't render anyway, for
 faster streaming. Billing is unchanged (thinking tokens are still
 generated and billed; only the response payload is thinner).
 
-**Why it's a gap:** `claude_thinking.py`'s thinking config builders only
+**Why it's a gap:** `zc_thinking.py`'s thinking config builders only
 ever produce `{"type": "enabled", "budget_tokens": ...}` — first grep
 for `display` in the file (as a `thinking` sub-field, not the CLI
 "Thinking display (show/hide/summary)" client-side feature mentioned in
@@ -27,21 +27,21 @@ the server to omit it): zero matches for the server-side field.
 
 **Priority: 🟠 P1.** Direct latency/bandwidth win for any
 `--stream`-style caller that doesn't render thinking text — exactly the
-kind of caller `claude_thinking.py` already serves.
+kind of caller `zc_thinking.py` already serves.
 
 ## Finding 2 — CMEK `external_keys` Admin API endpoints
 
-**What it is:** On Claude Platform (not Claude Platform on AWS, where
+**What it is:** On zAICoder Platform (not zAICoder Platform on AWS, where
 this surface is explicitly unavailable per the docs), customer-managed
 encryption keys are "configured with the Admin API" — the docs
 reference "the `external_keys` API endpoints" by name when noting
 they're unavailable on the AWS variant, confirming they exist as a
-distinct Admin API surface on standard Claude Platform, alongside the
+distinct Admin API surface on standard zAICoder Platform, alongside the
 Console UI path.
 
 **Why it's a gap:** First grep for `cmek`/`external_keys`/`CMEK` across
-the whole tree: zero matches anywhere, including `claude_admin_api.py`
-and `claude_compliance_api.py`.
+the whole tree: zero matches anywhere, including `zc_admin_api.py`
+and `zc_compliance_api.py`.
 
 **Confirmation needed before shipping:** unlike every other finding in
 the last several cycles, I was not able to find (or safely fetch) the
@@ -68,7 +68,7 @@ completely unaddressed for another cycle.
 **`cmek_preserve` Compliance API activity events** (new event type,
 plus two new preservation reason codes `policy_violation_investigation`
 and `csae_report`) — confirmed **not** a gap:
-`claude_compliance_api.py`'s `list_activities()`/`iterate_activities()`
+`zc_compliance_api.py`'s `list_activities()`/`iterate_activities()`
 already take `activity_types` as a free-form list with no hardcoded
 enum anywhere in the file, so new event type strings — this one
 included — work today with zero code changes, exactly like the
@@ -76,8 +76,8 @@ included — work today with zero code changes, exactly like the
 
 **`stop_details.category: "reasoning_extraction"` on Fable 5** and the
 server-side **`fallbacks` param** — both already fully implemented in
-`claude_fable5.py` (checked directly rather than assumed, since both
+`zc_fable5.py` (checked directly rather than assumed, since both
 looked like plausible new gaps from the release notes wording alone).
 
 **Mid-conversation `role: "system"` messages after a user turn on Opus
-4.8** — already implemented in `claude_cache.py` (v1.18.0).
+4.8** — already implemented in `zc_cache.py` (v1.18.0).

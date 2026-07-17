@@ -50,10 +50,10 @@ jobs:
       security-events: write  # required by github/codeql-action/upload-sarif below
     steps:
       - uses: actions/checkout@v4
-      - run: docker build -t zcoder:security-scan .
+      - run: docker build -t wire:security-scan .
       - uses: aquasecurity/trivy-action@0.28.0
         with:
-          image-ref: zcoder:security-scan
+          image-ref: wire:security-scan
           format: sarif
           output: trivy-results.sarif
           severity: CRITICAL,HIGH

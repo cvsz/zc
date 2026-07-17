@@ -1,7 +1,7 @@
 # v1.20.0 upgrade notes — Dreaming, Outcomes, Webhooks
 
 This release comes from re-running `ROADMAP.md`'s own gap-audit
-methodology against the live docs at platform.claude.com/docs. The
+methodology against the live docs at platform.zc.com/docs. The
 previous audit was dated 2026-07-08 (v1.19.0); this one is also dated
 2026-07-08 (same day, next cycle). Three findings closed, one further
 finding confirmed real and deliberately deferred.
@@ -13,7 +13,7 @@ alongside the Managed Agents memory-store feature it closed, without
 being investigated further. This cycle's step 6 (explicitly check for
 drift/adjacent shipped features, not just net-new items) picked that
 thread back up: re-reading the Managed Agents docs and Anthropic's own
-"New in Claude Managed Agents" release post surfaced that Dreaming,
+"New in zAICoder Managed Agents" release post surfaced that Dreaming,
 Outcomes, and Webhooks all shipped in the same wave (Dreaming as a
 research preview; Outcomes, Multiagent orchestration, and Webhooks
 promoted to public beta the same day), alongside the pre-existing
@@ -28,7 +28,7 @@ differently-worded greps before being written up, per this cycle's step
 - **Outcomes**: first grep for `define_outcome` — zero matches. Second
   grep for `outcome_evaluation|rubric` — also zero matches.
 - **Webhooks**: grep for `webhook` matched exactly one line — a comment
-  in `claude_agents_sdk.py`'s own module docstring describing the
+  in `zc_agents_sdk.py`'s own module docstring describing the
   *existing* SSE-stream pattern as an alternative to (not an
   implementation of) webhooks.
 - **Native Multiagent orchestration**: grep for
@@ -59,7 +59,7 @@ store's contents once it started accumulating duplicates/staleness —
 the only supported cleanup path was calling `memories.delete` on
 individual entries one at a time.
 
-**What changed:** Added to `claude_agents_sdk.py`:
+**What changed:** Added to `zc_agents_sdk.py`:
 
 ```python
 ManagedAgentsClient.create_dream(memory_store_id, session_ids=None,
@@ -165,13 +165,13 @@ stream — the lead agent can "check back in with other agents
 mid-workflow."
 
 **Why this is a real, separate gap from the existing client-side
-orchestration:** `claude_agents_sdk.py` already has
+orchestration:** `zc_agents_sdk.py` already has
 `--agent-orchestrate` / `ManagedAgent.orchestrate()` /
 `spawn_subagent()`, in place since v1.8.0. That pattern decomposes a
 goal into steps and runs each as an independent Messages API call from
 the local process — no shared Managed Agents session, no shared
 sandbox, no persistent cross-subagent event stream. It's a legitimate,
-different pattern (and still useful for zcoder's actual usage: an
+different pattern (and still useful for wire's actual usage: an
 independent-subtasks decomposition doesn't need a shared filesystem),
 not a partial implementation of the native feature under a different
 name.
@@ -179,11 +179,11 @@ name.
 **Why this cycle didn't build it:** the native feature's entire value
 proposition is the shared-sandbox, shared-event-stream, in-session
 delegation model. A faithful implementation means designing how
-`claude_agents_sdk.py` exposes per-subagent model/prompt/tool
+`zc_agents_sdk.py` exposes per-subagent model/prompt/tool
 configuration on the Agent resource and handles multiple concurrent
 event-stream threads (`sessions.threads.*`, per the docs) — a
 meaningfully larger, more architecturally involved surface than the
-three items closed above, and there isn't yet a concrete zcoder use case
+three items closed above, and there isn't yet a concrete wire use case
 that needs subagents to share one live sandbox rather than run as
 independent calls. This is the same reasoning `ROADMAP.md` used for the
 Compliance API between v1.15.0 (documented as a gap, not built) and
@@ -197,7 +197,7 @@ within a single Managed Agents session.
 ## Drift check
 
 Also checked for drift (not just net-new features) per this cycle's
-methodology: `claude_models.py`'s catalog (Fable 5, Mythos 5, Opus 4.8,
+methodology: `zc_models.py`'s catalog (Fable 5, Mythos 5, Opus 4.8,
 Sonnet 5, Haiku 4.5, legacy 4.5/4.6/4.7 tiers) still matches the live
 Models overview exactly — no stale entries, no missing releases, no new
 deprecation dates beyond what's already recorded in `RETIRED_MODELS`.
@@ -205,8 +205,8 @@ The `requirements.txt` floor pin (`anthropic>=0.75.0`) needed no change.
 
 ## Tests
 
-`claude_agents_sdk.py` already had test coverage from v1.19.0 (10 tests).
-Added 16 more tests to `tests/test_claude_agents_sdk.py` (26 total in
+`zc_agents_sdk.py` already had test coverage from v1.19.0 (10 tests).
+Added 16 more tests to `tests/test_zc_agents_sdk.py` (26 total in
 that file): Dreaming's beta header, `create_dream()`'s request shape
 (with and without `session_ids`), `get_dream()`'s output-store
 extraction (including the "no outputs yet" pending case), `list_dreams()`,

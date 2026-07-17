@@ -1,13 +1,13 @@
 # v1.29.0 — Textual TUI + web console streaming/sessions/theme upgrade
 
 **Scope requested:** "Advanced Professional TUI / Frontend / Backend" —
-a deep-dive across all three of zcoder's non-argparse front ends: a new
+a deep-dive across all three of wire's non-argparse front ends: a new
 terminal TUI, and an upgrade to the existing web console's frontend and
 backend (added in v1.28.0).
 
-This was a feature deep-dive, not a `platform.claude.com/docs` gap-audit
+This was a feature deep-dive, not a `platform.zc.com/docs` gap-audit
 cycle — no new Anthropic API surface is involved here beyond what
-`coder.py`/`claude_stream.py` already wrapped. `ROADMAP.md`'s "last
+`coder.py`/`zc_stream.py` already wrapped. `ROADMAP.md`'s "last
 audited" date is unchanged.
 
 ## 1. CLI TUI — `tui.py` (new)
@@ -20,13 +20,13 @@ three that gives a real widget/layout/event model.
 **What it reuses, unchanged:**
 - `coder.Coder` — non-streaming path (`--stream` switch off)
 - `personalities.PersonalityManager`, `skills.SkillManager`
-- `claude_models.MODEL_CATALOG`
+- `zc_models.MODEL_CATALOG`
 - `main.AGENT_SYSTEM_PROMPTS` (imported lazily inside a function, not at
   module scope — `main.py` imports `tui.py` for `--tui`, so a top-level
   `from main import ...` in `tui.py` would be circular)
 
 **What's new:** the streaming path doesn't go through `coder.Coder`
-(which is non-streaming only) or `claude_stream.StreamCoder` (which
+(which is non-streaming only) or `zc_stream.StreamCoder` (which
 prints to stdout, wrong for a TUI widget) — `tui.py` has its own
 `_stream_reply()` using the `anthropic` SDK directly, structurally
 identical to `StreamCoder.stream()`'s `content_block_delta`/`text_delta`

@@ -1,7 +1,7 @@
 """tests/test_logging_config.py"""
 import logging
 
-from logging_config import JsonFormatter, correlation_id, new_correlation_id, redact
+from wire.logging_config import JsonFormatter, correlation_id, new_correlation_id, redact
 
 
 def test_redact_scrubs_api_key():
@@ -25,7 +25,7 @@ def test_new_correlation_id_is_unique():
 def test_json_formatter_includes_correlation_id():
     new_correlation_id()
     record = logging.LogRecord(
-        name="zcoder.test", level=logging.INFO, pathname=__file__,
+        name="wire.test", level=logging.INFO, pathname=__file__,
         lineno=1, msg="hello", args=(), exc_info=None,
     )
     out = JsonFormatter().format(record)

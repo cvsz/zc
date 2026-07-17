@@ -1,13 +1,13 @@
 """
 Enterprise Monitoring & Observability - Phase 4
 Grafana Dashboards, Prometheus Alerts, and Real-time System Health
-2026 Enterprise Standards for Wire CLI-to-API System
+2026 Enterprise Standards for wire CLI-to-API System
 """
 
 import os
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable, Awaitable
 
 import aiofiles
 from prometheus_client import (
@@ -183,7 +183,7 @@ GRAFANA_DASHBOARD_CONFIG = {
     "dashboard": {
         "id": None,
         "uid": "wire-enterprise-main",
-        "title": "Wire Enterprise - System Overview",
+        "title": "wire Enterprise - System Overview",
         "tags": ["wire", "enterprise", "cli-api"],
         "timezone": "browser",
         "schemaVersion": 38,
@@ -342,7 +342,7 @@ groups:
     interval: 30s
     rules:
       # High Error Rate Alert
-      - alert: WireHighErrorRate
+      - alert: wireHighErrorRate
         expr: |
           sum(rate(wire_http_requests_total{status_code=~"5.."}[5m])) 
           / sum(rate(wire_http_requests_total[5m])) > 0.05
@@ -354,7 +354,7 @@ groups:
           description: "Error rate is {{ $value | humanizePercentage }} over the last 5 minutes"
 
       # High Latency Alert
-      - alert: WireHighLatency
+      - alert: wireHighLatency
         expr: |
           histogram_quantile(0.95, rate(wire_http_request_duration_seconds_bucket[5m])) > 1
         for: 10m
@@ -365,7 +365,7 @@ groups:
           description: "95th percentile latency is {{ $value }}s"
 
       # Upload Queue Backlog
-      - alert: WireUploadBacklog
+      - alert: wireUploadBacklog
         expr: wire_upload_active > 500
         for: 15m
         labels:
@@ -375,7 +375,7 @@ groups:
           description: "{{ $value }} active uploads"
 
       # Cache Hit Ratio Low
-      - alert: WireCacheHitRatioLow
+      - alert: wireCacheHitRatioLow
         expr: |
           rate(wire_cache_hits_total[5m]) 
           / (rate(wire_cache_hits_total[5m]) + rate(wire_cache_misses_total[5m])) < 0.5
@@ -387,7 +387,7 @@ groups:
           description: "Cache hit ratio is {{ $value | humanizePercentage }}"
 
       # Worker Queue Depth High
-      - alert: WireWorkerQueueDepthHigh
+      - alert: wireWorkerQueueDepthHigh
         expr: wire_worker_queue_depth > 1000
         for: 10m
         labels:
@@ -397,7 +397,7 @@ groups:
           description: "Queue {{ $labels.queue_name }} has {{ $value }} pending tasks"
 
       # Authentication Failures Spike
-      - alert: WireAuthFailuresSpike
+      - alert: wireAuthFailuresSpike
         expr: |
           rate(wire_auth_attempts_total{success="false"}[5m]) > 10
         for: 5m
@@ -408,7 +408,7 @@ groups:
           description: "{{ $value }} auth failures per second"
 
       # Rate Limiting Active
-      - alert: WireRateLimitingActive
+      - alert: wireRateLimitingActive
         expr: rate(wire_rate_limit_hits_total[5m]) > 50
         for: 5m
         labels:
@@ -418,7 +418,7 @@ groups:
           description: "{{ $value }} rate limit hits per second"
 
       # gRPC Service Errors
-      - alert: WireGrpcErrors
+      - alert: wireGrpcErrors
         expr: |
           sum(rate(wire_grpc_requests_total{status_code!="OK"}[5m])) 
           / sum(rate(wire_grpc_requests_total[5m])) > 0.01
@@ -470,18 +470,18 @@ class OpenTelemetryConfig:
 class HealthChecker:
     """Comprehensive Health Check System"""
     
-    def __init__(self):
-        self.checks: dict[str, callable] = {}
+    def __init__(self) -> None:
+        self.checks: dict[str, Callable[[], Awaitable[dict[str, Any]]]] = {}
         self.register_default_checks()
     
-    def register_default_checks(self):
+    def register_default_checks(self) -> None:
         """Register default health checks"""
         self.register_check("database", self._check_database)
         self.register_check("redis", self._check_redis)
         self.register_check("storage", self._check_storage)
         self.register_check("workers", self._check_workers)
     
-    def register_check(self, name: str, check_func: callable):
+    def register_check(self, name: str, check_func: Callable[[], Awaitable[dict[str, Any]]]) -> None:
         """Register a health check"""
         self.checks[name] = check_func
     
@@ -503,7 +503,7 @@ class HealthChecker:
             test_file = storage_path / ".health_check"
             async with aiofiles.open(test_file, 'w') as f:
                 await f.write("ok")
-            await test_file.unlink()
+            test_file.unlink()
             return {"status": "healthy", "path": str(storage_path)}
         except Exception as e:
             return {"status": "unhealthy", "error": str(e)}

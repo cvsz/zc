@@ -1,16 +1,16 @@
 # v1.10.5 — Native memory tool, context editing, tool search tool
 
-Prompted by a direct audit request: "what's missing, relative to Claude's
+Prompted by a direct audit request: "what's missing, relative to zAICoder's
 actual current API capabilities?" Three concrete gaps found in
-`claude_tools.py` and closed in this pass.
+`zc_tools.py` and closed in this pass.
 
 ## What was missing
 
-`claude_tools.py`'s `SERVER_TOOLS` covered web_search, web_fetch,
+`zc_tools.py`'s `SERVER_TOOLS` covered web_search, web_fetch,
 code_execution, bash, text_editor, and computer_use — but not:
 
 1. **The memory tool** (`memory_20250818`) — GA since 2025-09-29, no beta
-   header required. This project already has `claude_memory.py`, but
+   header required. This project already has `zc_memory.py`, but
    that's a custom database-backed memory system this CLI invented, not
    Anthropic's server-declared/client-executed memory tool. Different
    thing, same name is coincidental.
@@ -20,13 +20,13 @@ code_execution, bash, text_editor, and computer_use — but not:
    multi-hour tool-heavy session doesn't silently degrade as old content
    piles up in the transcript.
 3. **The tool search tool** (`tool-search-tool-2025-10-19` beta) — lets
-   Claude discover tools on demand instead of loading every definition
+   zAICoder discover tools on demand instead of loading every definition
    upfront, relevant once a tool library gets into the dozens/hundreds
    range.
 
 ## What changed
 
-**`claude_tools.py`**
+**`zc_tools.py`**
 
 - `SERVER_TOOLS` — added `memory` and `tool_search` entries.
 - New `SERVER_TOOL_BETAS` dict replaces the old single membership check
@@ -40,7 +40,7 @@ code_execution, bash, text_editor, and computer_use — but not:
   `clear_thinking_20251015`), with sane defaults (30k input-token
   trigger, keep last 3 tool uses).
 - New `MemoryToolHandler` class — the client-side implementation the
-  memory tool requires (it's server-declared, client-executed: Claude
+  memory tool requires (it's server-declared, client-executed: zAICoder
   emits `tool_use` blocks with a `command` field, your application
   carries them out). Supports view/create/str_replace/insert/delete/rename
   against a local directory. Every path is resolved via `_resolve()` and
@@ -66,7 +66,7 @@ default `~/.ai-coder/memory`) and `--context-management` flag (applies to
 
 ## What was NOT changed
 
-- `claude_memory.py` — left as-is. It's a legitimately different feature
+- `zc_memory.py` — left as-is. It's a legitimately different feature
   (this CLI's own tagged/namespaced memory store with importance and
   retention fields) and isn't a duplicate of the native memory tool; the
   two can coexist, they just shouldn't be confused for each other.

@@ -1,4 +1,4 @@
-# zcoder web console
+# wire web console
 
 A browser UI for the AI Model Coder CLI. It does not replace the CLI or
 duplicate its logic — `webapp/backend/server.py` imports and calls the
@@ -47,7 +47,7 @@ uvicorn webapp.backend.server:app --app-dir . --host 0.0.0.0 --port 8420
 |-----------------------------|------------------------------------------|
 | `POST /api/chat`            | `coder.Coder.generate()`                 |
 | `GET  /api/health`          | `health.run_health_check()`              |
-| `GET  /api/models`          | `claude_models.MODEL_CATALOG`            |
+| `GET  /api/models`          | `zc_models.MODEL_CATALOG`            |
 | `GET  /api/personalities`   | `personalities.PersonalityManager`       |
 | `GET  /api/skills`          | `skills.SkillManager`                    |
 | `GET  /api/agents`          | `main.AGENT_SYSTEM_PROMPTS`              |

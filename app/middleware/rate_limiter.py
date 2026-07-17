@@ -10,7 +10,7 @@ from typing import Any, Callable, Optional
 from fastapi import HTTPException, Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from app.core.cache import get_redis_client
+from app.core.cache import get_cache
 
 
 class TokenBucket:
@@ -19,7 +19,7 @@ class TokenBucket:
     def __init__(self, capacity: int, refill_rate: float):
         self.capacity = capacity  # Max tokens
         self.refill_rate = refill_rate  # Tokens per second
-        self.tokens = capacity
+        self.tokens: float = float(capacity)
         self.last_refill = time.time()
     
     def consume(self, tokens: int = 1) -> bool:
@@ -38,7 +38,10 @@ class TokenBucket:
     
     async def consume_async(self, tokens: int = 1) -> bool:
         """Async version using Redis for distributed rate limiting."""
-        redis = await get_redis_client()
+        cache = get_cache()
+        if not cache._connected or not cache.redis_client:
+            return True
+        redis = cache.redis_client
         key = f"ratelimit:{int(time.time()) // 60}"  # Per-minute buckets
         
         current = await redis.get(key)
@@ -98,7 +101,7 @@ class CircuitBreaker:
             return True
         
         if self.state == self.OPEN:
-            if (time.time() - self.last_failure_time) > self.recovery_timeout:
+            if self.last_failure_time is not None and (time.time() - self.last_failure_time) > self.recovery_timeout:
                 self.state = self.HALF_OPEN
                 self.half_open_calls = 0
                 return True

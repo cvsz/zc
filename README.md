@@ -1,8 +1,8 @@
-# Wire Enterprise CLI-to-API System
+# wire Enterprise CLI-to-API System
 
 ## Enterprise-Grade Production-Ready Implementation (2026 Standards)
 
-A highly optimized, full-stack system for Wire CLI-to-API workflows with advanced file uploads, real-time control panel, and enterprise resiliency patterns.
+A highly optimized, full-stack system for wire CLI-to-API workflows with advanced file uploads, real-time control panel, and enterprise resiliency patterns.
 
 ## 🚀 Features
 
@@ -28,23 +28,47 @@ A highly optimized, full-stack system for Wire CLI-to-API workflows with advance
 - Feature flag management
 - Activity logging
 
-### Phase 4: Security & Authentication 🔲
-- JWT-based authentication
-- mTLS service-to-service communication
-- RBAC authorization
-- Audit trail logging
+### Phase 4: Observability & Control Panel ✅
+- Distributed tracing with OpenTelemetry
+- GraphQL API with subscriptions
+- WebSocket real-time metrics streaming
+- Feature flag management & Activity logging
 
-### Phase 5: Kubernetes Deployment 🔲
-- k3s optimized manifests
-- Cilium eBPF networking
-- HPA/VPA auto-scaling
-- GitOps-ready (ArgoCD)
+### Phase 5: Security & Resiliency ✅
+- JWT, mTLS, and OPA (Open Policy Agent) integration
+- End-to-end payload encryption
+- Token bucket rate limiting (Redis Lua)
+- Circuit breaker pattern & Bulkheads (Semaphore)
 
-### Phase 6: Testing & Documentation 🔲
-- Integration tests
-- Load testing suite
-- API documentation
-- Runbook & operations guide
+### Phase 6: Deployment & GitOps ✅
+- k3s optimized manifests & Cilium zero-trust networking
+- HPA/VPA custom metrics auto-scaling
+- GitOps-ready ArgoCD architecture
+- Enterprise monitoring stack (Prometheus & Grafana)
+
+## 📚 Documentation Directory
+
+The project documentation has been organized into logical sections:
+
+**Enterprise Implementation**
+- [Enterprise Implementation Plan](docs/enterprise/ENTERPRISE_IMPLEMENTATION_PLAN.md)
+- [Enterprise Summary](docs/enterprise/ENTERPRISE_SUMMARY.md)
+- [Implementation Checklist](docs/enterprise/IMPLEMENTATION_CHECKLIST.md)
+
+**Phase Completion Reports**
+- [Phase 2 Complete](docs/enterprise/PHASE2_COMPLETE.md)
+- [Phase 3 Complete](docs/enterprise/PHASE3_COMPLETE.md)
+- [Phase 4 Complete](docs/enterprise/PHASE4_COMPLETE.md)
+- [Phase 5 Complete](docs/enterprise/PHASE5_COMPLETE.md)
+- [Phase 6 Complete](docs/enterprise/PHASE6_COMPLETE.md)
+- [Performance Optimization Complete](docs/enterprise/PERFORMANCE_OPTIMIZATION_COMPLETE.md)
+
+**Guides & SDKs**
+- [Quickstart Guide](QUICKSTART.md)
+- [Architecture](ARCHITECTURE.md)
+- [Agents Architecture](AGENTS.md)
+- [Config Generator Guide](docs/guides/config_generator.md)
+- [File SDK Guide](docs/guides/file_sdk.md)
 
 ## 📁 Project Structure
 
@@ -53,7 +77,7 @@ A highly optimized, full-stack system for Wire CLI-to-API workflows with advance
 ├── app/
 │   ├── api/
 │   │   ├── v1/
-│   │   │   └── routes.py          # Wire CLI REST endpoints
+│   │   │   └── routes.py          # wire CLI REST endpoints
 │   │   └── control_panel.py       # GraphQL control panel
 │   ├── core/
 │   │   ├── config.py              # Configuration management
@@ -71,10 +95,14 @@ A highly optimized, full-stack system for Wire CLI-to-API workflows with advance
 │   │       └── sync_service.py    # Delta synchronization
 │   └── telemetry/
 │       └── otel_service.py        # OpenTelemetry integration
+├── docs/
+│   ├── enterprise/                # Enterprise implementation plans & reports
+│   └── guides/                    # Developer guides & SDKs
 ├── k8s/
-│   └── wire-api-deployment.yaml   # Kubernetes manifests
+│   └── network-policies.yaml      # Kubernetes manifests
+├── argocd/                        # GitOps application configurations
+├── monitoring/                    # Observability stack manifests
 ├── AGENTS.md                      # Agent architecture specification
-├── PHASE2_COMPLETE.md             # Phase 2 completion report
 ├── requirements-enterprise.txt    # Enterprise dependencies
 └── README.md                      # This file
 ```
@@ -104,7 +132,7 @@ python -m uvicorn app.main:app --host 0.0.0.0 --port 8420 --workers 4
 
 | Service | Endpoint | Description |
 |---------|----------|-------------|
-| REST API | `http://localhost:8420/v1/wire` | Wire CLI REST endpoints |
+| REST API | `http://localhost:8420/v1/wire` | wire CLI REST endpoints |
 | GraphQL | `http://localhost:8420/admin/graphql` | Control panel GraphQL API |
 | gRPC | `localhost:9090` | gRPC service |
 | Docs | `http://localhost:8420/docs` | OpenAPI documentation |

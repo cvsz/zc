@@ -1,0 +1,436 @@
+# Makefile — Qwen Code + OpenCode Multi-Provider SDK Workflow
+#
+# This file never reads or prints secret values directly. The generator receives
+# the .env path and writes only environment-variable references into generated
+# configuration files.
+#
+# Common usage:
+#   make bootstrap
+#   make sdk-all
+#   make env-status
+#   make generate-all INCLUDE_ACCESSIBLE=1
+#   make validate
+#   make rotate
+#
+# Override paths:
+#   make generate-all ENV_FILE=/secure/z-platform.env
+#   make generate-opencode OPENCODE_CONFIG=./opencode.json
+#
+# Restrict providers:
+#   make generate-all PROVIDERS=openrouter,nvidia-nim,groq,ollama,litellm
+
+SHELL := /bin/bash
+.SHELLFLAGS := -euo pipefail -c
+.ONESHELL:
+.DELETE_ON_ERROR:
+.DEFAULT_GOAL := help
+
+# ------------------------------------------------------------------------------
+# Project paths
+# ------------------------------------------------------------------------------
+
+PYTHON ?= python3
+GENERATOR ?= ./qwen_opencode_config_generator.py
+ENV_FILE ?= .env
+
+QWEN_CONFIG ?= $(HOME)/.qwen/settings.json
+ROTATION_STATE ?= $(HOME)/.qwen/model-rotation-state.json
+OPENCODE_CONFIG ?= $(HOME)/.config/opencode/opencode.json
+
+VENV_DIR ?= .venv
+PYTHON_VENV := $(VENV_DIR)/bin/python
+PIP_VENV := $(VENV_DIR)/bin/pip
+
+CACHE_DIR ?= .cache/qwen-config-generator
+LOG_DIR ?= .logs
+BACKUP_DIR ?= .backups
+
+# Comma-separated provider slugs understood by the generator.
+PROVIDERS ?=
+
+# Set INCLUDE_ACCESSIBLE=1 to include account-visible models whose free status
+# cannot be proven from the provider catalog.
+INCLUDE_ACCESSIBLE ?= 0
+
+# Set DRY_RUN=1 to print generated JSON without writing configuration files.
+DRY_RUN ?= 0
+
+# ------------------------------------------------------------------------------
+# SDK package sets
+# ------------------------------------------------------------------------------
+
+# OpenRouter, NVIDIA NIM, DeepSeek, and other OpenAI-compatible services use the
+# OpenAI SDK. Provider-native SDKs are installed for direct integration/testing.
+PYTHON_SDKS ?= \
+	openai \
+	anthropic \
+	google-genai \
+	groq \
+	together \
+	huggingface-hub \
+	litellm \
+	python-dotenv \
+	httpx \
+	pydantic \
+	tenacity
+
+NODE_SDKS ?= \
+	openai \
+	@anthropic-ai/sdk \
+	@google/genai \
+	groq-sdk \
+	together-ai \
+	@huggingface/inference \
+	@ai-sdk/openai-compatible \
+	@ai-sdk/anthropic \
+	@ai-sdk/google \
+	dotenv \
+	zod
+
+# Development and validation tools.
+PYTHON_DEV_SDKS ?= \
+	pytest \
+	pytest-cov \
+	ruff \
+	mypy
+
+NODE_DEV_SDKS ?= \
+	typescript \
+	tsx \
+	eslint \
+	prettier
+
+# ------------------------------------------------------------------------------
+# Tool detection
+# ------------------------------------------------------------------------------
+
+UV := $(shell command -v uv 2>/dev/null || true)
+PNPM := $(shell command -v pnpm 2>/dev/null || true)
+NPM := $(shell command -v npm 2>/dev/null || true)
+JQ := $(shell command -v jq 2>/dev/null || true)
+
+ifeq ($(strip $(UV)),)
+PY_INSTALL = $(PIP_VENV) install --upgrade
+else
+PY_INSTALL = uv pip install --python $(PYTHON_VENV) --upgrade
+endif
+
+ifeq ($(strip $(PNPM)),)
+NODE_INSTALL = npm install
+NODE_INSTALL_DEV = npm install --save-dev
+else
+NODE_INSTALL = pnpm add
+NODE_INSTALL_DEV = pnpm add --save-dev
+endif
+
+# ------------------------------------------------------------------------------
+# Generator arguments
+# ------------------------------------------------------------------------------
+
+GENERATOR_COMMON_ARGS = \
+	--env-file "$(ENV_FILE)" \
+	--settings "$(QWEN_CONFIG)" \
+	--state "$(ROTATION_STATE)" \
+	--opencode-settings "$(OPENCODE_CONFIG)"
+
+ifneq ($(strip $(PROVIDERS)),)
+GENERATOR_PROVIDER_ARGS = --providers "$(PROVIDERS)"
+else
+GENERATOR_PROVIDER_ARGS =
+endif
+
+ifeq ($(INCLUDE_ACCESSIBLE),1)
+GENERATOR_ACCESS_ARGS = --include-accessible
+else
+GENERATOR_ACCESS_ARGS =
+endif
+
+ifeq ($(DRY_RUN),1)
+GENERATOR_DRY_RUN_ARG = --dry-run
+else
+GENERATOR_DRY_RUN_ARG =
+endif
+
+GENERATOR_GENERATE_ARGS = \
+	$(GENERATOR_ACCESS_ARGS) \
+	$(GENERATOR_PROVIDER_ARGS) \
+	$(GENERATOR_DRY_RUN_ARG)
+
+# ------------------------------------------------------------------------------
+# Public targets
+# ------------------------------------------------------------------------------
+
+.PHONY: help
+help: ## Show available targets
+	@awk 'BEGIN {FS = ":.*## "; printf "\nUsage: make <target> [VARIABLE=value]\n\nTargets:\n"} \
+		/^[a-zA-Z0-9_.-]+:.*## / {printf "  %-24s %s\n", $$1, $$2} \
+		END {printf "\nExamples:\n  make sdk-all\n  make generate-all INCLUDE_ACCESSIBLE=1\n  make generate-opencode PROVIDERS=openrouter,nvidia-nim\n\n"}' \
+		$(MAKEFILE_LIST)
+
+.PHONY: bootstrap
+bootstrap: directories check-generator venv ## Prepare local directories and Python virtual environment
+	@printf 'Bootstrap complete.\n'
+
+.PHONY: check
+check: check-tools check-generator check-env syntax lint validate ## Run all local static and configuration checks
+
+.PHONY: sdk-all
+sdk-all: sdk-python-all sdk-node-all ## Install all Python and Node provider SDKs
+
+.PHONY: sdk-python-all
+sdk-python-all: venv ## Install all Python provider SDKs and development tools
+	$(PY_INSTALL) $(PYTHON_SDKS) $(PYTHON_DEV_SDKS)
+
+.PHONY: sdk-python-runtime
+sdk-python-runtime: venv ## Install Python runtime provider SDKs only
+	$(PY_INSTALL) $(PYTHON_SDKS)
+
+.PHONY: sdk-python-dev
+sdk-python-dev: venv ## Install Python validation and test SDKs
+	$(PY_INSTALL) $(PYTHON_DEV_SDKS)
+
+.PHONY: sdk-node-all
+sdk-node-all: check-node package-json ## Install all Node provider SDKs and development tools
+	$(NODE_INSTALL) $(NODE_SDKS)
+	$(NODE_INSTALL_DEV) $(NODE_DEV_SDKS)
+
+.PHONY: sdk-node-runtime
+sdk-node-runtime: check-node package-json ## Install Node runtime provider SDKs only
+	$(NODE_INSTALL) $(NODE_SDKS)
+
+.PHONY: sdk-node-dev
+sdk-node-dev: check-node package-json ## Install Node development SDKs only
+	$(NODE_INSTALL_DEV) $(NODE_DEV_SDKS)
+
+.PHONY: env-status
+env-status: check-generator check-env ## Show configured providers without exposing secret values
+	$(PYTHON) "$(GENERATOR)" $(GENERATOR_COMMON_ARGS) env-status
+
+.PHONY: generate-all
+generate-all: check-generator check-env directories ## Generate Qwen Code and OpenCode configurations
+	$(PYTHON) "$(GENERATOR)" $(GENERATOR_COMMON_ARGS) generate \
+		--target both \
+		$(GENERATOR_GENERATE_ARGS)
+
+.PHONY: generate-qwen
+generate-qwen: check-generator check-env directories ## Generate only Qwen Code configuration
+	$(PYTHON) "$(GENERATOR)" $(GENERATOR_COMMON_ARGS) generate \
+		--target qwen \
+		$(GENERATOR_GENERATE_ARGS)
+
+.PHONY: generate-opencode
+generate-opencode: check-generator check-env directories ## Generate only OpenCode configuration
+	$(PYTHON) "$(GENERATOR)" $(GENERATOR_COMMON_ARGS) generate \
+		--target opencode \
+		$(GENERATOR_GENERATE_ARGS)
+
+.PHONY: refresh
+refresh: generate-all ## Compatibility alias for generate-all
+
+.PHONY: validate
+validate: check-generator ## Validate generated Qwen Code and OpenCode configurations
+	$(PYTHON) "$(GENERATOR)" \
+		--settings "$(QWEN_CONFIG)" \
+		--state "$(ROTATION_STATE)" \
+		--opencode-settings "$(OPENCODE_CONFIG)" \
+		validate
+
+.PHONY: rotate
+rotate: check-generator ## Rotate Qwen Code to the next model
+	$(PYTHON) "$(GENERATOR)" \
+		--settings "$(QWEN_CONFIG)" \
+		--state "$(ROTATION_STATE)" \
+		--opencode-settings "$(OPENCODE_CONFIG)" \
+		rotate
+
+.PHONY: rotate-previous
+rotate-previous: check-generator ## Rotate Qwen Code to the previous model
+	$(PYTHON) "$(GENERATOR)" \
+		--settings "$(QWEN_CONFIG)" \
+		--state "$(ROTATION_STATE)" \
+		--opencode-settings "$(OPENCODE_CONFIG)" \
+		rotate --step -1
+
+.PHONY: status
+status: check-generator ## Show current model and rotation state
+	$(PYTHON) "$(GENERATOR)" \
+		--settings "$(QWEN_CONFIG)" \
+		--state "$(ROTATION_STATE)" \
+		--opencode-settings "$(OPENCODE_CONFIG)" \
+		status
+
+.PHONY: syntax
+syntax: check-generator ## Compile-check the Python generator
+	$(PYTHON) -m py_compile "$(GENERATOR)"
+
+.PHONY: lint
+lint: check-generator ## Run Ruff when installed
+	@if command -v ruff >/dev/null 2>&1; then \
+		ruff check "$(GENERATOR)"; \
+	elif [[ -x "$(VENV_DIR)/bin/ruff" ]]; then \
+		"$(VENV_DIR)/bin/ruff" check "$(GENERATOR)"; \
+	else \
+		printf 'Ruff is not installed; skipping lint. Run: make sdk-python-dev\n'; \
+	fi
+
+.PHONY: format
+format: check-generator ## Format the generator with Ruff when installed
+	@if command -v ruff >/dev/null 2>&1; then \
+		ruff format "$(GENERATOR)"; \
+	elif [[ -x "$(VENV_DIR)/bin/ruff" ]]; then \
+		"$(VENV_DIR)/bin/ruff" format "$(GENERATOR)"; \
+	else \
+		printf 'Ruff is not installed; skipping format. Run: make sdk-python-dev\n'; \
+	fi
+
+.PHONY: test
+test: syntax ## Run project tests when present
+	@if [[ -d tests ]]; then \
+		if command -v pytest >/dev/null 2>&1; then \
+			pytest -q; \
+		elif [[ -x "$(VENV_DIR)/bin/pytest" ]]; then \
+			"$(VENV_DIR)/bin/pytest" -q; \
+		else \
+			printf 'pytest is not installed. Run: make sdk-python-dev\n'; \
+			exit 2; \
+		fi; \
+	else \
+		printf 'No tests directory found; syntax check passed.\n'; \
+	fi
+
+.PHONY: show-models
+show-models: ## Display generated model identifiers without credentials
+	@if [[ ! -f "$(QWEN_CONFIG)" ]]; then \
+		printf 'Missing Qwen config: %s\n' "$(QWEN_CONFIG)"; \
+		exit 2; \
+	fi
+	@if [[ -n "$(JQ)" ]]; then \
+		jq -r \
+			'.modelProviders | to_entries[] | .key as $$auth | .value.models[] | "\($$auth)\t\(.id)\t\(.name)"' \
+			"$(QWEN_CONFIG)"; \
+	else \
+		$(PYTHON) -c 'import json,pathlib; p=pathlib.Path(r"""$(QWEN_CONFIG)"""); d=json.loads(p.read_text()); [print(a, m["id"], m.get("name",""), sep="\t") for a,g in d.get("modelProviders",{}).items() for m in g.get("models",[])]'; \
+	fi
+
+.PHONY: show-opencode-models
+show-opencode-models: ## Display OpenCode provider/model identifiers without credentials
+	@if [[ ! -f "$(OPENCODE_CONFIG)" ]]; then \
+		printf 'Missing OpenCode config: %s\n' "$(OPENCODE_CONFIG)"; \
+		exit 2; \
+	fi
+	@if [[ -n "$(JQ)" ]]; then \
+		jq -r \
+			'.provider | to_entries[] | .key as $$provider | .value.models | keys[] | "\($$provider)/\(.)"' \
+			"$(OPENCODE_CONFIG)"; \
+	else \
+		$(PYTHON) -c 'import json,pathlib; p=pathlib.Path(r"""$(OPENCODE_CONFIG)"""); d=json.loads(p.read_text()); [print(f"{provider}/{model}") for provider,cfg in d.get("provider",{}).items() for model in cfg.get("models",{})]'; \
+	fi
+
+.PHONY: backup-config
+backup-config: directories ## Back up generated configurations
+	@stamp="$$(date -u +%Y%m%dT%H%M%SZ)"
+	@for file in "$(QWEN_CONFIG)" "$(ROTATION_STATE)" "$(OPENCODE_CONFIG)"; do \
+		if [[ -f "$$file" ]]; then \
+			name="$$(basename "$$file")"; \
+			cp -p "$$file" "$(BACKUP_DIR)/$${name}.$${stamp}.bak"; \
+			printf 'Backed up: %s\n' "$$file"; \
+		fi; \
+	done
+
+.PHONY: install-user
+install-user: check-generator ## Install generator under ~/.local/bin
+	@install -d "$(HOME)/.local/bin"
+	@install -m 0755 "$(GENERATOR)" "$(HOME)/.local/bin/qwen-config-generator"
+	@printf 'Installed: %s\n' "$(HOME)/.local/bin/qwen-config-generator"
+
+.PHONY: cron-example
+cron-example: ## Print safe refresh/rotation cron examples
+	@printf '%s\n' \
+		'15 3 * * * cd "$(CURDIR)" && $(PYTHON) "$(GENERATOR)" --env-file "$(abspath $(ENV_FILE))" generate --target both --include-accessible >>"$(abspath $(LOG_DIR))/refresh.log" 2>&1' \
+		'0 */6 * * * cd "$(CURDIR)" && $(PYTHON) "$(GENERATOR)" rotate >>"$(abspath $(LOG_DIR))/rotate.log" 2>&1'
+
+.PHONY: clean
+clean: ## Remove caches, bytecode, and temporary files
+	rm -rf \
+		"$(CACHE_DIR)" \
+		.pytest_cache \
+		.mypy_cache \
+		.ruff_cache \
+		__pycache__
+	find . -type d -name __pycache__ -prune -exec rm -rf {} +
+	find . -type f \( -name '*.pyc' -o -name '*.pyo' \) -delete
+
+.PHONY: clean-sdk
+clean-sdk: ## Remove local SDK installations
+	rm -rf "$(VENV_DIR)" node_modules
+
+.PHONY: distclean
+distclean: clean clean-sdk ## Remove local SDKs, caches, logs, and backups
+	rm -rf "$(LOG_DIR)" "$(BACKUP_DIR)"
+
+# ------------------------------------------------------------------------------
+# Internal targets
+# ------------------------------------------------------------------------------
+
+.PHONY: directories
+directories:
+	mkdir -p "$(CACHE_DIR)" "$(LOG_DIR)" "$(BACKUP_DIR)"
+	mkdir -p "$$(dirname "$(QWEN_CONFIG)")"
+	mkdir -p "$$(dirname "$(ROTATION_STATE)")"
+	mkdir -p "$$(dirname "$(OPENCODE_CONFIG)")"
+
+.PHONY: venv
+venv:
+	@if [[ ! -x "$(PYTHON_VENV)" ]]; then \
+		$(PYTHON) -m venv "$(VENV_DIR)"; \
+	fi
+	@if [[ -z "$(UV)" ]]; then \
+		"$(PYTHON_VENV)" -m pip install --upgrade pip setuptools wheel; \
+	fi
+
+.PHONY: package-json
+package-json:
+	@if [[ ! -f package.json ]]; then \
+		printf '%s\n' \
+			'{' \
+			'  "name": "qwen-opencode-provider-sdks",' \
+			'  "private": true,' \
+			'  "type": "module"' \
+			'}' > package.json; \
+	fi
+
+.PHONY: check-tools
+check-tools:
+	@command -v "$(PYTHON)" >/dev/null 2>&1 || { \
+		printf 'Missing Python executable: %s\n' "$(PYTHON)"; \
+		exit 2; \
+	}
+	@command -v git >/dev/null 2>&1 || printf 'Warning: git is not installed.\n'
+
+.PHONY: check-node
+check-node:
+	@if [[ -z "$(PNPM)" && -z "$(NPM)" ]]; then \
+		printf 'Neither pnpm nor npm is installed.\n'; \
+		exit 2; \
+	fi
+
+.PHONY: check-generator
+check-generator:
+	@if [[ ! -f "$(GENERATOR)" ]]; then \
+		printf 'Missing generator: %s\n' "$(GENERATOR)"; \
+		exit 2; \
+	fi
+
+.PHONY: check-env
+check-env:
+	@if [[ ! -f "$(ENV_FILE)" ]]; then \
+		printf 'Missing environment file: %s\n' "$(ENV_FILE)"; \
+		exit 2; \
+	fi
+	@if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then \
+		if git ls-files --error-unmatch "$(ENV_FILE)" >/dev/null 2>&1; then \
+			printf 'SECURITY ERROR: %s is tracked by Git.\n' "$(ENV_FILE)"; \
+			printf 'Remove it from the index and rotate exposed credentials.\n'; \
+			exit 3; \
+		fi; \
+	fi

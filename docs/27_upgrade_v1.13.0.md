@@ -14,11 +14,11 @@ additive infrastructure plus internal wiring in `coder.py`/`main.py`.
   jitter, honors a `RateLimitError.retry_after` when present) and
   `CircuitBreaker` (closed/open/half-open). Dependency-free stdlib only.
 - **`logging_config.py`** — structured logging (`text` on a TTY, `json`
-  otherwise or via `ZCODER_LOG_FORMAT`), a per-invocation correlation ID,
+  otherwise or via `wire_LOG_FORMAT`), a per-invocation correlation ID,
   and automatic redaction of API-key-shaped strings from every log line.
 - **`security.py`** — `safe_resolve()` / `validate_name()` (path
   traversal guards), `validate_url()` (https-only), `check_file_size()`
-  (default 25MB cap, `ZCODER_MAX_FILE_SIZE_BYTES`), `contains_secret()` /
+  (default 25MB cap, `wire_MAX_FILE_SIZE_BYTES`), `contains_secret()` /
   `assert_no_secret()`.
 - **`health.py`** — `run_health_check(deep=False)`: python version, config
   dir writable, API key present; `deep=True` additionally makes one live
@@ -32,7 +32,7 @@ additive infrastructure plus internal wiring in `coder.py`/`main.py`.
   attempts with backoff. The function's *return contract is unchanged* —
   it still returns `"[ERROR] ..."` / `"[API ERROR N] ..."` /
   `"[REFUSED] ..."` strings rather than raising, so no call site in
-  `main.py` or any `claude_*.py` module needed to change. See
+  `main.py` or any `zc_*.py` module needed to change. See
   `ARCHITECTURE.md` for why.
 - **`main.py`**: calls `logging_config.setup_logging()` and
   `new_correlation_id()` at the top of `main()`, before argument dispatch.
@@ -46,7 +46,7 @@ additive infrastructure plus internal wiring in `coder.py`/`main.py`.
 - `requirements-dev.txt` — pytest, pytest-cov, ruff, black, mypy, bandit.
 - `.github/workflows/ci.yml` — lint + bandit + pytest matrix (3.9–3.12) +
   Docker build smoke test, on every push/PR.
-- `Dockerfile` (multi-stage, non-root `zcoder` user, `HEALTHCHECK` wired
+- `Dockerfile` (multi-stage, non-root `wire` user, `HEALTHCHECK` wired
   to `--health-check`) + `.dockerignore` + `docker-compose.yml`.
 - `Makefile` — `make check` runs lint + typecheck + security + tests.
 - `SECURITY.md`, `ARCHITECTURE.md`, `CONTRIBUTING.md`,
@@ -56,8 +56,8 @@ additive infrastructure plus internal wiring in `coder.py`/`main.py`.
 ## Not done in this pass (flagged for follow-up)
 
 - `resilience.retry()` is only wired into `coder.py`. Other modules that
-  make direct HTTP calls (`claude_files.py`, `claude_batch.py`,
-  `claude_github.py`, etc.) still have their own ad hoc error handling and
+  make direct HTTP calls (`zc_files.py`, `zc_batch.py`,
+  `zc_github.py`, etc.) still have their own ad hoc error handling and
   would benefit from the same wrapper — left alone here to keep this
   release's diff reviewable rather than touching every network call site
   in the same pass.

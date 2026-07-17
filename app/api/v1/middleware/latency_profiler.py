@@ -1,5 +1,5 @@
 """
-Real-time Latency Profiler Middleware for Enterprise Wire API
+Real-time Latency Profiler Middleware for Enterprise wire API
 Tracks p50, p95, p99 latencies with automatic alerting on regressions.
 """
 

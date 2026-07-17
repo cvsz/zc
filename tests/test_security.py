@@ -1,8 +1,8 @@
 """tests/test_security.py"""
 import pytest
 
-from exceptions import SecurityError, ValidationError
-from security import (
+from wire.exceptions import SecurityError, ValidationError
+from wire.security import (
     assert_no_secret,
     contains_secret,
     env_flag,
@@ -68,11 +68,11 @@ def test_assert_no_secret_raises_on_key():
 
 def test_env_flag_parses_truthy_values(monkeypatch):
     for val in ("1", "true", "True", "yes", "on"):
-        monkeypatch.setenv("ZCODER_TEST_FLAG", val)
-        assert env_flag("ZCODER_TEST_FLAG") is True
+        monkeypatch.setenv("wire_TEST_FLAG", val)
+        assert env_flag("wire_TEST_FLAG") is True
 
 
 def test_env_flag_defaults_when_unset(monkeypatch):
-    monkeypatch.delenv("ZCODER_TEST_FLAG", raising=False)
-    assert env_flag("ZCODER_TEST_FLAG", default=True) is True
-    assert env_flag("ZCODER_TEST_FLAG", default=False) is False
+    monkeypatch.delenv("wire_TEST_FLAG", raising=False)
+    assert env_flag("wire_TEST_FLAG", default=True) is True
+    assert env_flag("wire_TEST_FLAG", default=False) is False

@@ -1,5 +1,5 @@
 """
-webapp/backend/server.py — FastAPI backend for the zcoder web UI.
+webapp/backend/server.py — FastAPI backend for the wire web UI.
 
 This is a thin HTTP adapter around the existing CLI core -- it does not
 reimplement any behaviour. Every endpoint delegates to the same classes
@@ -8,7 +8,7 @@ and modules `main.py` already uses:
     coder.Coder              -> chat/generation
     personalities.py         -> PersonalityManager
     skills.py                -> SkillManager
-    claude_models.py         -> MODEL_CATALOG (dropdown list)
+    zc_models.py         -> MODEL_CATALOG (dropdown list)
     main.py                  -> VERSION, AGENT_SYSTEM_PROMPTS
     config.py                -> Config (persisted to ~/.ai-coder-config.json)
     health.py                -> run_health_check (used for Docker/orchestrator
@@ -36,20 +36,20 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from claude_models import MODEL_CATALOG  # noqa: E402
-from coder import Coder  # noqa: E402
-from config import Config  # noqa: E402
-from health import run_health_check  # noqa: E402
-from logging_config import get_logger  # noqa: E402
-from main import AGENT_SYSTEM_PROMPTS, VERSION  # noqa: E402
-from personalities import PersonalityManager  # noqa: E402
-from skills import SkillManager  # noqa: E402
+from wire.zc_models import MODEL_CATALOG  # noqa: E402
+from wire.coder import Coder  # noqa: E402
+from wire.config import Config  # noqa: E402
+from wire.health import run_health_check  # noqa: E402
+from wire.logging_config import get_logger  # noqa: E402
+from wire.main import AGENT_SYSTEM_PROMPTS, VERSION  # noqa: E402
+from wire.personalities import PersonalityManager  # noqa: E402
+from wire.skills import SkillManager  # noqa: E402
 
 logger = get_logger("webapp.server")
 
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
 
-app = FastAPI(title="zcoder web", version=VERSION)
+app = FastAPI(title="wire web", version=VERSION)
 
 # The frontend is served as static files from the same origin by default
 # (see the StaticFiles mount at the bottom of this file), so CORS is only
@@ -279,7 +279,7 @@ def chat_stream(req: ChatRequest, request: Request):
     """Server-Sent Events variant of /api/chat. Same request body and same
     session-history semantics; the difference is purely transport — tokens
     arrive as they're generated instead of after the full response. Reuses
-    claude_stream.py's event-handling shape (content_block_delta/text_delta)
+    zc_stream.py's event-handling shape (content_block_delta/text_delta)
     rather than reimplementing SSE parsing.
 
     Each SSE `data:` line is a small JSON object:

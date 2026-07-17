@@ -3,7 +3,7 @@
 Prompted by a direct audit request against v1.12.0 "Release": find what's
 incomplete, broken, or missing, fix it, and add bulk-upgrade logic for
 Fable 5 and Opus. v1.12.0 itself was packaging-only (see CHANGELOG), so
-this is the first pass to touch `main.py`/`coder.py`/`claude_models.py`
+this is the first pass to touch `main.py`/`coder.py`/`zc_models.py`
 since v1.11.1.
 
 ## Bugs found and fixed
@@ -11,14 +11,14 @@ since v1.11.1.
 1. **`coder.py`'s `Coder.generate()` — fragile response parsing.**
    `data["content"][0]["text"]` assumed the first content block was always
    plain text. Every thinking-capable model (Sonnet 5, Opus 4.8, and
-   especially Fable 5/Mythos 5, which — per `claude_fable5.py` — have
+   especially Fable 5/Mythos 5, which — per `zc_fable5.py` — have
    thinking on by default) can return a `thinking` block first, which has
    no `"text"` key and would silently return an empty string via
    `.get()`, or previously (with plain indexing) risk a `KeyError`
    depending on response shape. Multi-text-block responses also silently
    dropped every block after the first. Fixed to concatenate all
    `type == "text"` blocks, matching the pattern already used correctly in
-   `claude_models.py` / `claude_fable5.py` / `claude_mythos5.py`. Also
+   `zc_models.py` / `zc_fable5.py` / `zc_mythos5.py`. Also
    added a clearer `[REFUSED]` message instead of returning an empty
    string when `stop_reason == "refusal"` yields no text content.
 
@@ -62,11 +62,11 @@ everything to the best available model" and wouldn't touch a perfectly
 callable-but-superseded `claude-sonnet-4-6` or a plain
 `claude-haiku-4-5-20251001` reference, since neither is retired.
 
-New in `claude_models.py`, wired into `main.py`'s existing Models API
+New in `zc_models.py`, wired into `main.py`'s existing Models API
 group:
 
 ```
---upgrade-all PATH             Rewrite every known Claude model ID under PATH
+--upgrade-all PATH             Rewrite every known zAICoder model ID under PATH
                                 to --upgrade-target. Dry-run by default.
 --upgrade-target {fable5,opus} fable5 -> claude-fable-5 (default)
                                 opus   -> claude-opus-4-8
@@ -92,7 +92,7 @@ Implementation notes:
 - `*.bak` files from a previous run are excluded from the walk, so
   running `--upgrade-all` twice in a row doesn't chase its own backups.
 - Dry-run is the default specifically because this writes to disk in
-  place (unlike every other `claude_*.py` command, which only calls the
+  place (unlike every other `zc_*.py` command, which only calls the
   API) — `--check-deprecated`'s read-only report-then-decide pattern
   is preserved as the default and application requires the explicit
   `--upgrade-yes`.

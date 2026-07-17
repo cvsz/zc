@@ -1,6 +1,6 @@
 # Observability
 
-zcoder has two, complementary layers of observability. This pass added
+wire has two, complementary layers of observability. This pass added
 the first; the second predates it and is unchanged.
 
 ## 1. Process-level structured logs (`logging_config.py`) — new
@@ -10,7 +10,7 @@ auth failures, refusals, unexpected exceptions) goes through
 `logging_config.py`:
 
 - **Format**: `text` on an interactive TTY, `json` otherwise, or forced
-  via `ZCODER_LOG_FORMAT`. JSON lines are one object each — no multi-line
+  via `wire_LOG_FORMAT`. JSON lines are one object each — no multi-line
   records to worry about for log shippers.
 - **Correlation ID**: one per CLI invocation (`main.py` calls
   `new_correlation_id()` at startup), attached to every line automatically
@@ -20,7 +20,7 @@ auth failures, refusals, unexpected exceptions) goes through
   record, regardless of what a call site logs.
 - **Where it goes**: stderr only, by design — stdout stays reserved for
   the actual CLI output (model responses, `--health-check` JSON, etc) so
-  piping `zcoder -p "..." > out.txt` doesn't get log noise mixed in.
+  piping `wire -p "..." > out.txt` doesn't get log noise mixed in.
 
 Ship stderr to whatever you already use (CloudWatch Logs agent, Datadog
 Agent, Fluent Bit, `journald` under systemd, Docker's default json-file
@@ -31,7 +31,7 @@ not attached to a TTY.
 
 ```python
 from logging_config import get_logger
-logger = get_logger("my_module")   # -> "zcoder.my_module"
+logger = get_logger("my_module")   # -> "wire.my_module"
 
 logger.info("thing_happened", extra={"key": "value"})
 logger.error("thing_failed", extra={"error_code": exc.error_code})
@@ -43,12 +43,12 @@ regex over a message string.
 
 ## 2. Application-level usage & request logs — pre-existing, unchanged
 
-- **`claude_metrics.py`** (`--metrics-show`, `--metrics-today`,
+- **`zc_metrics.py`** (`--metrics-show`, `--metrics-today`,
   `--metrics-model`, `--metrics-export`) — per-call token counts, cost
   (against a verified pricing table), and latency, logged to
   `~/.ai-coder/metrics.jsonl`. Answers "what am I spending, on which
   model."
-- **`claude_observability.py`** — structured request/response logging,
+- **`zc_observability.py`** — structured request/response logging,
   latency histograms, and AI-assisted error-trend analysis, logged to
   `~/.ai-coder/observability/requests.jsonl`. Answers "is latency/error
   rate drifting."

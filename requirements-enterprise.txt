@@ -1,4 +1,4 @@
-# Enterprise Dependencies for Wire CLI-to-API System (2026 Standards)
+# Enterprise Dependencies for wire CLI-to-API System (2026 Standards)
 # Install with: pip install -r requirements-enterprise.txt
 
 # === Core Async Framework ===

@@ -21,16 +21,16 @@ current lineup:
 | `claude-fable-5` | unchanged |
 | `claude-mythos-5` | unchanged |
 
-Files touched: `claude_models.py` (offline fallback list — deduped
+Files touched: `zc_models.py` (offline fallback list — deduped
 from 7 entries with 3 near-identical Opus rows down to 5 real ones),
-`claude_cost_optimizer.py` and `claude_metrics.py` (pricing tables —
-same dedup, `claude_metrics.py` also gained a `claude-mythos-5` row it
-was missing), `claude_tokens.py` (cost-estimate table — filled in the
+`zc_cost_optimizer.py` and `zc_metrics.py` (pricing tables —
+same dedup, `zc_metrics.py` also gained a `claude-mythos-5` row it
+was missing), `zc_tokens.py` (cost-estimate table — filled in the
 previously-absent Fable 5 / Mythos 5 rows), `main.py` (`--model`
-default and `_model()` fallback), and every `claude_*.py` module that
+default and `_model()` fallback), and every `zc_*.py` module that
 hardcoded a default model in a constructor.
 
-Also added, in `claude_fable5.py`, `claude_mythos5.py`, and
+Also added, in `zc_fable5.py`, `zc_mythos5.py`, and
 `--list-models`'s offline output: a note that Fable 5 / Mythos 5
 access was suspended 2026-06-12 → 2026-06-30 for US export-control
 compliance and restored 2026-07-01
@@ -45,12 +45,12 @@ problem in bug reports written after the fact.
 - `claude-mythos-5`'s access-gating behavior (`MythosAccessError` on
   403/404) — still correct, unrelated to the ID cleanup.
 - Actual USD pricing figures — these were already flagged as "ballpark
-  only, verify against platform.claude.com/docs" in every table that
+  only, verify against platform.zc.com/docs" in every table that
   has them, and this release didn't have a way to re-verify live
   pricing, so the numbers are carried over unchanged.
 - The Mythos-tier *chat* model info in this doc set is scoped to what
   the API-facing modules need (Fable 5 / Mythos 5). This CLI has no
-  module for the not-yet-public `Claude Mythos Preview`
+  module for the not-yet-public `zAICoder Mythos Preview`
   (Project Glasswing) since it isn't reachable via the standard
   Messages API this CLI wraps.
 

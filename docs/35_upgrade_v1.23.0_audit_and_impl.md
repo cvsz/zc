@@ -4,9 +4,9 @@ Unlike the last three cycles (v1.20.0–v1.22.0, all Managed Agents), this
 cycle deliberately widened the net per the methodology's own instruction
 to check the *whole* Features overview, not just the area of the last
 few fixes — Managed Agents has been audited three cycles running and
-was due for a break. Searched platform.claude.com/docs release notes
+was due for a break. Searched platform.zc.com/docs release notes
 across Authentication, Admin API, and Rate Limits, plus cross-referenced
-against `claude_admin_api.py` (the module most likely to already cover
+against `zc_admin_api.py` (the module most likely to already cover
 adjacent Admin-API surface) before writing anything up as a gap.
 
 ## Finding 1 — Workload Identity Federation (WIF) (GA)
@@ -15,7 +15,7 @@ adjacent Admin-API surface) before writing anything up as a gap.
 workload exchange a short-lived OIDC JWT from an identity provider it
 already trusts (AWS IAM, Google Cloud, GitHub Actions, Kubernetes,
 Entra ID, Okta, SPIFFE, or any standards-compliant OIDC issuer) for a
-short-lived Claude API access token (`sk-ant-oat01-...`), instead of
+short-lived zAICoder API access token (`sk-ant-oat01-...`), instead of
 using a long-lived static API key. Mechanically: `POST /v1/oauth/token`
 with an RFC 7523 jwt-bearer grant; the response is a standard OAuth 2.0
 token response. First-party SDKs auto-detect a full federation
@@ -31,16 +31,16 @@ API key.
 **Why it's a gap:** grep for `workload identity|OIDC|oidc|federation` in
 the tree: zero matches. Second, differently-worded grep for
 `short-lived|token_exchange|id_token`: also zero matches. Every existing
-zcoder module authenticates with a single, always-present, static
+wire module authenticates with a single, always-present, static
 `api_key`/`admin_api_key` string — there is no code path anywhere that
 exchanges a JWT for anything.
 
 **Priority: 🔴 P0.** This is the flagship "keyless auth" story Anthropic
-is pushing across the whole platform (SDKs, Claude Code, GitHub Actions)
+is pushing across the whole platform (SDKs, zAICoder, GitHub Actions)
 — a CLI wrapper that only supports static keys is missing the auth
 pattern Anthropic itself now recommends leading with.
 
-## Finding 2 — Spend Limits API (Claude Enterprise)
+## Finding 2 — Spend Limits API (zAICoder Enterprise)
 
 **What it is:** Eight Admin-API endpoints across two resources for
 per-member spend governance, Enterprise-only: `GET
@@ -54,7 +54,7 @@ submitted requests for a higher limit). Requires an Admin API key with
 `read:spend_limits`/`write:spend_limits` scopes.
 
 **Why it's a gap:** first grep for `spend_limit` in the tree: zero
-matches. `claude_admin_api.py` already implements the sibling Usage and
+matches. `zc_admin_api.py` already implements the sibling Usage and
 Cost API and API-key management, but has no code path for this
 resource family at all.
 
@@ -78,23 +78,23 @@ backoff, which is a different, already-solved problem — this finding is
 about reading Anthropic's *configured* limits, not reacting to them).
 
 **Priority: 🟡 P2.** Small, read-only, no side effects — a natural
-companion to `claude_admin_api.py`'s existing usage/cost reporting for
+companion to `zc_admin_api.py`'s existing usage/cost reporting for
 building gateways/dashboards, per the docs' own stated use cases.
 
 ## Non-gaps checked this cycle
 
-**Claude Managed Agents vault credential background refresh for
+**zAICoder Managed Agents vault credential background refresh for
 `mcp_oauth` credentials** — a release-note line item alongside these
 three. Not a gap: this is server-side behavior (Anthropic now refreshes
 a stored OAuth credential's access token automatically instead of it
-going stale), not a new request shape or parameter zcoder's
+going stale), not a new request shape or parameter wire's
 `add_credential()` needs to send. Nothing to build.
 
-**Claude Managed Agents on Claude Platform on AWS** (webhooks, multi-
+**zAICoder Managed Agents on zAICoder Platform on AWS** (webhooks, multi-
 agent, self-hosted sandboxes) — not a gap: this is the same API surface
-`claude_agents_sdk.py` already covers, becoming available on a different
-deployment target (AWS-native endpoints vs. the direct Claude API).
-Deployment location isn't a code-level gap unless zcoder starts
+`zc_agents_sdk.py` already covers, becoming available on a different
+deployment target (AWS-native endpoints vs. the direct zAICoder API).
+Deployment location isn't a code-level gap unless wire starts
 supporting multiple base URLs/auth schemes per cloud, which is a bigger,
 separate architectural question outside a single audit finding.
 
@@ -104,11 +104,11 @@ separate architectural question outside a single audit finding.
 
 ### Prompt 1 — Workload Identity Federation (P0)
 
-> Create `claude_wif.py`. Two client classes:
+> Create `zc_wif.py`. Two client classes:
 >
 > ```python
 > class WIFCredentialExchanger:
->     """Exchanges an IdP-issued JWT for a short-lived Claude API access
+>     """Exchanges an IdP-issued JWT for a short-lived zAICoder API access
 >     token via POST /v1/oauth/token (RFC 7523 jwt-bearer grant)."""
 >
 >     def exchange(self, federation_rule_id: str, organization_id: str,
@@ -137,7 +137,7 @@ separate architectural question outside a single audit finding.
 >
 > `WIFCredentialExchanger.exchange()` never logs `identity_token` or the
 > returned `access_token` in any exception message (same write-only
-> discipline as vault credentials in `claude_agents_sdk.py`).
+> discipline as vault credentials in `zc_agents_sdk.py`).
 >
 > CLI: `--wif-exchange-token` (calls `resolve_wif_env()`, exchanges, and
 > prints the resulting access token's expiry and scope — never the
@@ -149,7 +149,7 @@ separate architectural question outside a single audit finding.
 >
 > Second class, `WIFAdminClient`, for the setup side (service accounts,
 > federation issuers, federation rules) — these require an `org:admin`
-> OAuth bearer token, not the Admin API key `claude_admin_api.py` uses:
+> OAuth bearer token, not the Admin API key `zc_admin_api.py` uses:
 > ```python
 > class WIFAdminClient:
 >     def __init__(self, org_admin_oauth_token: str): ...
@@ -188,7 +188,7 @@ separate architectural question outside a single audit finding.
 
 ### Prompt 2 — Spend Limits API (P1)
 
-> Add to `claude_admin_api.py`'s `AdminApiClient`:
+> Add to `zc_admin_api.py`'s `AdminApiClient`:
 > ```python
 > def _delete(self, path: str) -> dict: ...  # new helper, mirrors _get/_post
 
@@ -204,7 +204,7 @@ separate architectural question outside a single audit finding.
 > def deny_spend_limit_increase_request(self, request_id: str, suppress_notification: bool = False) -> dict
 > ```
 > Note in the module docstring that this resource family is
-> Enterprise-only (a Claude Console/API-only org gets a 403) — surface
+> Enterprise-only (a zAICoder Console/API-only org gets a 403) — surface
 > that in the `cmd_*` error path the same way the existing functions
 > already surface the "wrong key type" 401/403 hint.
 >
@@ -243,6 +243,6 @@ separate architectural question outside a single audit finding.
 
 1. Prompt 1 (WIF) — highest priority, and a new standalone module, so no
    ordering conflict with the other two.
-2. Prompt 2 (Spend Limits) — extends `claude_admin_api.py`.
+2. Prompt 2 (Spend Limits) — extends `zc_admin_api.py`.
 3. Prompt 3 (Rate Limits) — smallest, extends the same file as Prompt 2;
    do after so both land in one coherent diff to that module.

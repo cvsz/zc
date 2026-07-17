@@ -4,7 +4,7 @@
 
 ```bash
 git clone <repo>
-cd zcoder
+cd wire
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements-dev.txt
 ```
@@ -29,7 +29,7 @@ fail.
   types (`TransientAPIError`, `RateLimitError`, `APIError`, ...), not bare
   `Exception`, so `resilience.retry()` can classify them correctly. Wrap
   the call in `@resilience.retry(...)` rather than hand-rolling a retry
-  loop. **Exception:** `claude_admin_api.py` and `claude_compliance_api.py`
+  loop. **Exception:** `zc_admin_api.py` and `zc_compliance_api.py`
   implement their own retry/backoff directly, because Anthropic documents
   a specific retry contract for those endpoint families independently of
   the general API's; reusing `resilience.retry()` there would couple two
@@ -45,7 +45,7 @@ fail.
 - **New tests** live under `tests/`, one file per module
   (`tests/test_<module>.py`), and must not make real network calls — mock
   `urllib.request.urlopen` as in `tests/test_coder.py`.
-- Every `claude_*.py` module documents which CLI flags it backs in its
+- Every `zc_*.py` module documents which CLI flags it backs in its
   module docstring (existing convention — keep it going).
 
 ## Versioning

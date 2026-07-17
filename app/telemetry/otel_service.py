@@ -20,10 +20,10 @@ try:
     from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
     from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
     from opentelemetry.sdk.metrics import MeterProvider
-    from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
+    PeriodicExportingMetricReader = __import__("opentelemetry.sdk.metrics.export", fromlist=["PeriodicExportingMetricReader"]).PeriodicExportingMetricReader
     from opentelemetry.sdk.resources import SERVICE_NAME, SERVICE_VERSION, Resource
     from opentelemetry.sdk.trace import TracerProvider
-    from opentelemetry.sdk.trace.export import BatchSpanProcessor
+    BatchSpanProcessor = __import__("opentelemetry.sdk.trace.export", fromlist=["BatchSpanProcessor"]).BatchSpanProcessor
     from opentelemetry.semconv.trace import SpanAttributes
     HAS_OTEL = True
 except ImportError:

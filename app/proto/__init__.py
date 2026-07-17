@@ -1,4 +1,4 @@
-# Protocol Buffers package for Wire CLI-to-API communication
+# Protocol Buffers package for wire CLI-to-API communication
 """
 This package contains generated Protocol Buffer classes from wire.proto.
 Generated with: python -m grpc_tools.protoc -Iapp/proto --python_out=app/proto --grpc_python_out=app/proto app/proto/wire.proto

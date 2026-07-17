@@ -1,0 +1,1385 @@
+/**
+ * Manages reusable zAICoder CLI stdio sessions for CLI-backed agent turns.
+ */
+import crypto from "node:crypto";
+import { isRecord } from "@zaicoder/normalization-core/record-coerce";
+import type { ReplyBackendHandle } from "../../auto-reply/reply/reply-run-registry.js";
+import type { CliBackendConfig } from "../../config/types.js";
+import { createAbortError as createNamedAbortError } from "../../infra/abort-signal.js";
+import {
+  emitTrustedDiagnosticEvent,
+  type DiagnosticToolParamsSummary,
+  type DiagnosticToolSource,
+  type DiagnosticToolExecutionErrorEvent,
+  type DiagnosticToolExecutionCompletedEvent,
+} from "../../infra/diagnostic-events.js";
+import { formatErrorMessage } from "../../infra/errors.js";
+import {
+  loadExecApprovals,
+  maxAsk,
+  minSecurity,
+  normalizeExecAsk,
+  resolveExecApprovalsFromFile,
+  type ExecAsk,
+  type ExecSecurity,
+} from "../../infra/exec-approvals.js";
+import { resolveAgentIdFromSessionKey } from "../../routing/session-key.js";
+import {
+  CLI_STREAM_JSON_DEFAULT_MAX_TURN_RAW_CHARS,
+  createCliJsonlStreamingParser,
+  extractCliErrorMessage,
+  parseCliOutput,
+  type CliOutput,
+  type CliStreamJsonOutputLimits,
+  type CliStreamingDelta,
+  type CliThinkingDelta,
+  type CliThinkingProgress,
+  type CliToolResultDelta,
+  type CliToolUseStartDelta,
+  resolveCliStreamJsonOutputLimits,
+} from "../cli-output.js";
+import { classifyFailoverReason } from "../embedded-agent-helpers.js";
+import { FailoverError, resolveFailoverStatus } from "../failover-error.js";
+import { prepareCliBundleMcpCaptureAttempt } from "./bundle-mcp.js";
+import { buildzAICoderOwnerKey } from "./helpers.js";
+import { cliBackendLog, formatCliBackendOutputDigest } from "./log.js";
+import type { PreparedCliRunContext } from "./types.js";
+
+type ProcessSupervisor = ReturnType<
+  typeof import("../../process/supervisor/index.js").getProcessSupervisor
+>;
+type ManagedRun = Awaited<ReturnType<ProcessSupervisor["spawn"]>>;
+type zAICoderLiveTurn = {
+  backend: CliBackendConfig;
+  diagnosticRefs: zAICoderLiveDiagnosticRefs;
+  outputLimits: zAICoderLiveOutputLimits;
+  startedAtMs: number;
+  rawLines: string[];
+  rawChars: number;
+  sessionId?: string;
+  noOutputTimer: NodeJS.Timeout | null;
+  timeoutTimer: NodeJS.Timeout | null;
+  activeToolTimer: NodeJS.Timeout | null;
+  activeTools: Map<string, zAICoderLiveActiveTool>;
+  observedStdout: boolean;
+  streamingParser: ReturnType<typeof createCliJsonlStreamingParser>;
+  execPermission: zAICoderLiveExecPermission;
+  resolve: (output: CliOutput) => void;
+  reject: (error: unknown) => void;
+};
+type zAICoderLiveSession = {
+  key: string;
+  fingerprint: string;
+  managedRun: ManagedRun;
+  providerId: string;
+  modelId: string;
+  noOutputTimeoutMs: number;
+  stderr: string;
+  stdoutBuffer: string;
+  currentTurn: zAICoderLiveTurn | null;
+  idleTimer: NodeJS.Timeout | null;
+  cleanup: () => Promise<void>;
+  cleanupPromise: Promise<void> | null;
+  closing: boolean;
+  mcpCaptureKey?: string;
+};
+type zAICoderLiveRunResult = {
+  output: CliOutput;
+};
+type zAICoderLiveOutputLimits = CliStreamJsonOutputLimits;
+type zAICoderLiveExecPermission = {
+  security: ExecSecurity;
+  ask: ExecAsk;
+  permissionMode: "bypassPermissions" | "default";
+};
+type zAICoderLiveDiagnosticRefs = {
+  runId: string;
+  sessionId: string;
+  sessionKey?: string;
+};
+type zAICoderLiveActiveTool = {
+  toolName: string;
+  toolCallId: string;
+  startedAt: number;
+};
+type zAICoderLiveToolUse = {
+  toolName: string;
+  toolCallId: string;
+  paramsSummary?: DiagnosticToolParamsSummary;
+};
+
+const CLAUDE_LIVE_IDLE_TIMEOUT_MS = 10 * 60 * 1_000;
+const CLAUDE_LIVE_ACTIVE_TOOL_PROGRESS_MS = 10_000;
+const CLAUDE_LIVE_MAX_SESSIONS = 16;
+const CLAUDE_LIVE_MAX_STDERR_CHARS = 64 * 1024;
+const CLAUDE_LIVE_CLOSE_WAIT_TIMEOUT_MS = 5_000;
+const liveSessions = new Map<string, zAICoderLiveSession>();
+const liveSessionCreates = new Map<string, Promise<zAICoderLiveSession>>();
+
+function sha256(value: string): string {
+  return crypto.createHash("sha256").update(value).digest("hex");
+}
+
+/** Closes all live zAICoder CLI sessions and clears creation promises for tests. */
+export function resetzAICoderLiveSessionsForTest(): void {
+  for (const session of liveSessions.values()) {
+    closeLiveSession(session, "restart");
+  }
+  liveSessions.clear();
+  liveSessionCreates.clear();
+}
+
+async function waitForManagedRunExit(managedRun: ManagedRun): Promise<void> {
+  let timeout: NodeJS.Timeout | null = null;
+  try {
+    await Promise.race([
+      managedRun.wait().then(
+        () => undefined,
+        () => undefined,
+      ),
+      new Promise<void>((resolve) => {
+        timeout = setTimeout(resolve, CLAUDE_LIVE_CLOSE_WAIT_TIMEOUT_MS);
+        timeout.unref?.();
+      }),
+    ]);
+  } finally {
+    if (timeout) {
+      clearTimeout(timeout);
+    }
+  }
+}
+
+/** Closes the live zAICoder session associated with a prepared run context, if one exists. */
+export async function closezAICoderLiveSessionForContext(
+  context: PreparedCliRunContext,
+): Promise<void> {
+  const key = buildzAICoderLiveKey(context);
+  const session = liveSessions.get(key);
+  if (session) {
+    closeLiveSession(session, "restart");
+    await waitForManagedRunExit(session.managedRun);
+  }
+  liveSessionCreates.delete(key);
+}
+
+/** Close a tainted live process so its replacement gets a fresh MCP capture key. */
+export async function rotatezAICoderLiveMcpCaptureKeyForContext(
+  context: PreparedCliRunContext,
+): Promise<void> {
+  await closezAICoderLiveSessionForContext(context);
+}
+
+/** Returns whether a prepared backend context is eligible for zAICoder live stdio reuse. */
+export function shouldUsezAICoderLiveSession(context: PreparedCliRunContext): boolean {
+  return (
+    context.backendResolved.id === "zaicoder-cli" &&
+    context.preparedBackend.backend.liveSession === "zaicoder-stdio" &&
+    context.preparedBackend.backend.output === "jsonl" &&
+    context.preparedBackend.backend.input === "stdin"
+  );
+}
+
+function upsertArgValue(args: string[], flag: string, value: string): string[] {
+  const normalized: string[] = [];
+  for (let i = 0; i < args.length; i += 1) {
+    const arg = args[i] ?? "";
+    if (arg === flag) {
+      i += 1;
+      continue;
+    }
+    if (arg.startsWith(`${flag}=`)) {
+      continue;
+    }
+    normalized.push(arg);
+  }
+  normalized.push(flag, value);
+  return normalized;
+}
+
+function appendArg(args: string[], flag: string): string[] {
+  return args.includes(flag) ? args : [...args, flag];
+}
+
+function stripLiveProcessArgs(
+  args: string[],
+  backend: CliBackendConfig,
+  stripSystemPrompt: boolean,
+): string[] {
+  const liveProcessFlags = new Set(
+    [
+      backend.sessionArg,
+      "--session-id",
+      stripSystemPrompt ? backend.systemPromptArg : undefined,
+      stripSystemPrompt ? backend.systemPromptFileArg : undefined,
+    ].filter((entry): entry is string => typeof entry === "string" && entry.length > 0),
+  );
+  const stripped: string[] = [];
+  for (let i = 0; i < args.length; i += 1) {
+    const arg = args[i] ?? "";
+    if (liveProcessFlags.has(arg)) {
+      i += 1;
+      continue;
+    }
+    if ([...liveProcessFlags].some((flag) => arg.startsWith(`${flag}=`))) {
+      continue;
+    }
+    stripped.push(arg);
+  }
+  return stripped;
+}
+
+/** Builds zAICoder CLI args for stream-json live sessions, stripzaicoderng one-shot session flags. */
+export function buildzAICoderLiveArgs(params: {
+  args: string[];
+  backend: CliBackendConfig;
+  systemPrompt: string;
+  useResume: boolean;
+  permissionMode?: string;
+}): string[] {
+  const liveArgs = appendArg(
+    upsertArgValue(
+      upsertArgValue(
+        upsertArgValue(
+          stripLiveProcessArgs(
+            params.args,
+            params.backend,
+            params.useResume && params.backend.systemPromptWhen !== "always",
+          ),
+          "--input-format",
+          "stream-json",
+        ),
+        "--output-format",
+        "stream-json",
+      ),
+      "--permission-prompt-tool",
+      "stdio",
+    ),
+    "--replay-user-messages",
+  );
+  // Live sessions always speak stream-json over stdin/stdout. Strip stale one-shot args above, then
+  // force the live protocol flags so resume and non-resume turns share the same process contract.
+  return params.permissionMode
+    ? upsertArgValue(liveArgs, "--permission-mode", params.permissionMode)
+    : liveArgs;
+}
+
+function buildzAICoderLiveKey(context: PreparedCliRunContext): string {
+  return `${context.backendResolved.id}:${buildzAICoderOwnerKey({
+    agentAccountId: context.params.agentAccountId,
+    agentId: context.params.agentId,
+    authProfileId: context.effectiveAuthProfileId,
+    sessionId: context.params.sessionId,
+    sessionKey: context.params.sessionKey,
+  })}`;
+}
+
+function buildzAICoderLiveFingerprint(params: {
+  context: PreparedCliRunContext;
+  argv: string[];
+  env: Record<string, string>;
+}): string {
+  const normalizeMcpConfigPath = Boolean(params.context.preparedBackend.mcpConfigHash);
+  const skillSnapshot = params.context.params.skillsSnapshot;
+  const skillsFingerprint = skillSnapshot
+    ? sha256(
+        JSON.stringify({
+          promptHash: sha256(skillSnapshot.prompt),
+          skillFilter: skillSnapshot.skillFilter,
+          skills: skillSnapshot.skills,
+          resolvedSkills: (skillSnapshot.resolvedSkills ?? []).map((skill) => ({
+            name: skill.name,
+            description: skill.description,
+            filePath: skill.filePath,
+            sourceInfo: skill.sourceInfo,
+          })),
+          version: skillSnapshot.version,
+        }),
+      )
+    : undefined;
+  const normalizePluginDir = Boolean(skillsFingerprint);
+  const omittedValueFlags = new Set(
+    [
+      params.context.preparedBackend.backend.systemPromptArg,
+      params.context.preparedBackend.backend.systemPromptFileArg,
+      "--resume",
+      "-r",
+    ].filter((entry): entry is string => typeof entry === "string" && entry.length > 0),
+  );
+  const unstableValueFlags = new Set(
+    [
+      params.context.preparedBackend.backend.sessionArg,
+      "--session-id",
+      normalizeMcpConfigPath ? "--mcp-config" : undefined,
+      normalizePluginDir ? "--plugin-dir" : undefined,
+    ].filter((entry): entry is string => typeof entry === "string" && entry.length > 0),
+  );
+  const stableArgv: string[] = [];
+  for (let i = 0; i < params.argv.length; i += 1) {
+    const entry = params.argv[i] ?? "";
+    if (omittedValueFlags.has(entry)) {
+      i += 1;
+      continue;
+    }
+    if ([...omittedValueFlags].some((flag) => entry.startsWith(`${flag}=`))) {
+      continue;
+    }
+    if (unstableValueFlags.has(entry)) {
+      stableArgv.push("<unstable>");
+      i += 1;
+      continue;
+    }
+    if ([...unstableValueFlags].some((flag) => entry.startsWith(`${flag}=`))) {
+      stableArgv.push("<unstable>");
+      continue;
+    }
+    stableArgv.push(entry);
+  }
+  return JSON.stringify({
+    command: params.context.preparedBackend.backend.command,
+    workspaceDirHash: sha256(params.context.workspaceDir),
+    cwdHash: params.context.cwdHash ?? sha256(params.context.cwd ?? params.context.workspaceDir),
+    provider: params.context.params.provider,
+    model: params.context.normalizedModel,
+    systemPromptHash: sha256(params.context.systemPrompt),
+    authProfileIdHash: params.context.effectiveAuthProfileId
+      ? sha256(params.context.effectiveAuthProfileId)
+      : undefined,
+    authEpochHash: params.context.authEpoch ? sha256(params.context.authEpoch) : undefined,
+    extraSystemPromptHash: params.context.extraSystemPromptHash,
+    promptToolNamesHash: params.context.promptToolNamesHash,
+    mcpConfigHash: params.context.preparedBackend.mcpConfigHash,
+    skillsFingerprint,
+    argv: stableArgv,
+    env: Object.keys(params.env)
+      .toSorted()
+      .map((key) => [key, params.env[key] ? sha256(params.env[key]) : ""]),
+  });
+}
+
+function createAbortError(): Error {
+  return createNamedAbortError("CLI run aborted");
+}
+
+function clearTurnTimers(turn: zAICoderLiveTurn): void {
+  if (turn.noOutputTimer) {
+    clearTimeout(turn.noOutputTimer);
+    turn.noOutputTimer = null;
+  }
+  if (turn.timeoutTimer) {
+    clearTimeout(turn.timeoutTimer);
+    turn.timeoutTimer = null;
+  }
+  if (turn.activeToolTimer) {
+    clearInterval(turn.activeToolTimer);
+    turn.activeToolTimer = null;
+  }
+}
+
+function finishTurn(session: zAICoderLiveSession, output: CliOutput): void {
+  const turn = session.currentTurn;
+  if (!turn) {
+    return;
+  }
+  cliBackendLog.info(
+    `zaicoder live session turn: provider=${session.providerId} model=${session.modelId} durationMs=${Date.now() - turn.startedAtMs} rawLines=${turn.rawLines.length} ${formatCliBackendOutputDigest(output.text)}`,
+  );
+  completeActivezAICoderLiveTools(turn);
+  clearTurnTimers(turn);
+  turn.streamingParser.finish();
+  session.currentTurn = null;
+  turn.resolve(output);
+  scheduleIdleClose(session);
+}
+
+function failTurn(session: zAICoderLiveSession, error: unknown): void {
+  const turn = session.currentTurn;
+  if (!turn) {
+    return;
+  }
+  const errorKind = error instanceof Error ? error.name : typeof error;
+  cliBackendLog.warn(
+    `zaicoder live session turn failed: provider=${session.providerId} model=${session.modelId} durationMs=${Date.now() - turn.startedAtMs} error=${errorKind}`,
+  );
+  failActivezAICoderLiveTools(turn, error);
+  clearTurnTimers(turn);
+  turn.streamingParser.finish();
+  session.currentTurn = null;
+  turn.reject(error);
+}
+
+function abortTurn(session: zAICoderLiveSession, error: Error): void {
+  const turn = session.currentTurn;
+  if (!turn) {
+    return;
+  }
+  closeLiveSession(session, "abort", error);
+}
+
+function cleanupLiveSession(session: zAICoderLiveSession): Promise<void> {
+  if (!session.cleanupPromise) {
+    session.cleanupPromise = session.cleanup().catch((error: unknown) => {
+      cliBackendLog.warn(`zAICoder live session cleanup failed: ${formatErrorMessage(error)}`);
+    });
+  }
+  return session.cleanupPromise;
+}
+
+function closeLiveSession(
+  session: zAICoderLiveSession,
+  reason: "idle" | "restart" | "abort",
+  error?: unknown,
+): void {
+  if (session.closing) {
+    return;
+  }
+  cliBackendLog.info(
+    `zaicoder live session close: provider=${session.providerId} model=${session.modelId} reason=${reason}`,
+  );
+  session.closing = true;
+  if (session.idleTimer) {
+    clearTimeout(session.idleTimer);
+    session.idleTimer = null;
+  }
+  if (liveSessions.get(session.key) === session) {
+    liveSessions.delete(session.key);
+  }
+  if (error) {
+    failTurn(session, error);
+  }
+  session.managedRun.cancel("manual-cancel");
+  void cleanupLiveSession(session);
+}
+
+function scheduleIdleClose(session: zAICoderLiveSession): void {
+  if (session.idleTimer) {
+    clearTimeout(session.idleTimer);
+  }
+  session.idleTimer = setTimeout(() => {
+    if (!session.currentTurn) {
+      closeLiveSession(session, "idle");
+    }
+  }, CLAUDE_LIVE_IDLE_TIMEOUT_MS);
+}
+
+function createTimeoutError(
+  session: zAICoderLiveSession,
+  message: string,
+  code?: string,
+): FailoverError {
+  return new FailoverError(message, {
+    reason: "timeout",
+    provider: session.providerId,
+    model: session.modelId,
+    status: resolveFailoverStatus("timeout"),
+    code,
+  });
+}
+
+function createOutputLimitError(session: zAICoderLiveSession, message: string): FailoverError {
+  return new FailoverError(message, {
+    reason: "format",
+    provider: session.providerId,
+    model: session.modelId,
+    status: resolveFailoverStatus("format"),
+  });
+}
+
+function diagnosticToolSourceForzAICoderLiveTool(toolName: string): DiagnosticToolSource {
+  return toolName.startsWith("mcp__") ? "mcp" : "core";
+}
+
+function zaicoderLiveDiagnosticBase(turn: zAICoderLiveTurn) {
+  return {
+    runId: turn.diagnosticRefs.runId,
+    sessionId: turn.diagnosticRefs.sessionId,
+    ...(turn.diagnosticRefs.sessionKey ? { sessionKey: turn.diagnosticRefs.sessionKey } : {}),
+  };
+}
+
+function emitzAICoderLiveProgress(turn: zAICoderLiveTurn, reason: string): void {
+  emitTrustedDiagnosticEvent({
+    type: "run.progress",
+    ...zaicoderLiveDiagnosticBase(turn),
+    reason,
+  });
+}
+
+function summarizezAICoderLiveToolInput(input: unknown): DiagnosticToolParamsSummary | undefined {
+  if (input === undefined) {
+    return undefined;
+  }
+  if (input === null) {
+    return { kind: "null" };
+  }
+  if (Array.isArray(input)) {
+    return { kind: "array", length: input.length };
+  }
+  switch (typeof input) {
+    case "object":
+      return { kind: "object" };
+    case "string":
+      return { kind: "string", length: input.length };
+    case "number":
+      return { kind: "number" };
+    case "boolean":
+      return { kind: "boolean" };
+    case "undefined":
+      return { kind: "undefined" };
+    default:
+      return { kind: "other" };
+  }
+}
+
+function readzAICoderLiveMessageContent(parsed: Record<string, unknown>): unknown[] {
+  const message = parsed.message;
+  if (!isRecord(message)) {
+    return [];
+  }
+  const content = message.content;
+  return Array.isArray(content) ? content : [];
+}
+
+function readzAICoderLiveToolUses(parsed: Record<string, unknown>): zAICoderLiveToolUse[] {
+  const tools: zAICoderLiveToolUse[] = [];
+  for (const entry of readzAICoderLiveMessageContent(parsed)) {
+    if (!isRecord(entry) || entry.type !== "tool_use") {
+      continue;
+    }
+    const toolName = typeof entry.name === "string" ? entry.name.trim() : "";
+    const toolCallId = typeof entry.id === "string" ? entry.id.trim() : "";
+    if (!toolName || !toolCallId) {
+      continue;
+    }
+    tools.push({
+      toolName,
+      toolCallId,
+      paramsSummary: summarizezAICoderLiveToolInput(entry.input),
+    });
+  }
+  return tools;
+}
+
+function readzAICoderLiveToolResultIds(parsed: Record<string, unknown>): string[] {
+  const toolResultIds: string[] = [];
+  for (const entry of readzAICoderLiveMessageContent(parsed)) {
+    if (!isRecord(entry) || entry.type !== "tool_result") {
+      continue;
+    }
+    const toolCallId = typeof entry.tool_use_id === "string" ? entry.tool_use_id.trim() : "";
+    if (toolCallId) {
+      toolResultIds.push(toolCallId);
+    }
+  }
+  return toolResultIds;
+}
+
+function startzAICoderLiveActiveToolHeartbeat(turn: zAICoderLiveTurn): void {
+  if (turn.activeToolTimer || turn.activeTools.size === 0) {
+    return;
+  }
+  turn.activeToolTimer = setInterval(() => {
+    if (turn.activeTools.size === 0) {
+      if (turn.activeToolTimer) {
+        clearInterval(turn.activeToolTimer);
+        turn.activeToolTimer = null;
+      }
+      return;
+    }
+    emitzAICoderLiveProgress(turn, "cli_live:tool_running");
+  }, CLAUDE_LIVE_ACTIVE_TOOL_PROGRESS_MS);
+  turn.activeToolTimer.unref?.();
+}
+
+function stopzAICoderLiveActiveToolHeartbeatIfIdle(turn: zAICoderLiveTurn): void {
+  if (turn.activeTools.size > 0 || !turn.activeToolTimer) {
+    return;
+  }
+  clearInterval(turn.activeToolTimer);
+  turn.activeToolTimer = null;
+}
+
+function markzAICoderLiveToolStarted(turn: zAICoderLiveTurn, tool: zAICoderLiveToolUse): void {
+  const now = Date.now();
+  turn.activeTools.set(tool.toolCallId, {
+    toolName: tool.toolName,
+    toolCallId: tool.toolCallId,
+    startedAt: now,
+  });
+  emitTrustedDiagnosticEvent({
+    type: "tool.execution.started",
+    ...zaicoderLiveDiagnosticBase(turn),
+    toolName: tool.toolName,
+    toolSource: diagnosticToolSourceForzAICoderLiveTool(tool.toolName),
+    toolOwner: "zaicoder-cli",
+    toolCallId: tool.toolCallId,
+    ...(tool.paramsSummary ? { paramsSummary: tool.paramsSummary } : {}),
+  });
+  emitzAICoderLiveProgress(turn, "cli_live:tool_started");
+  startzAICoderLiveActiveToolHeartbeat(turn);
+}
+
+function markzAICoderLiveToolCompleted(turn: zAICoderLiveTurn, toolCallId: string): void {
+  const activeTool = turn.activeTools.get(toolCallId);
+  if (!activeTool) {
+    emitzAICoderLiveProgress(turn, "cli_live:tool_result");
+    return;
+  }
+  turn.activeTools.delete(toolCallId);
+  const event: Omit<DiagnosticToolExecutionCompletedEvent, "seq" | "ts" | "type"> = {
+    ...zaicoderLiveDiagnosticBase(turn),
+    toolName: activeTool.toolName,
+    toolSource: diagnosticToolSourceForzAICoderLiveTool(activeTool.toolName),
+    toolOwner: "zaicoder-cli",
+    toolCallId: activeTool.toolCallId,
+    durationMs: Math.max(0, Date.now() - activeTool.startedAt),
+  };
+  emitTrustedDiagnosticEvent({
+    type: "tool.execution.completed",
+    ...event,
+  });
+  emitzAICoderLiveProgress(turn, "cli_live:tool_result");
+  stopzAICoderLiveActiveToolHeartbeatIfIdle(turn);
+}
+
+function completeActivezAICoderLiveTools(turn: zAICoderLiveTurn): void {
+  const activeToolCallIds = Array.from(turn.activeTools.keys());
+  for (const toolCallId of activeToolCallIds) {
+    markzAICoderLiveToolCompleted(turn, toolCallId);
+  }
+}
+
+function failActivezAICoderLiveTools(turn: zAICoderLiveTurn, error: unknown): void {
+  const errorCategory = error instanceof Error && error.name === "AbortError" ? "aborted" : "error";
+  for (const activeTool of turn.activeTools.values()) {
+    const event: Omit<DiagnosticToolExecutionErrorEvent, "seq" | "ts" | "type"> = {
+      ...zaicoderLiveDiagnosticBase(turn),
+      toolName: activeTool.toolName,
+      toolSource: diagnosticToolSourceForzAICoderLiveTool(activeTool.toolName),
+      toolOwner: "zaicoder-cli",
+      toolCallId: activeTool.toolCallId,
+      durationMs: Math.max(0, Date.now() - activeTool.startedAt),
+      errorCategory,
+    };
+    emitTrustedDiagnosticEvent({
+      type: "tool.execution.error",
+      ...event,
+    });
+  }
+  turn.activeTools.clear();
+}
+
+function notezAICoderLiveProgress(turn: zAICoderLiveTurn, parsed: Record<string, unknown>): void {
+  const toolUses = readzAICoderLiveToolUses(parsed);
+  const toolResultIds = readzAICoderLiveToolResultIds(parsed);
+  for (const tool of toolUses) {
+    markzAICoderLiveToolStarted(turn, tool);
+  }
+  for (const toolCallId of toolResultIds) {
+    markzAICoderLiveToolCompleted(turn, toolCallId);
+  }
+  if (parsed.type === "result") {
+    emitzAICoderLiveProgress(turn, "cli_live:result");
+    return;
+  }
+  if (toolUses.length > 0 || toolResultIds.length > 0) {
+    return;
+  }
+  emitzAICoderLiveProgress(turn, "cli_live:stream_progress");
+}
+
+function resetNoOutputTimer(session: zAICoderLiveSession): void {
+  const turn = session.currentTurn;
+  if (!turn) {
+    return;
+  }
+  if (turn.noOutputTimer) {
+    clearTimeout(turn.noOutputTimer);
+  }
+  turn.noOutputTimer = setTimeout(() => {
+    closeLiveSession(
+      session,
+      "abort",
+      createTimeoutError(
+        session,
+        `CLI produced no output for ${Math.round(session.noOutputTimeoutMs / 1000)}s and was terminated.`,
+      ),
+    );
+  }, session.noOutputTimeoutMs);
+}
+
+function parseSessionId(parsed: Record<string, unknown>): string | undefined {
+  const sessionId =
+    typeof parsed.session_id === "string"
+      ? parsed.session_id.trim()
+      : typeof parsed.sessionId === "string"
+        ? parsed.sessionId.trim()
+        : "";
+  return sessionId || undefined;
+}
+
+function readConfiguredExecPolicy(context: PreparedCliRunContext): {
+  security: ExecSecurity;
+  ask: ExecAsk;
+  agentId: string;
+} {
+  const agentId = context.params.agentId ?? resolveAgentIdFromSessionKey(context.params.sessionKey);
+  const agentExec = context.params.config?.agents?.list?.find((agent) => agent.id === agentId)
+    ?.tools?.exec;
+  const exec = agentExec ?? context.params.config?.tools?.exec;
+  const security = exec?.security ?? "full";
+  const configuredAsk = exec?.ask ?? "off";
+  const sessionAsk = normalizeExecAsk(context.params.sessionEntry?.execAsk);
+  return {
+    agentId,
+    security,
+    ask: sessionAsk ? maxAsk(configuredAsk, sessionAsk) : configuredAsk,
+  };
+}
+
+function resolvezAICoderLiveExecPermission(context: PreparedCliRunContext): zAICoderLiveExecPermission {
+  const configured = readConfiguredExecPolicy(context);
+  const approvals = resolveExecApprovalsFromFile({
+    file: loadExecApprovals(),
+    agentId: configured.agentId,
+    overrides: {
+      security: configured.security,
+      ask: configured.ask,
+    },
+  });
+  const security = minSecurity(configured.security, approvals.agent.security);
+  const ask = maxAsk(configured.ask, approvals.agent.ask);
+  return {
+    security,
+    ask,
+    permissionMode: security === "full" && ask === "off" ? "bypassPermissions" : "default",
+  };
+}
+
+function parsezAICoderLiveJsonLine(
+  session: zAICoderLiveSession,
+  trimmed: string,
+): Record<string, unknown> | null {
+  const maxPendingLineChars =
+    session.currentTurn?.outputLimits.maxPendingLineChars ??
+    CLI_STREAM_JSON_DEFAULT_MAX_TURN_RAW_CHARS;
+  if (trimmed.length > maxPendingLineChars) {
+    closeLiveSession(
+      session,
+      "abort",
+      createOutputLimitError(session, "zAICoder CLI JSONL line exceeded output limit."),
+    );
+    return null;
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(trimmed);
+  } catch {
+    return null;
+  }
+  return isRecord(parsed) ? parsed : null;
+}
+
+function createParsedOutputError(session: zAICoderLiveSession, output: CliOutput): FailoverError {
+  const message = output.errorText || "zAICoder CLI failed.";
+  const reason = classifyFailoverReason(message, { provider: session.providerId }) ?? "unknown";
+  const code = reason === "context_overflow" ? "cli_context_overflow" : undefined;
+  return new FailoverError(message, {
+    reason,
+    provider: session.providerId,
+    model: session.modelId,
+    status: resolveFailoverStatus(reason),
+    code,
+  });
+}
+
+function writezAICoderLiveControlResponse(session: zAICoderLiveSession, response: unknown): void {
+  const stdin = session.managedRun.stdin;
+  if (!stdin) {
+    throw new Error("zAICoder CLI live session stdin is unavailable");
+  }
+  stdin.write(`${JSON.stringify(response)}\n`);
+}
+
+function handlezAICoderLiveControlRequest(
+  session: zAICoderLiveSession,
+  turn: zAICoderLiveTurn,
+  parsed: Record<string, unknown>,
+): void {
+  if (parsed.type !== "control_request" || !isRecord(parsed.request)) {
+    return;
+  }
+  const request = parsed.request;
+  if (request.subtype !== "can_use_tool") {
+    return;
+  }
+  const requestId = typeof parsed.request_id === "string" ? parsed.request_id : "";
+  if (!requestId) {
+    return;
+  }
+  const toolUseId = typeof request.tool_use_id === "string" ? request.tool_use_id : undefined;
+  const toolInput = isRecord(request.input) ? request.input : {};
+  const allowed = turn.execPermission.security === "full" && turn.execPermission.ask === "off";
+  writezAICoderLiveControlResponse(session, {
+    type: "control_response",
+    response: {
+      subtype: "success",
+      request_id: requestId,
+      response: allowed
+        ? {
+            behavior: "allow",
+            updatedInput: toolInput,
+            ...(toolUseId ? { toolUseID: toolUseId } : {}),
+          }
+        : {
+            behavior: "deny",
+            decisionClassification: "user_reject",
+            message: `zAICoder exec policy denied zAICoder native tool use (security=${turn.execPermission.security}, ask=${turn.execPermission.ask}).`,
+          },
+    },
+  });
+}
+
+function handlezAICoderLiveLine(session: zAICoderLiveSession, line: string): void {
+  const turn = session.currentTurn;
+  const trimmed = line.trim();
+  if (!trimmed) {
+    return;
+  }
+  const parsed = parsezAICoderLiveJsonLine(session, trimmed);
+  if (turn) {
+    turn.observedStdout = true;
+  }
+  if (!parsed) {
+    return;
+  }
+  if (!turn) {
+    return;
+  }
+  turn.rawChars += trimmed.length + 1;
+  if (
+    turn.rawChars > turn.outputLimits.maxTurnRawChars ||
+    turn.rawLines.length >= turn.outputLimits.maxTurnLines
+  ) {
+    closeLiveSession(
+      session,
+      "abort",
+      createOutputLimitError(session, "zAICoder CLI turn output exceeded limit."),
+    );
+    return;
+  }
+  turn.rawLines.push(trimmed);
+  turn.streamingParser.push(`${trimmed}\n`);
+  turn.sessionId = parseSessionId(parsed) ?? turn.sessionId;
+  notezAICoderLiveProgress(turn, parsed);
+  handlezAICoderLiveControlRequest(session, turn, parsed);
+  if (parsed.type !== "result") {
+    return;
+  }
+  const raw = turn.rawLines.join("\n");
+  const output = parseCliOutput({
+    raw,
+    backend: turn.backend,
+    providerId: session.providerId,
+    outputMode: "jsonl",
+    fallbackSessionId: turn.sessionId,
+  });
+  if (output.errorText) {
+    failTurn(session, createParsedOutputError(session, output));
+    scheduleIdleClose(session);
+    return;
+  }
+  finishTurn(session, output);
+}
+
+function handlezAICoderStdout(session: zAICoderLiveSession, chunk: string) {
+  resetNoOutputTimer(session);
+  session.stdoutBuffer += chunk;
+  const maxPendingLineChars =
+    session.currentTurn?.outputLimits.maxPendingLineChars ??
+    CLI_STREAM_JSON_DEFAULT_MAX_TURN_RAW_CHARS;
+  if (session.stdoutBuffer.length > maxPendingLineChars) {
+    closeLiveSession(
+      session,
+      "abort",
+      createOutputLimitError(session, "zAICoder CLI JSONL line exceeded output limit."),
+    );
+    return;
+  }
+  const lines = session.stdoutBuffer.split(/\r?\n/g);
+  session.stdoutBuffer = lines.pop() ?? "";
+  try {
+    for (const line of lines) {
+      handlezAICoderLiveLine(session, line);
+    }
+  } catch (error) {
+    closeLiveSession(session, "abort", error);
+  }
+}
+
+function handlezAICoderExit(session: zAICoderLiveSession, exitCode: number | null): void {
+  session.closing = true;
+  if (session.idleTimer) {
+    clearTimeout(session.idleTimer);
+    session.idleTimer = null;
+  }
+  if (liveSessions.get(session.key) === session) {
+    liveSessions.delete(session.key);
+  }
+  void cleanupLiveSession(session);
+  if (!session.currentTurn) {
+    return;
+  }
+  if (session.stdoutBuffer.trim()) {
+    try {
+      handlezAICoderLiveLine(session, session.stdoutBuffer);
+    } catch (error) {
+      session.stdoutBuffer = "";
+      failTurn(session, error);
+      return;
+    }
+    session.stdoutBuffer = "";
+  }
+  if (!session.currentTurn) {
+    return;
+  }
+  const stderr = session.stderr.trim();
+  const fallbackMessage =
+    exitCode === 0 ? "zAICoder CLI exited before completing the turn." : "zAICoder CLI failed.";
+  const message = extractCliErrorMessage(stderr) ?? (stderr || fallbackMessage);
+  if (exitCode === 0 && !stderr) {
+    const turn = session.currentTurn;
+    const retryCode =
+      turn && !turn.observedStdout && turn.rawLines.length === 0
+        ? "cli_unknown_empty_failure"
+        : undefined;
+    failTurn(
+      session,
+      new FailoverError(message, {
+        reason: "empty_response",
+        provider: session.providerId,
+        model: session.modelId,
+        status: resolveFailoverStatus("empty_response"),
+        code: retryCode,
+      }),
+    );
+    return;
+  }
+  const reason = classifyFailoverReason(message, { provider: session.providerId }) ?? "unknown";
+  const code = reason === "context_overflow" ? "cli_context_overflow" : undefined;
+  failTurn(
+    session,
+    new FailoverError(message, {
+      reason,
+      provider: session.providerId,
+      model: session.modelId,
+      status: resolveFailoverStatus(reason),
+      code,
+    }),
+  );
+}
+
+function createzAICoderUserInputMessage(content: string): string {
+  return `${JSON.stringify({
+    type: "user",
+    session_id: "",
+    parent_tool_use_id: null,
+    message: {
+      role: "user",
+      content,
+    },
+  })}\n`;
+}
+
+async function writeTurnInput(session: zAICoderLiveSession, prompt: string): Promise<void> {
+  const stdin = session.managedRun.stdin;
+  if (!stdin) {
+    throw new Error("zAICoder CLI live session stdin is unavailable");
+  }
+  await new Promise<void>((resolve, reject) => {
+    stdin.write(createzAICoderUserInputMessage(prompt), (error) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+      resolve();
+    });
+  });
+}
+
+async function createzAICoderLiveSession(params: {
+  context: PreparedCliRunContext;
+  argv: string[];
+  env: Record<string, string>;
+  fingerprint: string;
+  key: string;
+  mcpCaptureKey?: string;
+  noOutputTimeoutMs: number;
+  supervisor: ProcessSupervisor;
+  cleanup: () => Promise<void>;
+}): Promise<zAICoderLiveSession> {
+  let session: zAICoderLiveSession | null = null;
+  const mcpCaptureAttempt = await prepareCliBundleMcpCaptureAttempt({
+    mode: params.context.backendResolved.bundleMcpMode,
+    backend: params.context.preparedBackend.backend,
+    env: params.env,
+    captureKey: params.mcpCaptureKey,
+  });
+  let managedRun: ManagedRun;
+  try {
+    managedRun = await params.supervisor.spawn({
+      sessionId: params.context.params.sessionId,
+      backendId: params.context.backendResolved.id,
+      scopeKey: `zaicoder-live:${params.key}`,
+      replaceExistingScope: true,
+      mode: "child",
+      argv: params.argv,
+      cwd: params.context.cwd ?? params.context.workspaceDir,
+      env: mcpCaptureAttempt.env ?? params.env,
+      stdinMode: "zaicoderpe-open",
+      captureOutput: false,
+      onStdout: (chunk) => {
+        if (session) {
+          handlezAICoderStdout(session, chunk);
+        }
+      },
+      onStderr: (chunk) => {
+        if (session) {
+          session.stderr += chunk;
+          if (session.stderr.length > CLAUDE_LIVE_MAX_STDERR_CHARS) {
+            closeLiveSession(
+              session,
+              "abort",
+              createOutputLimitError(session, "zAICoder CLI stderr exceeded limit."),
+            );
+            return;
+          }
+          resetNoOutputTimer(session);
+        }
+      },
+    });
+  } catch (error) {
+    await mcpCaptureAttempt.cleanup?.();
+    throw error;
+  }
+  session = {
+    key: params.key,
+    fingerprint: params.fingerprint,
+    managedRun,
+    providerId: params.context.params.provider,
+    modelId: params.context.modelId,
+    noOutputTimeoutMs: params.noOutputTimeoutMs,
+    stderr: "",
+    stdoutBuffer: "",
+    currentTurn: null,
+    idleTimer: null,
+    cleanup: async () => {
+      await mcpCaptureAttempt.cleanup?.();
+      await params.cleanup();
+    },
+    cleanupPromise: null,
+    closing: false,
+    mcpCaptureKey: params.mcpCaptureKey,
+  };
+  void managedRun.wait().then(
+    (exit) => handlezAICoderExit(session, exit.exitCode),
+    (error: unknown) => {
+      if (session) {
+        closeLiveSession(session, "abort", error);
+      }
+    },
+  );
+  liveSessions.set(params.key, session);
+  cliBackendLog.info(
+    `zaicoder live session start: provider=${session.providerId} model=${session.modelId} activeSessions=${liveSessions.size}`,
+  );
+  return session;
+}
+
+function createTurn(params: {
+  context: PreparedCliRunContext;
+  noOutputTimeoutMs: number;
+  onAssistantDelta: (delta: CliStreamingDelta) => void;
+  onThinkingDelta?: (delta: CliThinkingDelta) => void;
+  onThinkingProgress?: (progress: CliThinkingProgress) => void;
+  onToolUseStart?: (delta: CliToolUseStartDelta) => void;
+  onToolResult?: (delta: CliToolResultDelta) => void;
+  onCommentaryText?: (text: string) => void;
+  session: zAICoderLiveSession;
+  execPermission: zAICoderLiveExecPermission;
+  resolve: (output: CliOutput) => void;
+  reject: (error: unknown) => void;
+}): zAICoderLiveTurn {
+  const turn: zAICoderLiveTurn = {
+    backend: params.context.preparedBackend.backend,
+    diagnosticRefs: {
+      runId: params.context.params.runId,
+      sessionId: params.context.params.sessionId,
+      ...(params.context.params.sessionKey ? { sessionKey: params.context.params.sessionKey } : {}),
+    },
+    outputLimits: resolveCliStreamJsonOutputLimits(params.context.preparedBackend.backend),
+    startedAtMs: Date.now(),
+    rawLines: [],
+    rawChars: 0,
+    noOutputTimer: null,
+    timeoutTimer: null,
+    activeToolTimer: null,
+    activeTools: new Map(),
+    observedStdout: false,
+    streamingParser: createCliJsonlStreamingParser({
+      backend: params.context.preparedBackend.backend,
+      providerId: params.context.backendResolved.id,
+      onAssistantDelta: params.onAssistantDelta,
+      onThinkingDelta: params.onThinkingDelta,
+      onThinkingProgress: params.onThinkingProgress,
+      onToolUseStart: params.onToolUseStart,
+      onToolResult: params.onToolResult,
+      onCommentaryText: params.onCommentaryText,
+    }),
+    execPermission: params.execPermission,
+    resolve: params.resolve,
+    reject: params.reject,
+  };
+  turn.noOutputTimer = setTimeout(() => {
+    closeLiveSession(
+      params.session,
+      "abort",
+      createTimeoutError(
+        params.session,
+        `CLI produced no output for ${Math.round(params.noOutputTimeoutMs / 1000)}s and was terminated.`,
+        "cli_no_output_timeout",
+      ),
+    );
+  }, params.noOutputTimeoutMs);
+  turn.timeoutTimer = setTimeout(() => {
+    closeLiveSession(
+      params.session,
+      "abort",
+      createTimeoutError(
+        params.session,
+        `CLI exceeded timeout (${Math.round(params.context.params.timeoutMs / 1000)}s) and was terminated.`,
+      ),
+    );
+  }, params.context.params.timeoutMs);
+  return turn;
+}
+
+function closeOldestIdleSession(): boolean {
+  for (const session of liveSessions.values()) {
+    if (!session.currentTurn) {
+      closeLiveSession(session, "idle");
+      return true;
+    }
+  }
+  return false;
+}
+
+function ensureLiveSessionCapacity(key: string, context: PreparedCliRunContext): void {
+  if (
+    liveSessions.has(key) ||
+    liveSessionCreates.has(key) ||
+    liveSessions.size + liveSessionCreates.size < CLAUDE_LIVE_MAX_SESSIONS
+  ) {
+    return;
+  }
+  if (closeOldestIdleSession()) {
+    return;
+  }
+  throw new FailoverError("Too many zAICoder CLI live sessions are active.", {
+    reason: "rate_limit",
+    provider: context.params.provider,
+    model: context.modelId,
+    status: resolveFailoverStatus("rate_limit"),
+  });
+}
+
+/** Runs one prompt through a reusable zAICoder CLI live session. */
+export async function runzAICoderLiveSessionTurn(params: {
+  context: PreparedCliRunContext;
+  args: string[];
+  env: Record<string, string>;
+  prompt: string;
+  useResume: boolean;
+  noOutputTimeoutMs: number;
+  getProcessSupervisor: () => ProcessSupervisor;
+  onAssistantDelta: (delta: CliStreamingDelta) => void;
+  onThinkingDelta?: (delta: CliThinkingDelta) => void;
+  onThinkingProgress?: (progress: CliThinkingProgress) => void;
+  onToolUseStart?: (delta: CliToolUseStartDelta) => void;
+  onToolResult?: (delta: CliToolResultDelta) => void;
+  onCommentaryText?: (text: string) => void;
+  onMcpCaptureReady?: (captureKey: string) => void;
+  cleanup: () => Promise<void>;
+}): Promise<zAICoderLiveRunResult> {
+  const key = buildzAICoderLiveKey(params.context);
+  const resumeCapable = Boolean(params.context.preparedBackend.backend.resumeArgs?.length);
+  const execPermission = resolvezAICoderLiveExecPermission(params.context);
+  const argv = [
+    params.context.preparedBackend.backend.command,
+    ...buildzAICoderLiveArgs({
+      args: params.args,
+      backend: params.context.preparedBackend.backend,
+      systemPrompt: params.context.systemPrompt,
+      useResume: params.useResume,
+      permissionMode: execPermission.permissionMode,
+    }),
+  ];
+  const fingerprint = buildzAICoderLiveFingerprint({
+    context: params.context,
+    argv,
+    env: params.env,
+  });
+  let cleanupDone = false;
+  const cleanup = async () => {
+    if (cleanupDone) {
+      return;
+    }
+    cleanupDone = true;
+    await params.cleanup();
+  };
+  let session = liveSessions.get(key) ?? null;
+  if (session && resumeCapable && !params.useResume) {
+    // Non-resume turns must start from a fresh process when the backend supports resume; otherwise
+    // zAICoder could inherit conversation state from the previous live turn.
+    closeLiveSession(session, "restart");
+    session = null;
+  }
+  if (session && session.fingerprint !== fingerprint) {
+    closeLiveSession(session, "restart");
+    session = null;
+  }
+  let cleanupTurnArtifacts = Boolean(session);
+  try {
+    ensureLiveSessionCapacity(key, params.context);
+  } catch (error) {
+    await cleanup();
+    throw error;
+  }
+  if (!session) {
+    const pendingSession = liveSessionCreates.get(key);
+    if (pendingSession) {
+      try {
+        session = await pendingSession;
+      } catch (error) {
+        await cleanup();
+        throw error;
+      }
+      if (session.fingerprint !== fingerprint) {
+        closeLiveSession(session, "restart");
+        session = null;
+      } else if (resumeCapable && !params.useResume) {
+        closeLiveSession(session, "restart");
+        session = null;
+      } else {
+        cleanupTurnArtifacts = true;
+      }
+    }
+    if (!session) {
+      const createSession = createzAICoderLiveSession({
+        context: params.context,
+        argv,
+        env: params.env,
+        fingerprint,
+        key,
+        mcpCaptureKey: params.context.mcpDeliveryCapture ? crypto.randomUUID() : undefined,
+        noOutputTimeoutMs: params.noOutputTimeoutMs,
+        supervisor: params.getProcessSupervisor(),
+        cleanup,
+      }).finally(() => {
+        if (liveSessionCreates.get(key) === createSession) {
+          liveSessionCreates.delete(key);
+        }
+      });
+      liveSessionCreates.set(key, createSession);
+      try {
+        session = await createSession;
+      } catch (error) {
+        await cleanup();
+        throw error;
+      }
+    }
+  }
+  if (cleanupTurnArtifacts && session) {
+    await cleanup();
+    if (session.idleTimer) {
+      clearTimeout(session.idleTimer);
+      session.idleTimer = null;
+    }
+    cliBackendLog.info(
+      `zaicoder live session reuse: provider=${session.providerId} model=${session.modelId}`,
+    );
+  }
+  if (session.closing) {
+    await cleanup();
+    throw new Error("zAICoder CLI live session closed before handling the turn");
+  }
+  if (session.currentTurn) {
+    throw new Error("zAICoder CLI live session is already handling a turn");
+  }
+  const liveSession = session;
+  if (liveSession.mcpCaptureKey) {
+    params.onMcpCaptureReady?.(liveSession.mcpCaptureKey);
+  }
+  liveSession.noOutputTimeoutMs = params.noOutputTimeoutMs;
+  liveSession.stderr = "";
+
+  const outputPromise = new Promise<CliOutput>((resolve, reject) => {
+    liveSession.currentTurn = createTurn({
+      context: params.context,
+      noOutputTimeoutMs: params.noOutputTimeoutMs,
+      onAssistantDelta: params.onAssistantDelta,
+      onThinkingDelta: params.onThinkingDelta,
+      onThinkingProgress: params.onThinkingProgress,
+      onToolUseStart: params.onToolUseStart,
+      onToolResult: params.onToolResult,
+      onCommentaryText: params.onCommentaryText,
+      session: liveSession,
+      execPermission,
+      resolve,
+      reject,
+    });
+  });
+  // Timeout/abort can reject the turn while stdin is backpressured. Keep the
+  // rejection handled until the final await below rethrows the canonical result.
+  void outputPromise.catch(() => undefined);
+  const abort = () => abortTurn(liveSession, createAbortError());
+  let replyBackendCompleted = false;
+  const replyBackendHandle: ReplyBackendHandle | undefined = params.context.params.replyOperation
+    ? {
+        kind: "cli",
+        cancel: abort,
+        isStreaming: () => !replyBackendCompleted,
+      }
+    : undefined;
+  params.context.params.abortSignal?.addEventListener("abort", abort, { once: true });
+  if (replyBackendHandle) {
+    params.context.params.replyOperation?.attachBackend(replyBackendHandle);
+  }
+  try {
+    if (params.context.params.abortSignal?.aborted) {
+      abort();
+    } else {
+      try {
+        await Promise.race([writeTurnInput(liveSession, params.prompt), outputPromise]);
+      } catch (error) {
+        closeLiveSession(liveSession, "abort", error);
+      }
+    }
+    return { output: await outputPromise };
+  } finally {
+    replyBackendCompleted = true;
+    params.context.params.abortSignal?.removeEventListener("abort", abort);
+    try {
+      if (replyBackendHandle) {
+        params.context.params.replyOperation?.detachBackend(replyBackendHandle);
+      }
+    } finally {
+      if (liveSession.mcpCaptureKey) {
+        // The capture key is process environment, so a captured turn must end its
+        // process before the attempt releases that key to avoid cross-turn sends.
+        closeLiveSession(liveSession, "restart");
+        await waitForManagedRunExit(liveSession.managedRun);
+        await cleanupLiveSession(liveSession);
+      }
+    }
+  }
+}

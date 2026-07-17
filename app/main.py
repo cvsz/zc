@@ -1,7 +1,7 @@
 """
 app/main.py - Enterprise FastAPI Application
 
-Main entry point for the enterprise-grade zcoder API server.
+Main entry point for the enterprise-grade wire API server.
 Features:
 - OpenTelemetry instrumentation
 - Prometheus metrics endpoint
@@ -23,6 +23,7 @@ from .core.cache import init_cache, shutdown_cache
 from .core.config import get_config
 from .core.http_client import init_http_client, shutdown_http_client
 from .services.upload_manager import init_upload_manager
+from typing import Optional
 
 
 # Track request timing for metrics
@@ -32,7 +33,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
     config = get_config()
     
     # Startup
-    print(f"🚀 Starting zcoder-enterprise v{config.version}")
+    print(f"🚀 Starting wire-enterprise v{config.version}")
     print(f"   Environment: {config.environment}")
     print(f"   Redis: {'enabled' if config.redis_enabled else 'disabled'}")
     print(f"   Protobuf: {'enabled' if config.protobuf_enabled else 'disabled'}")
@@ -55,16 +56,37 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
     except Exception as e:
         print(f"⚠ Upload manager initialization failed: {e}")
     
+    if config.protobuf_enabled:
+        try:
+            from .grpc.wire_servicer import create_grpc_server
+            from .services.upload_manager import get_upload_manager
+            
+            grpc_server = await create_grpc_server(
+                host=config.api_host if hasattr(config, 'api_host') else "0.0.0.0",
+                port=(config.api_port + 1) if hasattr(config, 'api_port') else 50051,
+                upload_manager=get_upload_manager(),
+                delta_service=None  # will use default in create_grpc_server
+            )
+            await grpc_server.start()
+            print("✓ gRPC server started")
+            app.state.grpc_server = grpc_server
+        except Exception as e:
+            print(f"⚠ gRPC server initialization failed: {e}")
+    
     yield
     
     # Shutdown
-    print("\n🛑 Shutting down zcoder-enterprise...")
+    print("\n🛑 Shutting down wire-enterprise...")
     
     await shutdown_cache()
     print("✓ Cache shutdown complete")
     
     await shutdown_http_client()
     print("✓ HTTP client shutdown complete")
+    
+    if hasattr(app.state, 'grpc_server'):
+        await app.state.grpc_server.stop(grace=5.0)
+        print("✓ gRPC server shutdown complete")
 
 
 # Create FastAPI application
@@ -73,7 +95,7 @@ config = get_config()
 app = FastAPI(
     title=config.app_name,
     version=config.version,
-    description="Enterprise-grade Wire CLI-to-API backend with optimized file uploads",
+    description="Enterprise-grade wire CLI-to-API backend with optimized file uploads",
     docs_url="/docs" if config.debug else None,
     redoc_url="/redoc" if config.debug else None,
     openapi_url="/openapi.json" if config.debug else None,
@@ -112,7 +134,7 @@ async def root() -> dict:
     return {
         "name": config.app_name,
         "version": config.version,
-        "description": "Enterprise-grade Wire CLI-to-API backend",
+        "description": "Enterprise-grade wire CLI-to-API backend",
         "docs": "/docs" if config.debug else "Disabled in production",
         "health": "/v1/wire/health/live",
         "metrics": "/v1/wire/metrics/performance",
@@ -125,7 +147,7 @@ async def readiness() -> dict:
     return {"status": "ready"}
 
 
-def run_server(host: str = None, port: int = None, workers: int = None):
+def run_server(host: Optional[str] = None, port: Optional[int] = None, workers: Optional[int] = None):
     """Run the FastAPI server with uvicorn."""
     cfg = get_config()
     

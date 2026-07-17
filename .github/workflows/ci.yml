@@ -80,8 +80,8 @@ jobs:
     needs: [test]
     steps:
       - uses: actions/checkout@v4
-      - run: docker build -t zcoder:ci .
-      - run: docker run --rm zcoder:ci --version
+      - run: docker build -t wire:ci .
+      - run: docker run --rm wire:ci --version
       # Startup + health smoke test: a dummy key is enough here because
       # `--health-check` (shallow) only checks that a key is *configured*,
       # not that it's valid — the live-API check only runs under
@@ -91,4 +91,4 @@ jobs:
       - run: |
           docker run --rm \
             -e ANTHROPIC_API_KEY=sk-ant-ci-smoke-test-dummy-key \
-            zcoder:ci --health-check
+            wire:ci --health-check

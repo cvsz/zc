@@ -13,7 +13,14 @@ from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from strawberry.fastapi import GraphQLRouter
 from strawberry.subscriptions import GRAPHQL_TRANSPORT_WS_PROTOCOL
 
-from app.core.cache import get_redis_client
+from app.core.cache import get_cache
+import redis.asyncio as redis_async
+
+async def get_redis_client() -> redis_async.Redis:
+    cache = get_cache()
+    if cache.redis_client is None:
+        raise RuntimeError("Redis client is not available")
+    return cache.redis_client
 
 # ==================== GraphQL Schema Types ====================
 
@@ -86,7 +93,7 @@ class Query:
         # Fetch metrics from Redis (populated by telemetry service)
         metrics_data = await redis.hgetall("metrics:system")
         
-        return SystemMetrics(
+        return SystemMetrics(  # type: ignore[call-arg]
             active_uploads=int(metrics_data.get(b"active_uploads", 0)),
             queue_depth=int(metrics_data.get(b"queue_depth", 0)),
             avg_latency_ms=float(metrics_data.get(b"avg_latency_ms", 1.2)),
@@ -113,7 +120,7 @@ class Query:
         for key in session_keys[:limit]:
             data = await redis.hgetall(key)
             if data:
-                session = UploadSession(
+                session = UploadSession(  # type: ignore[call-arg]
                     session_id=data.get(b"session_id", b"").decode(),
                     file_id=data.get(b"file_id", b"").decode(),
                     file_name=data.get(b"file_name", b"unknown").decode(),
@@ -149,7 +156,7 @@ class Query:
             if stored:
                 import json
                 parsed = json.loads(stored.decode())
-                flags.append(FeatureFlag(
+                flags.append(FeatureFlag(  # type: ignore[call-arg]
                     name=name,
                     enabled=parsed.get("enabled", config["enabled"]),
                     rollout_percentage=parsed.get("rollout", config["rollout"]),
@@ -157,7 +164,7 @@ class Query:
                     last_modified=parsed.get("modified", datetime.now(timezone.utc).isoformat())
                 ))
             else:
-                flags.append(FeatureFlag(
+                flags.append(FeatureFlag(  # type: ignore[call-arg]
                     name=name,
                     enabled=config["enabled"],
                     rollout_percentage=config["rollout"],
@@ -190,10 +197,11 @@ class Query:
     @strawberry.field
     async def health_status(self, info: strawberry.Info) -> HealthStatus:
         """Get overall system health status."""
-        start_time = await get_redis_client().get("system:start_time")
+        redis = await get_redis_client()
+        start_time = await redis.get("system:start_time")
         uptime = (datetime.now(timezone.utc).timestamp() - float(start_time or 0)) if start_time else 0
         
-        return HealthStatus(
+        return HealthStatus(  # type: ignore[call-arg]
             status="healthy",
             version="2026.1.0",
             uptime_seconds=uptime,
@@ -235,7 +243,7 @@ class Mutation:
             "data": flag_data
         }))
         
-        return FeatureFlag(
+        return FeatureFlag(  # type: ignore[call-arg]
             name=flag.name,
             enabled=flag.enabled,
             rollout_percentage=flag.rollout_percentage,
@@ -274,7 +282,7 @@ class Subscription:
             redis = await get_redis_client()
             metrics_data = await redis.hgetall("metrics:system")
             
-            yield SystemMetrics(
+            yield SystemMetrics(  # type: ignore[call-arg]
                 active_uploads=int(metrics_data.get(b"active_uploads", 0)),
                 queue_depth=int(metrics_data.get(b"queue_depth", 0)),
                 avg_latency_ms=float(metrics_data.get(b"avg_latency_ms", 1.2)),
@@ -293,7 +301,8 @@ class Subscription:
         session_id: str
     ) -> AsyncGenerator[UploadSession, None]:
         """Track upload progress in real-time."""
-        pubsub = await get_redis_client().pubsub()
+        redis = await get_redis_client()
+        pubsub = redis.pubsub()
         await pubsub.subscribe(f"upload:{session_id}:progress")
         
         async for message in pubsub.listen():
@@ -315,7 +324,7 @@ graphql_app = GraphQLRouter(
 def create_control_panel_app() -> FastAPI:
     """Create the Control Panel FastAPI application."""
     app = FastAPI(
-        title="Wire Enterprise Control Panel",
+        title="wire Enterprise Control Panel",
         version="2026.1.0",
         docs_url="/admin/docs",
         redoc_url="/admin/redoc"

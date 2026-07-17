@@ -1,7 +1,7 @@
 # v1.19.0 upgrade notes — Managed Agents memory stores
 
 This release comes from re-running `ROADMAP.md`'s own gap-audit
-methodology against the live docs at platform.claude.com/docs. The
+methodology against the live docs at platform.zc.com/docs. The
 previous audit was dated 2026-07-08; this one is also dated 2026-07-08
 (same day, next cycle). One real finding, closed here.
 
@@ -26,15 +26,15 @@ differently-worded grep before writing it into Part 2), a second grep —
 Only then was this written up as a real gap.
 
 **Why this isn't a duplicate of either existing "memory" feature:**
-zcoder already has two things with "memory" in the name, and it mattered
+wire already has two things with "memory" in the name, and it mattered
 to rule both out before concluding this was new:
 
-- `claude_memory.py`'s `memory_20250818` client-side tool — the caller's
+- `zc_memory.py`'s `memory_20250818` client-side tool — the caller's
   own application implements the file-operation handlers; scope is a
   single Messages API conversation; storage is wherever the caller wires
   it (local disk, database, etc.).
-- Claude Code's local `.claude`/auto-generated `MEMORY.md` — never
-  leaves the developer's own machine; loaded into a Claude Code session's
+- zAICoder's local `.zc`/auto-generated `MEMORY.md` — never
+  leaves the developer's own machine; loaded into a zAICoder session's
   context at the start of each session.
 
 Neither implements a `memory_store` resource type or talks to a
@@ -50,7 +50,7 @@ survive past that single session. For a CLI whose stated use case
 includes multi-session agentic coding, that's a capability gap, not a
 reporting/admin convenience.
 
-**What was built**, all in `claude_agents_sdk.py`:
+**What was built**, all in `zc_agents_sdk.py`:
 
 - `MEMORY_STORE_BETA = "agent-memory-2026-07-22"` — a second beta header,
   sent alongside `MANAGED_AGENTS_BETA` only when a memory store is
@@ -86,7 +86,7 @@ python main.py --agent-managed-run "Continue the refactor from last time" \
 ## Drift check
 
 Also checked for drift (not just net-new features) per this cycle's
-methodology: `claude_models.py`'s catalog (Fable 5, Mythos 5, Opus 4.8,
+methodology: `zc_models.py`'s catalog (Fable 5, Mythos 5, Opus 4.8,
 Sonnet 5, Haiku 4.5, legacy tiers) still matches the live Models overview
 exactly — no stale entries, no missing releases, no deprecation-date
 changes. Nothing to fix there this cycle. The `requirements.txt` pin
@@ -97,9 +97,9 @@ that surfaced the finding above.
 
 ## Tests
 
-`claude_agents_sdk.py` had zero test coverage before this release —
-matching the pattern the v1.18.0 cycle found in `claude_cache.py`. Added
-`tests/test_claude_agents_sdk.py`, 10 tests covering: `PermissionMode`
+`zc_agents_sdk.py` had zero test coverage before this release —
+matching the pattern the v1.18.0 cycle found in `zc_cache.py`. Added
+`tests/test_zc_agents_sdk.py`, 10 tests covering: `PermissionMode`
 and `TOOL_PRESETS` constants (pre-existing behavior), a regression guard
 on the `MANAGED_AGENTS_BETA` header string, `MEMORY_STORE_BETA`'s value,
 `create_memory_store()`'s request shape, `create_session()` both with

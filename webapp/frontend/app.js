@@ -1,4 +1,4 @@
-// app.js — zcoder web console
+// app.js — wire web console
 // Talks to the FastAPI backend in webapp/backend/server.py. Same-origin by
 // default (the backend serves this file), so relative URLs are enough.
 
@@ -35,7 +35,7 @@ let busy = false;
 function applyTheme(theme) {
   document.documentElement.setAttribute("data-theme", theme);
   themeToggle.textContent = theme === "light" ? "☀" : "☾";
-  try { localStorage.setItem("zcoder-theme", theme); } catch (e) { /* ignore */ }
+  try { localStorage.setItem("wire-theme", theme); } catch (e) { /* ignore */ }
 }
 themeToggle.addEventListener("click", () => {
   const current = document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark";
@@ -43,7 +43,7 @@ themeToggle.addEventListener("click", () => {
 });
 (() => {
   let saved = "dark";
-  try { saved = localStorage.getItem("zcoder-theme") || "dark"; } catch (e) { /* ignore */ }
+  try { saved = localStorage.getItem("wire-theme") || "dark"; } catch (e) { /* ignore */ }
   applyTheme(saved);
 })();
 
@@ -204,7 +204,7 @@ async function loadStaticData() {
       modelSelect.appendChild(opt);
     });
   } catch (e) {
-    modelSelect.innerHTML = '<option value="claude-sonnet-5">Claude Sonnet 5</option>';
+    modelSelect.innerHTML = '<option value="claude-sonnet-5">zAICoder Sonnet 5</option>';
   }
 
   try {

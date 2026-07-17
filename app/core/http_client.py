@@ -113,7 +113,7 @@ class EnterpriseHTTPClient:
         self._circuit_failures = 0
         self._circuit_threshold = 5
         self._circuit_reset_seconds = 30
-        self._last_failure_time = 0
+        self._last_failure_time: float = 0.0
     
     async def _create_session(self) -> ClientSession:
         """Create optimized aiohttp session."""
@@ -138,7 +138,7 @@ class EnterpriseHTTPClient:
             connector=self._connector,
             timeout=timeout,
             headers={
-                'User-Agent': f'zcoder-enterprise/{self.config.version}',
+                'User-Agent': f'wire-enterprise/{self.config.version}',
                 'Accept-Encoding': 'gzip, deflate, br',  # Compression
             },
             auto_decompress=True,
@@ -229,7 +229,8 @@ class EnterpriseHTTPClient:
                     body = await response.read()
                     elapsed_ms = (time.perf_counter() - start_time) * 1000
                     
-                    bytes_sent = len(json.dumps(json).encode()) if json else (len(data) if isinstance(data, bytes) else 0)
+                    import json as json_mod
+                    bytes_sent = len(json_mod.dumps(json).encode()) if json else (len(data) if isinstance(data, bytes) else 0)
                     bytes_received = len(body)
                     
                     http_response = HttpResponse(
