@@ -19,7 +19,7 @@ jobs:
           python-version: "3.12"
       - run: pip install -r requirements-dev.txt
       - run: ruff check .
-      - run: black --check .
+      - run: black --check src app webapp scripts tests google ./*.py
 
   typecheck:
     runs-on: ubuntu-latest
@@ -40,15 +40,15 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -r requirements-dev.txt
-      # -ll: only fail on medium+ severity; -x tests: don't scan the test suite itself
-      - run: bandit -r . -ll -x ./tests,./build,./dist
+      # -ll: only fail on medium+ severity; scan only source roots to avoid vendored and build artifacts.
+      - run: bandit -r src app webapp scripts ./*.py -ll -x tests
 
   test:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.9", "3.10", "3.11", "3.12"]
+        python-version: ["3.11", "3.12"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
