@@ -15,7 +15,7 @@ CLI flags:
 
 import json
 import os
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -30,7 +30,7 @@ PRICE_TABLE = {
     "zc-fable-5":               (10.0, 50.0),
     "zc-mythos-5":              (10.0, 50.0),
     "zc-opus-4-8":               (5.0, 25.0),
-    "zc-sonnet-5":                (3.0, 15.0),
+    "zc-xxx":                (3.0, 15.0),
     "zc-haiku-4-5-20251001":      (1.0,  5.0),
     # Legacy — still callable
     "zc-opus-4-7":               (5.0, 25.0),

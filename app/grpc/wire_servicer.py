@@ -26,7 +26,7 @@ from app.services.upload_manager import UploadManager
 from app.telemetry.otel_service import get_telemetry
 
 
-class wireServiceServicer:
+class WireServiceServicer:
     """
     gRPC service implementation for wire CLI operations.
     
@@ -311,12 +311,12 @@ async def create_grpc_server(
     )
     
     # Add servicer
-    servicer = wireServiceServicer(
+    servicer = WireServiceServicer(
         upload_manager=upload_manager or UploadManager(),
         delta_service=delta_service or DeltaSyncService(Path("./storage"))
     )
     
-    wire_pb2_grpc.add_wireServiceServicer_to_server(servicer, server)
+    wire_pb2_grpc.add_WireServiceServicer_to_server(servicer, server)
     
     # Bind to address
     server.add_insecure_port(f"{host}:{port}")

@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Optional, cast
 """
 zc_batch.py — Messages Batch API
 AI Model Coder CLI v1.11.1
@@ -31,7 +31,6 @@ import uuid
 from pathlib import Path
 
 import anthropic
-from typing import Optional
 
 BATCH_STORE = Path(os.path.expanduser("~/.ai-coder/batches"))
 
@@ -43,7 +42,7 @@ BATCH_STORE = Path(os.path.expanduser("~/.ai-coder/batches"))
 OUTPUT_300K_BETA = "output-300k-2026-03-24"
 OUTPUT_300K_MODELS = {
     "zc-opus-4-8", "zc-opus-4-7", "zc-opus-4-6",
-    "zc-sonnet-5", "zc-sonnet-4-6",
+    "zc-xxx", "zc-sonnet-4-6",
 }
 OUTPUT_300K_MAX_TOKENS = 300_000
 
@@ -51,7 +50,7 @@ OUTPUT_300K_MAX_TOKENS = 300_000
 class BatchCoder:
     """zAICoder Batch API client."""
 
-    def __init__(self, api_key: str, model: str = "zc-sonnet-5",
+    def __init__(self, api_key: str, model: str = "zc-xxx",
                  use_300k_output: bool = False):
         self.client = anthropic.Anthropic(api_key=api_key)
         self.model  = model
@@ -156,19 +155,20 @@ class BatchCoder:
         """Stream results once batch is complete. Returns list of result dicts."""
         items = []
         for result in self.client.messages.batches.results(batch_id):
-            entry = {
+            result_data = cast(Any, result.result)
+            entry: dict[str, Any] = {
                 "custom_id": result.custom_id,
-                "type":      result.result.type,
+                "type":      result_data.type,
             }
-            if result.result.type == "succeeded":
-                msg    = result.result.message
+            if result_data.type == "succeeded":
+                msg = result_data.message
                 entry["text"] = msg.content[0].text if msg.content else ""
                 entry["usage"] = {
                     "input":  msg.usage.input_tokens,
                     "output": msg.usage.output_tokens,
                 }
             else:
-                entry["error"] = str(result.result.error)
+                entry["error"] = str(result_data.error)
             items.append(entry)
 
         if save_to:

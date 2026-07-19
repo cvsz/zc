@@ -1,10 +1,30 @@
 """tests/conftest.py — shared fixtures"""
-import os
+from pathlib import Path
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+ROOT = Path(__file__).resolve().parents[1]
+SRC = ROOT / "src"
+
+for path in (SRC, ROOT):
+    path_str = str(path)
+    if path_str not in sys.path:
+        sys.path.insert(0, path_str)
 
 import pytest
+
+
+def pytest_configure(config):
+    """Keep the suite isolated from optional globally-installed plugins.
+
+    LangSmith's pytest plugin can wrap the in-process ASGI test transport and
+    deadlock synchronous tests in environments where it is installed outside
+    this project. It is not a project dependency or part of the test contract.
+    """
+    plugin_manager = config.pluginmanager
+    for plugin_name in ("langsmith.pytest_plugin", "langsmith"):
+        plugin = plugin_manager.get_plugin(plugin_name)
+        if plugin is not None:
+            plugin_manager.unregister(plugin)
 
 
 @pytest.fixture(autouse=True)
