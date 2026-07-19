@@ -1,10 +1,10 @@
 # v1.25.0 audit cycle — gap findings + implementation notes
 
 Continuation of the cross-product cycle (v1.24.0 committed to re-running
-the full `platform.zaicoder.com/docs/en/release-notes/overview` sweep and
+the full `platform.zc.com/docs/en/release-notes/overview` sweep and
 following up on the deferred `zc_models.py`/`requirements.txt` drift
 check). Model catalog checked first — no new model releases since
-ZaiCoder Sonnet 5 (June 30, 2026); `MODEL_CATALOG` in `zc_models.py`
+zAICoder Sonnet 5 (June 30, 2026); `MODEL_CATALOG` in `zc_models.py`
 is current. Two further gaps found while re-reading the same release
 notes page this cycle started from.
 
@@ -31,12 +31,12 @@ kind of caller `zc_thinking.py` already serves.
 
 ## Finding 2 — CMEK `external_keys` Admin API endpoints
 
-**What it is:** On ZaiCoder Platform (not ZaiCoder Platform on AWS, where
+**What it is:** On zAICoder Platform (not zAICoder Platform on AWS, where
 this surface is explicitly unavailable per the docs), customer-managed
 encryption keys are "configured with the Admin API" — the docs
 reference "the `external_keys` API endpoints" by name when noting
 they're unavailable on the AWS variant, confirming they exist as a
-distinct Admin API surface on standard ZaiCoder Platform, alongside the
+distinct Admin API surface on standard zAICoder Platform, alongside the
 Console UI path.
 
 **Why it's a gap:** First grep for `cmek`/`external_keys`/`CMEK` across

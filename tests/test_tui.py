@@ -10,12 +10,12 @@ import pytest
 
 textual = pytest.importorskip("textual", reason="optional dependency for --tui, see requirements.txt")
 
-import tui  # noqa: E402
+import wire.tui as tui  # noqa: E402
 
 
 @pytest.mark.asyncio
 async def test_compose_builds_sidebar_and_transcript():
-    app = tui.ZCoderTUI(api_key="test-key")
+    app = tui.wireTUI(api_key="test-key")
     async with app.run_test() as pilot:
         await pilot.pause()
         assert app.query_one("#sidebar") is not None
@@ -25,7 +25,7 @@ async def test_compose_builds_sidebar_and_transcript():
 
 @pytest.mark.asyncio
 async def test_missing_api_key_shows_error_message():
-    app = tui.ZCoderTUI(api_key="")
+    app = tui.wireTUI(api_key="")
     async with app.run_test() as pilot:
         await pilot.pause()
         transcript = app.query_one("#transcript")
@@ -35,7 +35,7 @@ async def test_missing_api_key_shows_error_message():
 
 @pytest.mark.asyncio
 async def test_submitting_prompt_adds_user_and_assistant_messages():
-    app = tui.ZCoderTUI(api_key="test-key")
+    app = tui.wireTUI(api_key="test-key")
     async with app.run_test() as pilot:
         await pilot.pause()
         app.query_one("#prompt_input").value = "hello there"
@@ -49,7 +49,7 @@ async def test_submitting_prompt_adds_user_and_assistant_messages():
 
 @pytest.mark.asyncio
 async def test_new_session_clears_transcript_and_history():
-    app = tui.ZCoderTUI(api_key="test-key")
+    app = tui.wireTUI(api_key="test-key")
     async with app.run_test() as pilot:
         await pilot.pause()
         app.history = [{"role": "user", "content": "x"}, {"role": "assistant", "content": "y"}]
@@ -62,7 +62,7 @@ async def test_new_session_clears_transcript_and_history():
 
 @pytest.mark.asyncio
 async def test_build_system_prompt_combines_agent_skill_personality():
-    app = tui.ZCoderTUI(api_key="test-key")
+    app = tui.wireTUI(api_key="test-key")
     async with app.run_test() as pilot:
         await pilot.pause()
         app.query_one("#agent_select").value = "code_reviewer"
@@ -76,7 +76,7 @@ async def test_build_system_prompt_combines_agent_skill_personality():
 
 @pytest.mark.asyncio
 async def test_temperature_falls_back_to_default_on_bad_input():
-    app = tui.ZCoderTUI(api_key="test-key")
+    app = tui.wireTUI(api_key="test-key")
     async with app.run_test() as pilot:
         await pilot.pause()
         temp_input = app.query_one("#temp_input")
@@ -134,7 +134,7 @@ def test_streamed_reply_shows_full_text_even_when_gated(monkeypatch):
     )
     widget = types.SimpleNamespace(update_text=updates.append)
 
-    result = tui.ZCoderTUI._stream_reply(owner, "hello", "test", None, 0.3, [], widget)
+    result = tui.wireTUI._stream_reply(owner, "hello", "test", None, 0.3, [], widget)
 
     assert result == "Hi there!"
     assert updates == ["Hi", "Hi there!"]
@@ -148,17 +148,17 @@ def test_import_error_message_is_actionable_when_textual_missing(monkeypatch):
     real_textual = _sys.modules.get("textual")
     _sys.modules["textual"] = None  # forces an ImportError on next import
     for mod in list(_sys.modules):
-        if mod == "tui" or mod.startswith("tui."):
+        if mod == "wire.tui" or mod.startswith("wire.tui."):
             del _sys.modules[mod]
     try:
         with pytest.raises(ImportError, match="pip install textual"):
-            importlib.import_module("tui")
+            importlib.import_module("wire.tui")
     finally:
         if real_textual is not None:
             _sys.modules["textual"] = real_textual
         else:
             _sys.modules.pop("textual", None)
         for mod in list(_sys.modules):
-            if mod == "tui" or mod.startswith("tui."):
+            if mod == "wire.tui" or mod.startswith("wire.tui."):
                 del _sys.modules[mod]
-        importlib.import_module("tui")
+        importlib.import_module("wire.tui")

@@ -1,4 +1,4 @@
-# zcoder web console
+# wire web console
 
 A browser UI for the AI Model Coder CLI. It does not replace the CLI or
 duplicate its logic — `webapp/backend/server.py` imports and calls the

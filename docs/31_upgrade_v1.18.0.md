@@ -1,7 +1,7 @@
 # v1.18.0 upgrade notes — Mid-conversation system messages + Cache diagnostics CLI wiring
 
 This release comes from re-running `ROADMAP.md`'s own gap-audit
-methodology against the live docs at platform.zaicoder.com/docs. The
+methodology against the live docs at platform.zc.com/docs. The
 previous audit was dated 2026-07-04; this one is dated 2026-07-08. Two
 real findings, both closed here — plus a correction to `ROADMAP.md`
 itself, which had drifted from what was actually true in the codebase.
@@ -9,7 +9,7 @@ itself, which had drifted from what was actually true in the codebase.
 ## Finding 1 — Mid-conversation system messages (new, genuinely missing)
 
 **What it is:** on Opus 4.8, you can append a `{"role": "system", ...}`
-message into the middle of `messages` to update ZaiCoder's instructions
+message into the middle of `messages` to update zAICoder's instructions
 partway through a conversation — no beta header required. The key
 property: unlike editing the top-level `system` field, this doesn't
 touch the hashed system/tools prefix that prompt caching keys off of, so

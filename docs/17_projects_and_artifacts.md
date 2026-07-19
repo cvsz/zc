@@ -43,7 +43,7 @@ ai-coder --project-list
 # Show project details and task status
 ai-coder --project-show <id>
 
-# AI-generate a task plan (calls ZaiCoder to design tasks)
+# AI-generate a task plan (calls zAICoder to design tasks)
 ai-coder --project-plan <id>
 
 # Add a custom task
@@ -264,7 +264,7 @@ ai-coder --project-run <project_id> --task all
 | `artifacts.py` | Versioned AI outputs: create, iterate, diff, export, tag |
 | 6 project templates | blank, web_app, api, cli_tool, data_pipeline, ml_model |
 | 12 artifact types | code, docs, tests, schema, config, diagram, report, plan, changelog, prompt, script, template |
-| AI plan generation | `--project-plan` calls ZaiCoder to design task lists |
+| AI plan generation | `--project-plan` calls zAICoder to design task lists |
 | Version diffing | `--artifact-diff` shows unified diff between any two versions |
 | Project export | `--artifact-export-all` bundles all project artifacts |
 | 100% backward compatible | All v1.0–v1.6 commands unchanged |

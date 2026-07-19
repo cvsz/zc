@@ -70,7 +70,7 @@ def test_known_exceptions_still_point_at_real_functions():
     exception entry keeps suppressing a check that would now catch
     something real)."""
     for module_name, fn in KNOWN_EXCEPTIONS:
-        module_path = os.path.join(REPO_ROOT, module_name)
+        module_path = os.path.join(REPO_ROOT, "src", "wire", module_name)
         assert os.path.exists(module_path), f"{module_name} no longer exists"
         assert fn in _cmd_functions(module_path), (
             f"{module_name}.{fn} no longer defined — remove from KNOWN_EXCEPTIONS"
@@ -82,7 +82,7 @@ def test_known_exceptions_still_point_at_real_functions():
 
 @pytest.fixture
 def parsed_args():
-    import main as main_mod
+    import wire.main as main_mod
     parser = main_mod.build_parser()
 
     def _parse(argv):
@@ -144,14 +144,14 @@ def test_metrics_export_flag_parses(parsed_args):
 
 
 def _run_main_with(monkeypatch, argv, api_key="sk-ant-test"):
-    import main as main_mod
+    import wire.main as main_mod
     monkeypatch.setattr("sys.argv", ["main.py"] + argv)
     monkeypatch.setenv("ANTHROPIC_API_KEY", api_key)
     main_mod.main()
 
 
 def test_route_list_dispatches_to_cmd_route_list(monkeypatch):
-    import zc_router
+    import wire.zc_router as zc_router
     called = {}
     monkeypatch.setattr(zc_router, "cmd_route_list", lambda *a, **k: called.setdefault("hit", True))
     _run_main_with(monkeypatch, ["--route-list"])
@@ -159,7 +159,7 @@ def test_route_list_dispatches_to_cmd_route_list(monkeypatch):
 
 
 def test_prompt_lib_list_dispatches(monkeypatch):
-    import zc_prompt_optimizer
+    import wire.zc_prompt_optimizer as zc_prompt_optimizer
     called = {}
     monkeypatch.setattr(zc_prompt_optimizer, "cmd_prompt_lib_list",
                         lambda *a, **k: called.setdefault("hit", True))
@@ -168,7 +168,7 @@ def test_prompt_lib_list_dispatches(monkeypatch):
 
 
 def test_metrics_clear_dispatches(monkeypatch):
-    import zc_metrics
+    import wire.zc_metrics as zc_metrics
     called = {}
     monkeypatch.setattr(zc_metrics, "cmd_metrics_clear",
                         lambda *a, **k: called.setdefault("hit", True))
@@ -177,7 +177,7 @@ def test_metrics_clear_dispatches(monkeypatch):
 
 
 def test_gh_triage_dispatches_with_positional_order(monkeypatch):
-    import zc_github
+    import wire.zc_github as zc_github
     seen = {}
 
     def fake_triage(repo, max_items, token, api_key, model):
@@ -227,25 +227,25 @@ def test_route_add_agent_defaults_to_none(parsed_args):
 
 
 def test_extra_table_from_pairs_builds_dict():
-    from zc_router import extra_table_from_pairs
+    from wire.zc_router import extra_table_from_pairs
     table = extra_table_from_pairs([["frontend", "React and CSS"], ["infra", "Terraform"]])
     assert table == {"frontend": "React and CSS", "infra": "Terraform"}
 
 
 def test_extra_table_from_pairs_none_for_empty_input():
-    from zc_router import extra_table_from_pairs
+    from wire.zc_router import extra_table_from_pairs
     assert extra_table_from_pairs(None) is None
     assert extra_table_from_pairs([]) is None
 
 
 def test_extra_table_from_pairs_last_write_wins_on_duplicate_name():
-    from zc_router import extra_table_from_pairs
+    from wire.zc_router import extra_table_from_pairs
     table = extra_table_from_pairs([["frontend", "first draft"], ["frontend", "second draft"]])
     assert table == {"frontend": "second draft"}
 
 
 def test_route_add_agent_merges_into_route_dispatch(monkeypatch):
-    import zc_router
+    import wire.zc_router as zc_router
     seen = {}
 
     def fake_cmd_route(prompt, api_key, model, explain=False, parallel=False, extra_table=None):
@@ -259,7 +259,7 @@ def test_route_add_agent_merges_into_route_dispatch(monkeypatch):
 
 
 def test_route_add_agent_merges_into_route_list_dispatch(monkeypatch):
-    import zc_router
+    import wire.zc_router as zc_router
     seen = {}
 
     def fake_cmd_route_list(extra_table=None):
@@ -272,7 +272,7 @@ def test_route_add_agent_merges_into_route_list_dispatch(monkeypatch):
 
 
 def test_route_without_add_agent_passes_none_not_omitted(monkeypatch):
-    import zc_router
+    import wire.zc_router as zc_router
     seen = {}
 
     def fake_cmd_route(prompt, api_key, model, explain=False, parallel=False, extra_table=None):
@@ -315,7 +315,7 @@ def test_pdf_native_defaults_to_none_when_omitted(parsed_args):
 
 
 def test_docx_native_dispatches_to_cmd_docx_chat(monkeypatch):
-    import zc_word
+    import wire.zc_word as zc_word
     seen = {}
 
     def fake_cmd_docx_chat(api_key, model, input_path=None, output_path=None, max_tokens=4096):
@@ -327,7 +327,7 @@ def test_docx_native_dispatches_to_cmd_docx_chat(monkeypatch):
 
 
 def test_docx_native_with_no_file_passes_none_input_path(monkeypatch):
-    import zc_word
+    import wire.zc_word as zc_word
     seen = {}
 
     def fake_cmd_docx_chat(api_key, model, input_path=None, output_path=None, max_tokens=4096):
@@ -339,7 +339,7 @@ def test_docx_native_with_no_file_passes_none_input_path(monkeypatch):
 
 
 def test_pdf_native_dispatches_to_cmd_pdf_chat(monkeypatch):
-    import zc_pdf
+    import wire.zc_pdf as zc_pdf
     seen = {}
 
     def fake_cmd_pdf_chat(api_key, model, input_path=None, output_path=None, max_tokens=4096):
@@ -351,7 +351,7 @@ def test_pdf_native_dispatches_to_cmd_pdf_chat(monkeypatch):
 
 
 def test_pdf_native_with_no_file_passes_none_input_path(monkeypatch):
-    import zc_pdf
+    import wire.zc_pdf as zc_pdf
     seen = {}
 
     def fake_cmd_pdf_chat(api_key, model, input_path=None, output_path=None, max_tokens=4096):

@@ -1,6 +1,6 @@
 # v1.10.5 — Native memory tool, context editing, tool search tool
 
-Prompted by a direct audit request: "what's missing, relative to ZaiCoder's
+Prompted by a direct audit request: "what's missing, relative to zAICoder's
 actual current API capabilities?" Three concrete gaps found in
 `zc_tools.py` and closed in this pass.
 
@@ -20,7 +20,7 @@ code_execution, bash, text_editor, and computer_use — but not:
    multi-hour tool-heavy session doesn't silently degrade as old content
    piles up in the transcript.
 3. **The tool search tool** (`tool-search-tool-2025-10-19` beta) — lets
-   ZaiCoder discover tools on demand instead of loading every definition
+   zAICoder discover tools on demand instead of loading every definition
    upfront, relevant once a tool library gets into the dozens/hundreds
    range.
 
@@ -40,7 +40,7 @@ code_execution, bash, text_editor, and computer_use — but not:
   `clear_thinking_20251015`), with sane defaults (30k input-token
   trigger, keep last 3 tool uses).
 - New `MemoryToolHandler` class — the client-side implementation the
-  memory tool requires (it's server-declared, client-executed: ZaiCoder
+  memory tool requires (it's server-declared, client-executed: zAICoder
   emits `tool_use` blocks with a `command` field, your application
   carries them out). Supports view/create/str_replace/insert/delete/rename
   against a local directory. Every path is resolved via `_resolve()` and

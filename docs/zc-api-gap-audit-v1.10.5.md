@@ -1,18 +1,18 @@
-# AI Model Coder CLI v1.10.5 — Gap Audit vs. Current ZaiCoder API (checked 2026-07-02)
+# AI Model Coder CLI v1.10.5 — Gap Audit vs. Current zAICoder API (checked 2026-07-02)
 
 This project is unusually well-maintained for this kind of audit: `docs/19–23_upgrade_*.md`
 already record a running self-audit history, and `zc_models.py` / `zc_fable5.py` /
-`zc_cost_optimizer.py` explicitly timestamp their data against `platform.zaicoder.com/docs`
+`zc_cost_optimizer.py` explicitly timestamp their data against `platform.zc.com/docs`
 as of 2026-07-02. The gaps below are everything **still missing or stale** after that history,
-found by cross-checking every module against the current ZaiCoder Platform docs.
+found by cross-checking every module against the current zAICoder Platform docs.
 
 ## 1. Missing entirely (no module, no flag, no code)
 
 | Feature | What it is | Where it should live |
 |---|---|---|
 | **Advisor tool** (`advisor_20260301`, beta `advisor-tool-2026-03-01`) | Server tool that pairs a fast executor model with a stronger advisor model consulted mid-generation at decision points (`server_tool_use` → `advisor_tool_result`, `pause_turn` resume flow, per-iteration billing at the advisor model's rate). Supported executors: Opus 4.6+, Sonnet 4.6+, Haiku 4.5, Fable 5. Not available on Bedrock/Vertex/Foundry. | New `zc_advisor.py`; add to `SERVER_TOOLS` in `zc_tools.py` |
-| **Task budgets** (beta `task-budgets-2026-03-13`) | Advisory token budget for a full agentic loop (thinking + tool calls + tool results + output); ZaiCoder sees a running countdown and prioritizes/wraps up as it depletes. GA on Opus 4.7 and 4.8. | `zc_tools.py` or `zc_code.py` agent loop |
-| **Tool Use Examples** (`input_examples` field on tool defs, beta `advanced-tool-use-2025-11-20`) | Third feature from the same Nov 2025 "advanced tool use" release as Tool Search Tool and Programmatic Tool Calling — worked examples of correct tool calls, shown by ZaiCoder to raise complex-parameter accuracy from 72%→90%. Expands automatically when a deferred tool is discovered via tool search. | `zc_tools.py`, `ToolCoder` tool-definition builder |
+| **Task budgets** (beta `task-budgets-2026-03-13`) | Advisory token budget for a full agentic loop (thinking + tool calls + tool results + output); zAICoder sees a running countdown and prioritizes/wraps up as it depletes. GA on Opus 4.7 and 4.8. | `zc_tools.py` or `zc_code.py` agent loop |
+| **Tool Use Examples** (`input_examples` field on tool defs, beta `advanced-tool-use-2025-11-20`) | Third feature from the same Nov 2025 "advanced tool use" release as Tool Search Tool and Programmatic Tool Calling — worked examples of correct tool calls, shown by Anthropic to raise complex-parameter accuracy from 72%→90%. Expands automatically when a deferred tool is discovered via tool search. | `zc_tools.py`, `ToolCoder` tool-definition builder |
 | **Programmatic Tool Calling — actual implementation** | `zc_tools.py`'s docstring claims this, but there's no `allowed_callers` field, no `code_execution_20260120` (the minimum version, now **GA, no beta header**), no handling of the `caller` field on `tool_use` blocks. It's a bullet point, not code. | `zc_tools.py` |
 | **Embeddings** | No module at all. `zc_memory.py` even says "swap in embeddings for larger stores" and never does. | New `zc_embeddings.py` |
 | **MCP tunnels** (research preview, `mcp-tunnels-2026-06-22`, `/v1/tunnels`) | New surface for exposing local MCP servers remotely; moved off the Admin API in the last couple of months. | `zc_agents_sdk.py` |
@@ -31,9 +31,9 @@ that are now behind the current defaults:
   even support Programmatic Tool Calling (REPL-state persistence requirement)
 - `computer_20250124` / `bash_20250124` / `text_editor_20250124` → worth re-checking against
   the current per-model computer-use version table before assuming these are still the latest
-  ZaiCoder Sonnet 5 / Opus 4.8 pairings support
+  zAICoder Sonnet 5 / Opus 4.8 pairings support
 
-None of these are hard failures (old versions still work until ZaiCoder retires them), but
+None of these are hard failures (old versions still work until Anthropic retires them), but
 `zc_models.py`'s own retirement-scanner pattern (`check_retired`/`RETIRED_MODELS`) has no
 equivalent for *tool* version strings — worth a `RETIRED_TOOL_VERSIONS` table for the same
 reason it exists for models.

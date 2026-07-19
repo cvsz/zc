@@ -8,7 +8,7 @@ name: Release
 # setuptools package discovery) and cuts a GitHub Release with the source
 # archive. It deliberately does NOT run `python -m build` to produce a
 # PyPI-style wheel/sdist: the project's ~65 root-level modules
-# (main.py, claude_*.py, ...) are flat files, not a package directory, and
+# (main.py, zc_*.py, ...) are flat files, not a package directory, and
 # pyproject.toml has no [tool.setuptools] py-modules/packages declaration
 # telling setuptools which of them to include. Without that, a wheel build
 # would either fail or silently produce a near-empty artifact. Fixing that
@@ -95,6 +95,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release create "${GITHUB_REF_NAME}" \
-            --title "zcoder ${GITHUB_REF_NAME}" \
+            --title "wire ${GITHUB_REF_NAME}" \
             --generate-notes \
             --notes "Docker image: ghcr.io/${{ github.repository }}:${GITHUB_REF_NAME#v}"

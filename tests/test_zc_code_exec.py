@@ -14,16 +14,15 @@ directly — this is what actually proves the anthropic-beta header is
 """
 import json
 
-import pytest
-
-import zc_code_exec as mod
-from zc_code_exec import CodeExecutionCoder
+import wire.zc_code_exec as mod
+from wire.zc_code_exec import CodeExecutionCoder
+from typing import Optional
 
 
 class _FakeResp:
     def __init__(self, body: bytes):
         self._body = body
-        self.headers = {}
+        self.headers: dict[str, str] = {}
 
     def read(self):
         return self._body
@@ -35,7 +34,7 @@ class _FakeResp:
         return False
 
 
-def _install_fake_urlopen(monkeypatch, captured_headers: dict, response_body: dict = None):
+def _install_fake_urlopen(monkeypatch, captured_headers: dict, response_body: Optional[dict] = None):
     response_body = response_body or {"content": [], "usage": {}}
 
     def fake_urlopen(req, timeout=None):

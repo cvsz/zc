@@ -1,12 +1,12 @@
 # v1.31.0 — CLI-to-API wiring audit: four fully-built modules with zero CLI access
 
 Different kind of cycle than usual. Every prior cycle in this series
-(`docs/35` through `docs/42`) re-checked zcoder's *API-level* behavior
-against `platform.zaicoder.com/docs` — did we send the right request shape,
+(`docs/35` through `docs/42`) re-checked wire's *API-level* behavior
+against `platform.zc.com/docs` — did we send the right request shape,
 handle the right response fields, use the current beta header. This one
 checked something else: for every `zc_*.py` module, is every
 `cmd_*` function it defines actually reachable from `main.py`? A module
-can be a perfectly correct, fully-tested implementation of some ZaiCoder
+can be a perfectly correct, fully-tested implementation of some zAICoder
 capability and still be dead weight to the person typing `python main.py
 --help` if nothing in `main.py` ever imports it.
 

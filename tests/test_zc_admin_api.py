@@ -5,22 +5,19 @@ default date range, the 401/403 admin-key-required error hint, API key
 revoke (status -> inactive, no delete endpoint), and that
 --admin-create-key is a pure explanation with no network call.
 """
-import re
 
-import pytest
 
-from zc_admin_api import (
+from wire.zc_admin_api import (
     AdminApiClient,
-    cmd_usage_report,
-    cmd_cost_report,
+    _default_date_range,
+    cmd_admin_create_key,
     cmd_admin_list_keys,
     cmd_admin_revoke_key,
-    cmd_admin_create_key,
+    cmd_cost_report,
     cmd_rate_limits,
     cmd_rate_limits_workspace,
-    _default_date_range,
+    cmd_usage_report,
 )
-
 
 # ── AdminApiClient query building ────────────────────────────────────────
 
@@ -81,7 +78,7 @@ def test_default_date_range_is_30_days():
 def test_cmd_usage_report_prints_admin_key_hint_on_403(monkeypatch, capsys):
     client = AdminApiClient(admin_api_key="regular-looking-key")
     monkeypatch.setattr(
-        "zc_admin_api.AdminApiClient",
+        "wire.zc_admin_api.AdminApiClient",
         lambda admin_api_key: client,
     )
     monkeypatch.setattr(client, "get_usage_report",
@@ -96,7 +93,7 @@ def test_cmd_usage_report_prints_admin_key_hint_on_403(monkeypatch, capsys):
 
 def test_cmd_cost_report_prints_rows(monkeypatch, capsys):
     client = AdminApiClient(admin_api_key="k")
-    monkeypatch.setattr("zc_admin_api.AdminApiClient", lambda admin_api_key: client)
+    monkeypatch.setattr("wire.zc_admin_api.AdminApiClient", lambda admin_api_key: client)
     monkeypatch.setattr(client, "get_cost_report",
                         lambda start, end, group_by="model": {
                             "data": [{"model": "zc-sonnet-5", "amount": "12.50", "currency": "usd"}]
@@ -112,7 +109,7 @@ def test_cmd_cost_report_prints_rows(monkeypatch, capsys):
 
 def test_cmd_admin_list_keys_prints_each_key(monkeypatch, capsys):
     client = AdminApiClient(admin_api_key="k")
-    monkeypatch.setattr("zc_admin_api.AdminApiClient", lambda admin_api_key: client)
+    monkeypatch.setattr("wire.zc_admin_api.AdminApiClient", lambda admin_api_key: client)
     monkeypatch.setattr(client, "list_api_keys", lambda limit=20: {
         "data": [{"id": "key_1", "name": "prod", "status": "active"}]
     })
@@ -126,7 +123,7 @@ def test_cmd_admin_list_keys_prints_each_key(monkeypatch, capsys):
 
 def test_cmd_admin_revoke_key_success_message(monkeypatch, capsys):
     client = AdminApiClient(admin_api_key="k")
-    monkeypatch.setattr("zc_admin_api.AdminApiClient", lambda admin_api_key: client)
+    monkeypatch.setattr("wire.zc_admin_api.AdminApiClient", lambda admin_api_key: client)
     monkeypatch.setattr(client, "revoke_api_key", lambda key_id: {"id": key_id, "status": "inactive"})
 
     result = cmd_admin_revoke_key("k", "key_1")
@@ -138,7 +135,7 @@ def test_cmd_admin_revoke_key_success_message(monkeypatch, capsys):
 
 def test_cmd_admin_revoke_key_error(monkeypatch, capsys):
     client = AdminApiClient(admin_api_key="k")
-    monkeypatch.setattr("zc_admin_api.AdminApiClient", lambda admin_api_key: client)
+    monkeypatch.setattr("wire.zc_admin_api.AdminApiClient", lambda admin_api_key: client)
     monkeypatch.setattr(client, "revoke_api_key", lambda key_id: {"error": "not found"})
 
     result = cmd_admin_revoke_key("k", "ghost")
@@ -155,7 +152,7 @@ def test_cmd_admin_create_key_makes_no_network_call(monkeypatch, capsys):
     def boom(*a, **kw):
         raise AssertionError("cmd_admin_create_key must not touch the network")
 
-    monkeypatch.setattr("zc_admin_api.AdminApiClient", boom)
+    monkeypatch.setattr("wire.zc_admin_api.AdminApiClient", boom)
 
     result = cmd_admin_create_key("my-new-key")
 
@@ -240,7 +237,7 @@ def test_cmd_rate_limits_workspace_no_overrides_message(monkeypatch, capsys):
     assert "no overrides" in capsys.readouterr().out
 
 
-# ── v1.23.0: Spend Limits API (Claude Enterprise only) ───────────────────
+# ── v1.23.0: Spend Limits API (zAICoder Enterprise only) ───────────────────
 
 
 def test_list_effective_spend_limits_builds_expected_params(monkeypatch):
@@ -344,7 +341,7 @@ def test_deny_spend_limit_increase_request_with_suppress(monkeypatch):
 
 
 def test_cmd_spend_limits_list_prints_rows(monkeypatch, capsys):
-    from zc_admin_api import cmd_spend_limits_list
+    from wire.zc_admin_api import cmd_spend_limits_list
     monkeypatch.setattr(AdminApiClient, "list_effective_spend_limits", lambda self, limit=50, page=None: {
         "data": [{"user_id": "user_1", "amount": "5000", "source": "group",
                  "period_to_date_spend": "1200"}],
@@ -357,7 +354,7 @@ def test_cmd_spend_limits_list_prints_rows(monkeypatch, capsys):
 
 
 def test_cmd_spend_limits_list_enterprise_hint_on_403(monkeypatch, capsys):
-    from zc_admin_api import cmd_spend_limits_list
+    from wire.zc_admin_api import cmd_spend_limits_list
     monkeypatch.setattr(AdminApiClient, "list_effective_spend_limits",
                         lambda self, limit=50, page=None: {"error": "forbidden", "status": 403})
 
@@ -368,7 +365,7 @@ def test_cmd_spend_limits_list_enterprise_hint_on_403(monkeypatch, capsys):
 
 
 def test_cmd_spend_limit_set_success_message(monkeypatch, capsys):
-    from zc_admin_api import cmd_spend_limit_set
+    from wire.zc_admin_api import cmd_spend_limit_set
     monkeypatch.setattr(AdminApiClient, "set_spend_limit",
                         lambda self, user_id, amount, suppress_notification=False: {"id": "spl_1"})
 
@@ -379,7 +376,7 @@ def test_cmd_spend_limit_set_success_message(monkeypatch, capsys):
 
 
 def test_cmd_spend_limit_delete_success_message(monkeypatch, capsys):
-    from zc_admin_api import cmd_spend_limit_delete
+    from wire.zc_admin_api import cmd_spend_limit_delete
     monkeypatch.setattr(AdminApiClient, "delete_spend_limit",
                         lambda self, spend_limit_id: {"deleted": True})
 
@@ -389,7 +386,7 @@ def test_cmd_spend_limit_delete_success_message(monkeypatch, capsys):
 
 
 def test_cmd_spend_limit_requests_list_passes_single_status_filter(monkeypatch, capsys):
-    from zc_admin_api import cmd_spend_limit_requests_list
+    from wire.zc_admin_api import cmd_spend_limit_requests_list
     captured = {}
     monkeypatch.setattr(AdminApiClient, "list_spend_limit_increase_requests",
                         lambda self, status=None, actor_ids=None, limit=50, page=None: (
@@ -402,7 +399,7 @@ def test_cmd_spend_limit_requests_list_passes_single_status_filter(monkeypatch, 
 
 
 def test_cmd_spend_limit_request_approve_and_deny(monkeypatch, capsys):
-    from zc_admin_api import cmd_spend_limit_request_approve, cmd_spend_limit_request_deny
+    from wire.zc_admin_api import cmd_spend_limit_request_approve, cmd_spend_limit_request_deny
     monkeypatch.setattr(AdminApiClient, "approve_spend_limit_increase_request",
                         lambda self, request_id, suppress_notification=False: {"id": request_id})
     monkeypatch.setattr(AdminApiClient, "deny_spend_limit_increase_request",
@@ -416,7 +413,7 @@ def test_cmd_spend_limit_request_approve_and_deny(monkeypatch, capsys):
     assert "req_2" in out and "denied" in out
 
 
-# ── v1.24.0: ZaiCoder Code Analytics API ────────────────────────────────────
+# ── v1.24.0: zAICoder Analytics API ────────────────────────────────────
 
 
 def test_get_zc_code_usage_report_builds_expected_params(monkeypatch):
@@ -445,10 +442,10 @@ def test_get_zc_code_usage_report_passes_page_cursor(monkeypatch):
 
 
 def test_cmd_zc_code_usage_report_prints_wrong_key_hint(monkeypatch, capsys):
-    client = AdminApiClient(admin_api_key="admin-k")
+    AdminApiClient(admin_api_key="admin-k")
     monkeypatch.setattr(AdminApiClient, "get_zc_code_usage_report",
                         lambda self, *a, **k: {"error": "forbidden", "status": 403})
-    from zc_admin_api import cmd_zc_code_usage_report
+    from wire.zc_admin_api import cmd_zc_code_usage_report
 
     result = cmd_zc_code_usage_report("regular-key", "2026-07-08")
 
@@ -462,7 +459,7 @@ def test_cmd_zc_code_usage_report_handles_missing_optional_fields(monkeypatch, c
                         lambda self, *a, **k: {"data": [
                             {"date": "2026-07-08T00:00:00Z", "api_actor": {"api_key_name": "ci-key"}},
                         ]})
-    from zc_admin_api import cmd_zc_code_usage_report
+    from wire.zc_admin_api import cmd_zc_code_usage_report
 
     result = cmd_zc_code_usage_report("admin-k", "2026-07-08")
 
@@ -487,12 +484,12 @@ def test_cmd_zc_code_usage_report_prints_named_user_and_metrics(monkeypatch, cap
                                  "estimated_cost": {"currency": "USD", "amount": 1025}},
                             ],
                         }]})
-    from zc_admin_api import cmd_zc_code_usage_report
+    from wire.zc_admin_api import cmd_zc_code_usage_report
 
     cmd_zc_code_usage_report("admin-k", "2026-07-08")
 
     out = capsys.readouterr().out
-    assert "[email protected]" in out
+    assert "[em***ed]" in out
     assert "sessions=5" in out
     assert "cost=1025" in out
 
@@ -596,7 +593,7 @@ def test_list_external_keys_with_workspace_filter(monkeypatch):
 
 
 def test_cmd_cmek_list_prints_wrong_key_hint(monkeypatch, capsys):
-    from zc_admin_api import cmd_cmek_list
+    from wire.zc_admin_api import cmd_cmek_list
     monkeypatch.setattr(AdminApiClient, "list_external_keys",
                         lambda self, workspace_id=None: {"error": "forbidden", "status": 403})
 
@@ -607,7 +604,7 @@ def test_cmd_cmek_list_prints_wrong_key_hint(monkeypatch, capsys):
 
 
 def test_cmd_cmek_list_prints_keys(monkeypatch, capsys):
-    from zc_admin_api import cmd_cmek_list
+    from wire.zc_admin_api import cmd_cmek_list
     monkeypatch.setattr(AdminApiClient, "list_external_keys",
                         lambda self, workspace_id=None: {"data": [
                             {"id": "key_1", "workspace_id": "wrkspc_1",

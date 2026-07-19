@@ -10,7 +10,7 @@ simply never got a second half built.
 ## What was found
 
 `zc_skills_api.py`'s `PREBUILT_SKILLS` dict has listed all four
-ZaiCoder-maintained Skills since v1.15.0:
+Anthropic-maintained Skills since v1.15.0:
 
 ```python
 PREBUILT_SKILLS = {

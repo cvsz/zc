@@ -1,6 +1,6 @@
-# zcoder v1.33.0 — Deep Audit Report
+# wire v1.33.0 — Deep Audit Report
 
-**Scope:** `zcoder-v1_33_0.zip` (current release), diffed against `zcoder-v1_32_0.zip` (previous release)
+**Scope:** `wire-v1_33_0.zip` (current release), diffed against `wire-v1_32_0.zip` (previous release)
 **Method:** Static analysis (AST + grep across all 91 Python files / ~26,200 LOC), manual line-by-line review of every security- and correctness-critical module, independent re-derivation of the project's own CLI-wiring test, and a full file-level diff between the two supplied archives.
 **Not done, and why:** This sandbox has no network access, so `zc`, `pytest`, `fastapi`, `pydantic`, and `uvicorn` could not be installed. I could not execute the test suite or actually run the FastAPI backend. Every finding below is either (a) confirmed by direct code inspection with exact file:line citations, or (b) explicitly marked as inferred/unverified. Nothing here is a guess dressed up as a fact.
 
@@ -8,7 +8,7 @@
 
 ## 1. Executive Summary
 
-The uploaded instructions describe continuing to build a **multi-tenant, CLI-to-API SaaS product** — organizations, workspaces, a backend the CLI talks to, per-tenant authorization and audit, database migrations, container smoke tests. That product does not exist here, and per the repo's own `ARCHITECTURE.md` was never the design. **zcoder is a single-user, local Python CLI that talks directly to ZaiCoder's real public APIs using the user's own API key**, plus one optional local FastAPI+vanilla-JS web UI. Section 3 explains why this matters for how to read the rest of this report — most of the uploaded prompt's specific invariants (tenant scoping, DB migrations, job-queue cancellation) don't have a referent in this codebase's actual shape, so I audited it against what it actually is rather than mechanically checking boxes that don't apply.
+The uploaded instructions describe continuing to build a **multi-tenant, CLI-to-API SaaS product** — organizations, workspaces, a backend the CLI talks to, per-tenant authorization and audit, database migrations, container smoke tests. That product does not exist here, and per the repo's own `ARCHITECTURE.md` was never the design. **wire is a single-user, local Python CLI that talks directly to Anthropic's real public APIs using the user's own API key**, plus one optional local FastAPI+vanilla-JS web UI. Section 3 explains why this matters for how to read the rest of this report — most of the uploaded prompt's specific invariants (tenant scoping, DB migrations, job-queue cancellation) don't have a referent in this codebase's actual shape, so I audited it against what it actually is rather than mechanically checking boxes that don't apply.
 
 Within that real shape, the codebase is a mix of genuinely good engineering and serious, concrete defects:
 
@@ -39,7 +39,7 @@ No database. No server the CLI talks to. No user accounts, sessions, or multi-te
 
 ## 3. Framing: What This Product Actually Is
 
-`ARCHITECTURE.md` is explicit and, on inspection, accurate: zcoder is "a CLI that wraps ZaiCoder's public API," run locally, authenticated with the user's own `ZC_API_KEY`. I confirmed this by grep: **20 files import the `zc` SDK directly**, and **`ZC_API_KEY` is read directly inside CLI-layer files** (`main.py`, `coder.py`, `tui.py`, `zc_embeddings.py`, `zc_code.py`). There is no backend that owns provider credentials on the CLI's behalf.
+`ARCHITECTURE.md` is explicit and, on inspection, accurate: wire is "a CLI that wraps Anthropic's public API," run locally, authenticated with the user's own `ANTHROPIC_API_KEY`. I confirmed this by grep: **20 files import the `anthropic` SDK directly**, and **`ANTHROPIC_API_KEY` is read directly inside CLI-layer files** (`main.py`, `coder.py`, `tui.py`, `zc_embeddings.py`, `zc_code.py`). There is no backend that owns provider credentials on the CLI's behalf.
 
 The uploaded execution-loop prompt assumes the opposite: a CLI that talks only to *your own* backend API, which then holds provider credentials server-side, with per-organization/workspace tenant isolation, authenticated mutating operations, database migrations, and container startup checks. Those requirements describe a different product. Two consequences for this report:
 
@@ -74,8 +74,8 @@ Extracted directly from `main.py`'s argument parser (the ground truth for what's
 | 16 | Token Counting | 2 | Pre-flight token counting |
 | 17 | Citations & RAG | 3 | Citations-enabled responses |
 | 18 | Models API | 8 | List/inspect models, deprecation checks, guided model upgrades |
-| 19 | ZaiCoder Fable 5 / Mythos 5 | 5 | Fable 5 access + fallback-chain configuration |
-| 20 | ZaiCoder Mythos 5 (limited access) | 2 | Mythos 5 access |
+| 19 | zAICoder Fable 5 / Mythos 5 | 5 | Fable 5 access + fallback-chain configuration |
+| 20 | zAICoder Mythos 5 (limited access) | 2 | Mythos 5 access |
 | 21 | Admin API | 27 | Org usage/cost reporting, API-key list/revoke (not create — see **§8**), spend limits, rate limits, CMEK |
 | 22 | Workload Identity Federation | 13 | OIDC token exchange, service accounts, issuers, trust rules |
 | 23 | Compliance API | 25 | Activity feed, chat/file/project export & delete, org/group directory |
@@ -87,7 +87,7 @@ Extracted directly from `main.py`'s argument parser (the ground truth for what's
 | 29 | PowerPoint / Slide Chat | 3 | Slide-deck chat (native + local fallback) |
 | 30 | Word / PDF Chat | 4 | **New in v1.33.0** — Skills-API-only doc chat, no local fallback (by design — see **§9**) |
 | 31 | Browse | 4 | Browser-automation-style agent loop |
-| 32 | ZaiCoder Code | 25 | The flagship coding agent: sessions, MCP, hooks, checkpoints, subagents, slash commands, sandboxing |
+| 32 | zAICoder | 25 | The flagship coding agent: sessions, MCP, hooks, checkpoints, subagents, slash commands, sandboxing |
 | 33 | Plugins & Marketplaces | 12 | Install/list/enable/disable third-party plugin bundles |
 | 34 | Memory | 9 | Long-term memory store (add/recall/forget/stats) |
 | 35 | Sessions & Checkpoints | 4 | List sessions, show, list checkpoints, away-summary |
@@ -108,7 +108,7 @@ Extracted directly from `main.py`'s argument parser (the ground truth for what's
 | 50 | Plan Mode | 3 | Read-only "plan before executing" agent mode |
 | 51 | Settings | 2 | Settings display, status-line customization |
 
-This is a large, genuinely broad feature surface — it tracks ZaiCoder's real public API surface closely (Messages, Batches, Files, Admin, Compliance, Agent SDK, Skills, Computer Use) plus a substantial amount of original CLI/agent tooling on top (ZaiCoder Code clone, plugins, workflows, routing, cost/prompt optimizers). The wiring connecting flags to implementations is, with the exceptions below, sound.
+This is a large, genuinely broad feature surface — it tracks Anthropic's real public API surface closely (Messages, Batches, Files, Admin, Compliance, Agent SDK, Skills, Computer Use) plus a substantial amount of original CLI/agent tooling on top (zAICoder clone, plugins, workflows, routing, cost/prompt optimizers). The wiring connecting flags to implementations is, with the exceptions below, sound.
 
 ---
 
@@ -139,7 +139,7 @@ def delete_project(self, project_id: str) -> bool:
     if pp.exists():
         shutil.rmtree(pp)
 ```
-Wired directly to user input at `main.py:1349-1350`:
+wired directly to user input at `main.py:1349-1350`:
 ```python
 if args.project_delete:
     from projects import ProjectManager; ProjectManager().delete_project(args.project_delete)
@@ -166,7 +166,7 @@ def delete(self, artifact_id: str) -> bool:
         return True
     return False
 ```
-Wired at `main.py:1381-1382`. Same absolute-path and `..`-traversal escape as SEC-2, byte-for-byte the same missing guard.
+wired at `main.py:1381-1382`. Same absolute-path and `..`-traversal escape as SEC-2, byte-for-byte the same missing guard.
 
 **Related, lower severity:** `ArtifactManager.export(output_path=...)` writes file content to a caller-supplied path with no validation at all — an arbitrary-file-*write* primitive, not just delete, if `output_path` is ever fed by anything other than a human typing at a terminal (see SEC-5 for why that's not a hypothetical concern in this codebase).
 
@@ -246,13 +246,13 @@ Put together: anyone on the same network — or, per the well-documented "malici
 
 ### BUG-1: The "Sonnet-5-family rejects explicit sampling params" fix wasn't applied everywhere
 
-`utils.py` defines `sampling_kwargs()` specifically because ZaiCoder Sonnet 5 / Fable 5 / Mythos 5 return a 400 if `temperature`/`top_p`/`top_k` are set to any non-default value at all (confirmed via the model's documented behavior, and via `zc_cost_optimizer.py`'s own fix comment referencing a prior hardcoded-temperature bug). It is **not used consistently** — three confirmed call sites still hardcode the parameter directly against the real API:
+`utils.py` defines `sampling_kwargs()` specifically because zAICoder Sonnet 5 / Fable 5 / Mythos 5 return a 400 if `temperature`/`top_p`/`top_k` are set to any non-default value at all (confirmed via the model's documented behavior, and via `zc_cost_optimizer.py`'s own fix comment referencing a prior hardcoded-temperature bug). It is **not used consistently** — three confirmed call sites still hardcode the parameter directly against the real API:
 
 | Site | Code | Reachable via | Effect |
 |---|---|---|---|
-| `zc_observability.py:126` | `client.messages.create(model=model, max_tokens=512, temperature=0, ...)` | `--obs-errors` | 400s with the default model (`zc-sonnet-5`) |
-| `zc_hooks_perms_plan.py:241` | `self.client.messages.create(model=self.model, max_tokens=max_tokens, temperature=0.3, ...)` | `--plan` (`PlanModeAgent`, model passed through from `_model(args)`, default `zc-sonnet-5`) | 400s out of the box |
-| `webapp/backend/server.py:313-314` | `if 0.0 <= req.temperature <= 1.0: kwargs["temperature"] = req.temperature` | `POST /api/chat/stream` | `ChatRequest.model` defaults to `"zc-sonnet-5"` (line 79) and `temperature` defaults to `0.3` (line 80), both always in range, so this condition is true on effectively every default-configuration request |
+| `zc_observability.py:126` | `client.messages.create(model=model, max_tokens=512, temperature=0, ...)` | `--obs-errors` | 400s with the default model (`claude-sonnet-5`) |
+| `zc_hooks_perms_plan.py:241` | `self.client.messages.create(model=self.model, max_tokens=max_tokens, temperature=0.3, ...)` | `--plan` (`PlanModeAgent`, model passed through from `_model(args)`, default `claude-sonnet-5`) | 400s out of the box |
+| `webapp/backend/server.py:313-314` | `if 0.0 <= req.temperature <= 1.0: kwargs["temperature"] = req.temperature` | `POST /api/chat/stream` | `ChatRequest.model` defaults to `"claude-sonnet-5"` (line 79) and `temperature` defaults to `0.3` (line 80), both always in range, so this condition is true on effectively every default-configuration request |
 
 The sibling non-streaming endpoint (`POST /api/chat`) is fine, because it goes through `Coder.generate()`, which correctly calls `sampling_kwargs()` (`coder.py:84`, verified). So in the same file, against the same default model, `/api/chat` works and `/api/chat/stream` — presumably the more-used path, since streaming is the better UX — does not.
 
@@ -278,7 +278,7 @@ Two separate gaps stack here:
 
 ```toml
 [project]
-name = "zcoder"
+name = "wire"
 version = "1.33.0"
 ...
 # no `dependencies = [...]` key anywhere in the file
@@ -292,11 +292,11 @@ This is a real `[build-system]` + `[project]` table (setuptools-backed), i.e. `p
 - **QUAL-1 — Two disagreeing file-size ceilings.** `security.py`'s unused `MAX_FILE_SIZE_BYTES` defaults to 25MB; `zc_files.py` defines and *actually enforces* (`zc_files.py:100`) its own separate `MAX_FILE_SIZE_BYTES = 500 * 1024 * 1024` (500MB) — a 20x difference between the "canonical" limit and the real one.
 - **QUAL-2 — Dead formatting helpers.** `utils.py`'s `print_header`/`print_success`/`print_error`/`print_info`/`print_warn` are never imported anywhere else; every module hand-rolls its own ANSI codes instead, producing inconsistent CLI output styling across features.
 - **QUAL-3 — Cross-cutting docs have drifted from the code by several versions.** `ROADMAP.md`'s own header still reads "v1.32.0" against an actual v1.33.0 codebase, and its "Part 1 — Current Coverage" table claims "46 modules, ~11,700 lines" against an actual 65 root modules / ~21,000 lines (root only, before tests/webapp). `CHECKLIST.md`'s title still reads "v1.16.0." These are the documents the task's own instructions name as "source of truth" — they can't be trusted at face value for the last several versions without cross-checking the code, which is what this report did instead.
-- **QUAL-4 — Stray duplicate directory shipped in the v1.32.0 release zip.** `v1_32_0.zip` unpacks to `zcoder/zcoder/` (129 files, a stale partial snapshot missing docs 39-44) sitting alongside `zcoder/zcoder_release/` (149 files, the real one) — leftover from whatever process produced that release artifact.
+- **QUAL-4 — Stray duplicate directory shipped in the v1.32.0 release zip.** `v1_32_0.zip` unpacks to `wire/wire/` (129 files, a stale partial snapshot missing docs 39-44) sitting alongside `wire/wire_release/` (149 files, the real one) — leftover from whatever process produced that release artifact.
 - **QUAL-5 — Webapp rate limiter keys on the immediate peer IP** (`webapp/backend/server.py:129`, `request.client.host`), with no `X-Forwarded-For` handling. Behind a reverse proxy (plausible, given the file's own Docker/orchestrator framing), every real client would collapse into one shared bucket.
-- **QUAL-6 — Secret redaction coverage is uneven across credential types.** `logging_config.py:31-35` catches ZaiCoder keys by shape (`sk-ant-...`) regardless of context, but GitHub tokens, Voyage keys, and WIF/OAuth tokens are only redacted if the literal env-var name string happens to appear next to the value in the log line — a much weaker guarantee for every credential type except ZaiCoder's own.
+- **QUAL-6 — Secret redaction coverage is uneven across credential types.** `logging_config.py:31-35` catches Anthropic keys by shape (`sk-ant-...`) regardless of context, but GitHub tokens, Voyage keys, and WIF/OAuth tokens are only redacted if the literal env-var name string happens to appear next to the value in the log line — a much weaker guarantee for every credential type except Anthropic's own.
 - **QUAL-7 — Inconsistent line endings.** Seven files (`zc_embeddings.py`, `zc_advisor.py`, `zc_compliance_api.py`, `zc_observability.py`, `zc_hooks_perms_plan.py`, `tests/test_zc_compliance_api.py`, `tests/test_zc_fable5.py`) use CRLF while the rest of the repository uses LF.
-- **QUAL-8 — Test-count bookkeeping has repeatedly drifted across versions**, by the project's own admission (`IMPLEMENTATION_CHECKLIST.md` documents v1.31.0's stated 336 vs. a freshly-recounted 387 for the same commit). I could not execute the suite to independently verify v1.33.0's claimed 416 (no network access to install `pytest`/`zc` in this sandbox); a raw `grep -c "def test_"` finds 358 test functions (347 excluding `test_webapp_server.py`), and the gap is structurally explainable by `@pytest.mark.parametrize` usage (one function alone, `test_every_cmd_function_is_referenced_in_main`, expands to 49 cases), but I can't confirm the exact figure.
+- **QUAL-8 — Test-count bookkeeping has repeatedly drifted across versions**, by the project's own admission (`IMPLEMENTATION_CHECKLIST.md` documents v1.31.0's stated 336 vs. a freshly-recounted 387 for the same commit). I could not execute the suite to independently verify v1.33.0's claimed 416 (no network access to install `pytest`/`anthropic` in this sandbox); a raw `grep -c "def test_"` finds 358 test functions (347 excluding `test_webapp_server.py`), and the gap is structurally explainable by `@pytest.mark.parametrize` usage (one function alone, `test_every_cmd_function_is_referenced_in_main`, expands to 49 cases), but I can't confirm the exact figure.
 - **Naming debt, tracked correctly:** `zc_eval.py` and `zc_evals.py` coexist; the latter is a pre-v1.10 predecessor explicitly superseded by the former. This is handled well, not badly — it's a documented, intentional entry in `tests/test_cli_wiring.py`'s `KNOWN_EXCEPTIONS`, which itself has a self-check (`test_known_exceptions_are_still_valid`, `test_cli_wiring.py:68-76`) that fails if the dead function is ever actually removed, so the exception can't silently go stale. Worth cleaning up eventually, not worth losing sleep over.
 
 ---
@@ -309,14 +309,14 @@ To keep this report honest in both directions:
 - **`resilience.py`** (jittered exponential backoff, a proper three-state circuit breaker, retry-eligibility driven by a typed exception hierarchy rather than string matching) and **`exceptions.py`** (a clean, documented error taxonomy with stable `error_code`s and an explicit `RETRYABLE` flag) are well-designed and internally consistent — no bugs found in either.
 - **`coder.py`'s core `generate()` path** correctly gates sampling parameters, correctly parses multi-block API responses, and correctly routes errors through the resilience layer. It's the one thing in this codebase that everything else *should* be routing through, and where it is (the non-streaming webapp chat, the interactive CLI chat, the browse agent), things work.
 - **This release's actual new feature — native Word/PDF chat (`zc_word.py`, `zc_pdf.py`)** — is clean. It's honestly scoped in its own docstring ("no local python-docx dependency needed for this path... Skills-only"), and it's wired end-to-end: `--docx-native`/`--pdf-native` → `cmd_docx_chat`/`cmd_pdf_chat` → argparse → dispatch, all confirmed. This is a good template for what "vertical slice, actually complete" looks like in this codebase.
-- **`cmd_admin_create_key()`** (`zc_admin_api.py:485-498`) is a good example of the right way to leave something unimplemented: rather than silently no-op-ing (like BUG-2) or faking a response, it explains exactly why ZaiCoder's real Admin API doesn't expose key creation and points to the supported alternative.
+- **`cmd_admin_create_key()`** (`zc_admin_api.py:485-498`) is a good example of the right way to leave something unimplemented: rather than silently no-op-ing (like BUG-2) or faking a response, it explains exactly why Anthropic's real Admin API doesn't expose key creation and points to the supported alternative.
 - **The opt-in Bash sandbox is correctly wired end-to-end** — `--code-agent-sandbox` sets `AI_CODER_SANDBOX=1`, which `zc_code.py:826` checks before running any Bash command — and its own docstring is honest about its limits rather than overselling them as real isolation.
 
 ---
 
 ## 9. v1.32.0 → v1.33.0: What This Release Actually Shipped
 
-File-level diff of the two supplied archives (after discounting the stray duplicate directory in the v1.32.0 zip — see QUAL-4 — and using the real `zcoder_release/` copy as the baseline):
+File-level diff of the two supplied archives (after discounting the stray duplicate directory in the v1.32.0 zip — see QUAL-4 — and using the real `wire_release/` copy as the baseline):
 
 ```
 New:      zc_word.py, zc_pdf.py, tests/test_zc_word_pdf.py,
@@ -336,7 +336,7 @@ So the release's real scope was: native Word/PDF document chat via the Skills AP
 2. Confine `zc_code.py`'s Read/Write/Edit tools to `session.cwd` (or an explicit allowlist of roots) by default, not just under the opt-in sandbox. (SEC-5)
 3. Add the missing `elif permission == "acceptEdits"` branch so it actually distinguishes edit tools from everything else, per its own documented behavior. (SEC-6)
 4. Either add authentication to `webapp/backend/server.py` or change its documented default run command to bind `127.0.0.1` and drop the wildcard CORS origin. At minimum, `/api/config` should not accept writes without some form of local-only confirmation. (SEC-7)
-5. Wire `sampling_kwargs()` into the three remaining raw call sites. (BUG-1)
+5. wire `sampling_kwargs()` into the three remaining raw call sites. (BUG-1)
 6. Add `dependencies = [...]` to `pyproject.toml` matching `requirements.txt`, or drop the `[build-system]` table if `pip install .` was never meant to work. (BUG-4)
 
 **Fix soon:**
@@ -346,7 +346,7 @@ So the release's real scope was: native Word/PDF document chat via the Skills AP
 
 **Housekeeping:**
 10. Refresh `ROADMAP.md`/`CHECKLIST.md` headers and coverage numbers, or stop treating them as living documents. (QUAL-3)
-11. Remove the stray `zcoder/zcoder/` duplicate from the release pipeline. (QUAL-4)
+11. Remove the stray `wire/wire/` duplicate from the release pipeline. (QUAL-4)
 12. Normalize line endings; delete `zc_evals.py` once its `KNOWN_EXCEPTIONS` entry is intentionally retired.
 
 ---

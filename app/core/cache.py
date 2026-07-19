@@ -13,14 +13,14 @@ Features:
 - Circuit breaker for Redis failures
 """
 import asyncio
-import json
 import hashlib
-from typing import Any, Optional, TypeVar, Generic
-from datetime import timedelta
+import json
+from typing import Any, Generic, Optional, TypeVar
+
 import redis.asyncio as redis
 from redis.asyncio import ConnectionPool
 
-from .config import get_config, Config
+from .config import Config, get_config
 
 T = TypeVar('T')
 
@@ -41,7 +41,7 @@ class CacheKey:
     @classmethod
     def build(cls, namespace: str, *parts: str) -> str:
         """Build a namespaced cache key."""
-        prefix = cls.PREFIXS.get(namespace, 'gen')
+        prefix = cls.PREFIXES.get(namespace, 'gen')
         key_parts = [prefix] + list(parts)
         return ':'.join(key_parts)
     
@@ -108,7 +108,7 @@ class EnterpriseCache:
     
     def __init__(self, config: Optional[Config] = None):
         self.config = config or get_config()
-        self.l1_cache = Layer1Cache()
+        self.l1_cache: Layer1Cache[Any] = Layer1Cache()
         self.redis_pool: Optional[ConnectionPool] = None
         self.redis_client: Optional[redis.Redis] = None
         self._connected = False
@@ -134,7 +134,7 @@ class EnterpriseCache:
             await self.redis_client.ping()
             self._connected = True
             self._circuit_open = True
-        except Exception as e:
+        except Exception:
             self._connected = False
             self._circuit_open = False
             raise
@@ -170,7 +170,7 @@ class EnterpriseCache:
         if self._circuit_failures >= self._circuit_threshold:
             self._circuit_open = False
     
-    async def get(self, key: str, default: Any = None) -> Any:
+    async def get(self, key: str, default: Optional[Any] = None) -> Any:
         """
         Get value from cache (L1 -> L2).
         
@@ -187,7 +187,7 @@ class EnterpriseCache:
             return l1_value
         
         # Try L2 (Redis)
-        if self._connected and await self._check_circuit():
+        if self._connected and self.redis_client is not None and await self._check_circuit():
             try:
                 data = await self.redis_client.get(key)
                 if data:
@@ -227,7 +227,7 @@ class EnterpriseCache:
         await self.l1_cache.set(key, value)
         
         # Set L2 (Redis)
-        if self._connected and await self._check_circuit():
+        if self._connected and self.redis_client is not None and await self._check_circuit():
             try:
                 data = self._serialize(value)
                 if nx:
@@ -246,7 +246,7 @@ class EnterpriseCache:
         """Delete value from cache (L1 + L2)."""
         l1_deleted = await self.l1_cache.delete(key)
         
-        if self._connected and await self._check_circuit():
+        if self._connected and self.redis_client is not None and await self._check_circuit():
             try:
                 l2_deleted = await self.redis_client.delete(key)
                 return l1_deleted or bool(l2_deleted)
@@ -260,9 +260,9 @@ class EnterpriseCache:
         if await self.l1_cache.get(key) is not None:
             return True
         
-        if self._connected and await self._check_circuit():
+        if self._connected and self.redis_client is not None and await self._check_circuit():
             try:
-                return await self.redis_client.exists(key)
+                return bool(await self.redis_client.exists(key))
             except Exception:
                 await self._record_failure()
         
@@ -270,7 +270,7 @@ class EnterpriseCache:
     
     async def increment(self, key: str, amount: int = 1) -> int:
         """Atomically increment a counter."""
-        if self._connected and await self._check_circuit():
+        if self._connected and self.redis_client is not None and await self._check_circuit():
             try:
                 return await self.redis_client.incrby(key, amount)
             except Exception:
@@ -287,7 +287,7 @@ class EnterpriseCache:
     
     async def get_ttl(self, key: str) -> int:
         """Get remaining TTL for a key."""
-        if self._connected and await self._check_circuit():
+        if self._connected and self.redis_client is not None and await self._check_circuit():
             try:
                 return await self.redis_client.ttl(key)
             except Exception:
@@ -296,9 +296,9 @@ class EnterpriseCache:
     
     async def expire(self, key: str, ttl: int) -> bool:
         """Set expiration on an existing key."""
-        if self._connected and await self._check_circuit():
+        if self._connected and self.redis_client is not None and await self._check_circuit():
             try:
-                return await self.redis_client.expire(key, ttl)
+                return bool(await self.redis_client.expire(key, ttl))
             except Exception:
                 await self._record_failure()
         return False
@@ -306,7 +306,7 @@ class EnterpriseCache:
     async def clear_pattern(self, pattern: str) -> int:
         """Delete all keys matching a pattern."""
         count = 0
-        if self._connected and await self._check_circuit():
+        if self._connected and self.redis_client is not None and await self._check_circuit():
             try:
                 cursor = 0
                 while True:
@@ -327,9 +327,9 @@ class EnterpriseCache:
         
         return count
     
-    async def health_check(self) -> dict:
+    async def health_check(self) -> dict[str, Any]:
         """Check cache health status."""
-        status = {
+        status: dict[str, Any] = {
             'l1_size': len(self.l1_cache._cache),
             'l1_max': self.l1_cache._max_size,
             'redis_connected': self._connected,
@@ -337,7 +337,7 @@ class EnterpriseCache:
             'circuit_failures': self._circuit_failures,
         }
         
-        if self._connected:
+        if self._connected and self.redis_client is not None:
             try:
                 info = await self.redis_client.info('memory')
                 status['redis_memory_used'] = info.get('used_memory_human', 'unknown')

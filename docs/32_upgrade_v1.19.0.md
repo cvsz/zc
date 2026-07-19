@@ -1,7 +1,7 @@
 # v1.19.0 upgrade notes — Managed Agents memory stores
 
 This release comes from re-running `ROADMAP.md`'s own gap-audit
-methodology against the live docs at platform.zaicoder.com/docs. The
+methodology against the live docs at platform.zc.com/docs. The
 previous audit was dated 2026-07-08; this one is also dated 2026-07-08
 (same day, next cycle). One real finding, closed here.
 
@@ -26,15 +26,15 @@ differently-worded grep before writing it into Part 2), a second grep —
 Only then was this written up as a real gap.
 
 **Why this isn't a duplicate of either existing "memory" feature:**
-zcoder already has two things with "memory" in the name, and it mattered
+wire already has two things with "memory" in the name, and it mattered
 to rule both out before concluding this was new:
 
 - `zc_memory.py`'s `memory_20250818` client-side tool — the caller's
   own application implements the file-operation handlers; scope is a
   single Messages API conversation; storage is wherever the caller wires
   it (local disk, database, etc.).
-- ZaiCoder Code's local `.zc`/auto-generated `MEMORY.md` — never
-  leaves the developer's own machine; loaded into a ZaiCoder Code session's
+- zAICoder's local `.zc`/auto-generated `MEMORY.md` — never
+  leaves the developer's own machine; loaded into a zAICoder session's
   context at the start of each session.
 
 Neither implements a `memory_store` resource type or talks to a

@@ -14,6 +14,8 @@ build
 tests
 docs
 *.md
+!README.md
+!AGENTS.md
 .env
 .env.*
 !.env.example

@@ -1,7 +1,7 @@
 """tests/test_config.py"""
 import json
 
-from config import Config
+from wire.config import Config
 
 
 def test_get_default_when_missing():

@@ -1,1 +1,1 @@
-# Core module for enterprise-grade zcoder
+# Core module for enterprise-grade wire

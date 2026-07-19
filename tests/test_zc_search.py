@@ -1,7 +1,8 @@
 """tests/test_zc_search.py
 
 Covers zc_search.py's v1.24.0 fix: this module's own separate
-WEB_SEARCH_TOOL/WEB_FETCH_TOOL constants had drifted from zc_tools.py's version tracking entirely (still on
+WEB_SEARCH_TOOL/WEB_FETCH_TOOL constants had drifted from
+zc_tools.py's version tracking entirely (still on
 web_search_20250305/web_fetch_20250124). Bumped to
 web_search_20260318/web_fetch_20260318 and threaded response_inclusion
 through — see docs/36_upgrade_v1.24.0_audit_and_impl.md Finding 1.
@@ -27,7 +28,8 @@ def search_mod(monkeypatch):
     monkeypatch.setitem(sys.modules, "anthropic", fake_anthropic)
 
     import importlib
-    import zc_search as mod
+
+    import wire.zc_search as mod
     importlib.reload(mod)
     return mod
 

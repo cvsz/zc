@@ -8,12 +8,12 @@ Covers both fallback patterns documented in zc_fable5.py:
 """
 import pytest
 
-from zc_fable5 import (
+from wire.zc_fable5 import (
+    FABLE5_MODEL_ID,
     Fable5Client,
     RefusalError,
     estimate_cost_usd,
     parse_fallback_chain,
-    FABLE5_MODEL_ID,
 )
 
 

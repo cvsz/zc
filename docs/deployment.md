@@ -8,12 +8,12 @@ why env vars are preferred).
 
 | Variable                    | Required | Default | Purpose |
 |------------------------------|----------|---------|---------|
-| `ZC_API_KEY`          | yes      | —       | ZaiCoder API key |
+| `ANTHROPIC_API_KEY`          | yes      | —       | Anthropic API key |
 | `GITHUB_TOKEN`                | no       | —       | `zc_github.py` integration |
 | `VOYAGE_API_KEY`              | no       | —       | `zc_embeddings.py` |
-| `ZCODER_LOG_LEVEL`            | no       | `INFO`  | `DEBUG`/`INFO`/`WARNING`/`ERROR` |
-| `ZCODER_LOG_FORMAT`           | no       | `text` (TTY) / `json` (non-TTY) | Force `json` or `text` |
-| `ZCODER_MAX_FILE_SIZE_BYTES`  | no       | `26214400` (25MB) | Upper bound for `--file`/`--file-upload` |
+| `wire_LOG_LEVEL`            | no       | `INFO`  | `DEBUG`/`INFO`/`WARNING`/`ERROR` |
+| `wire_LOG_FORMAT`           | no       | `text` (TTY) / `json` (non-TTY) | Force `json` or `text` |
+| `wire_MAX_FILE_SIZE_BYTES`  | no       | `26214400` (25MB) | Upper bound for `--file`/`--file-upload` |
 
 ## Running locally
 
@@ -38,11 +38,11 @@ bandit -r . -x ./tests       # security static analysis
 ## Running in Docker
 
 ```bash
-docker build -t zcoder .
-docker run --rm -e ZC_API_KEY=sk-ant-... zcoder -p "hello"
+docker build -t wire .
+docker run --rm -e ANTHROPIC_API_KEY=sk-ant-... wire -p "hello"
 
-# or via compose (reads ZC_API_KEY from the environment or a .env file)
-docker compose run --rm zcoder -p "hello"
+# or via compose (reads ANTHROPIC_API_KEY from the environment or a .env file)
+docker compose run --rm wire -p "hello"
 ```
 
 The image runs as a non-root user, has a `HEALTHCHECK` wired to
@@ -75,7 +75,7 @@ diagnosis; it makes a real, billed API call.
 
 ## Logging & observability
 
-Set `ZCODER_LOG_FORMAT=json` in any non-interactive environment (this is
+Set `wire_LOG_FORMAT=json` in any non-interactive environment (this is
 the default when stdout isn't a TTY, e.g. under Docker/systemd/CI) to get
 one JSON object per log line, suitable for shipping to a log aggregator
 (CloudWatch, Datadog, ELK, etc). Every line carries a `correlation_id`
@@ -94,11 +94,11 @@ See `docs/observability.md` for metrics/tracing hooks (`zc_metrics.py`,
 Every release is tagged. To roll back a container deployment:
 
 ```bash
-docker pull zcoder:<previous-tag>
+docker pull wire:<previous-tag>
 docker compose up -d
 ```
 
-Config/state on the `zcoder-home` volume is forward/backward compatible
+Config/state on the `wire-home` volume is forward/backward compatible
 within a major version (flat JSON files, no schema migrations as of
 1.12.x).
 

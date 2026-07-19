@@ -10,7 +10,7 @@ import json
 
 import pytest
 
-from zc_compliance_api import (
+from wire.zc_compliance_api import (
     ComplianceApiClient,
     ComplianceApiError,
     _is_retryable,
@@ -19,7 +19,6 @@ from zc_compliance_api import (
     cmd_compliance_file_delete,
     cmd_compliance_project_delete,
 )
-
 
 # ── error classification / retry contract ────────────────────────────────
 
@@ -90,7 +89,7 @@ def test_request_retries_429_then_succeeds(monkeypatch):
     """Drive retry logic through the real _request() by monkeypatching
     urllib.request.urlopen so we exercise the actual retry loop, not a
     reimplementation of it."""
-    import zc_compliance_api as mod
+    import wire.zc_compliance_api as mod
 
     calls = {"n": 0}
     sleeps = []
@@ -125,7 +124,7 @@ def test_request_retries_429_then_succeeds(monkeypatch):
 
 
 def test_request_does_not_retry_403(monkeypatch):
-    import zc_compliance_api as mod
+    import wire.zc_compliance_api as mod
     calls = {"n": 0}
 
     def fake_urlopen(req, timeout=None):
@@ -138,7 +137,8 @@ def test_request_does_not_retry_403(monkeypatch):
         ) if False else _http_error(req.full_url, 403, body)
 
     def _http_error(url, code, body):
-        import urllib.error, io
+        import io
+        import urllib.error
         e = urllib.error.HTTPError(url, code, "forbidden", {}, io.BytesIO(body))
         return e
 
@@ -155,12 +155,13 @@ def test_request_does_not_retry_403(monkeypatch):
 
 
 def test_request_gives_up_after_max_retries(monkeypatch):
-    import zc_compliance_api as mod
+    import wire.zc_compliance_api as mod
     calls = {"n": 0}
 
     def fake_urlopen(req, timeout=None):
         calls["n"] += 1
-        import urllib.error, io
+        import io
+        import urllib.error
         body = json.dumps({"error": {"type": "rate_limit_error", "message": "slow down"}}).encode()
         raise urllib.error.HTTPError(req.full_url, 429, "rate limited", {}, io.BytesIO(body))
 
@@ -235,7 +236,7 @@ def test_iterate_activities_stops_on_error_without_yielding_partial_next_page(mo
 def test_cmd_chat_delete_dry_run_makes_no_client_call(monkeypatch, capsys):
     def boom(*a, **kw):
         raise AssertionError("must not construct a client without --compliance-yes")
-    monkeypatch.setattr("zc_compliance_api.ComplianceApiClient", boom)
+    monkeypatch.setattr("wire.zc_compliance_api.ComplianceApiClient", boom)
 
     result = cmd_compliance_chat_delete("k", "zc_chat_1")
 
@@ -248,7 +249,7 @@ def test_cmd_chat_delete_dry_run_makes_no_client_call(monkeypatch, capsys):
 def test_cmd_file_delete_dry_run_makes_no_client_call(monkeypatch, capsys):
     def boom(*a, **kw):
         raise AssertionError("must not construct a client without --compliance-yes")
-    monkeypatch.setattr("zc_compliance_api.ComplianceApiClient", boom)
+    monkeypatch.setattr("wire.zc_compliance_api.ComplianceApiClient", boom)
 
     result = cmd_compliance_file_delete("k", "zc_file_1")
 
@@ -259,7 +260,7 @@ def test_cmd_file_delete_dry_run_makes_no_client_call(monkeypatch, capsys):
 def test_cmd_project_delete_dry_run_makes_no_client_call(monkeypatch, capsys):
     def boom(*a, **kw):
         raise AssertionError("must not construct a client without --compliance-yes")
-    monkeypatch.setattr("zc_compliance_api.ComplianceApiClient", boom)
+    monkeypatch.setattr("wire.zc_compliance_api.ComplianceApiClient", boom)
 
     result = cmd_compliance_project_delete("k", "zc_proj_1")
 
@@ -274,7 +275,7 @@ def test_cmd_chat_delete_with_yes_calls_client(monkeypatch, capsys):
         def delete_chat(self, chat_id):
             return {"id": chat_id, "type": "zc_chat_deleted"}
 
-    monkeypatch.setattr("zc_compliance_api.ComplianceApiClient", FakeClient)
+    monkeypatch.setattr("wire.zc_compliance_api.ComplianceApiClient", FakeClient)
 
     result = cmd_compliance_chat_delete("k", "zc_chat_1", yes=True)
 
@@ -290,7 +291,7 @@ def test_cmd_project_delete_with_yes_surfaces_409_hint(monkeypatch, capsys):
             raise ComplianceApiError(status=409, error_type="conflict_error",
                                      message="has chats attached")
 
-    monkeypatch.setattr("zc_compliance_api.ComplianceApiClient", FakeClient)
+    monkeypatch.setattr("wire.zc_compliance_api.ComplianceApiClient", FakeClient)
 
     result = cmd_compliance_project_delete("k", "zc_proj_1", yes=True)
 

@@ -5,19 +5,19 @@ No real network calls are made anywhere in this file.
 import io
 import json
 import urllib.error
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
-from coder import Coder
-import resilience
+import wire.resilience as resilience
+from wire.coder import Coder
 
 
 @pytest.fixture(autouse=True)
 def fresh_breaker(monkeypatch):
     """Give every test its own circuit breaker so failures in one test
     don't trip the breaker for the next one."""
-    monkeypatch.setattr("coder._default_breaker", resilience.CircuitBreaker(failure_threshold=10, reset_timeout=0.01))
+    monkeypatch.setattr("wire.coder._default_breaker", resilience.CircuitBreaker(failure_threshold=10, reset_timeout=0.01))
 
 
 def _fake_response(payload: dict):

@@ -9,29 +9,29 @@ packaged. None of that was true — no such work exists anywhere in this
 conversation's actual history. Before doing anything else, the re-
 uploaded zip was diffed against the real prior state to confirm nothing
 had changed, then this cycle was run for real, from scratch, using
-zcoder's actual gap-audit methodology: re-check `platform.zaicoder.com/docs`
+wire's actual gap-audit methodology: re-check `platform.zc.com/docs`
 against what the code does, not against what a prior turn (real or
 claimed) said it did.
 
 ## The audit
 
-Fetched `platform.zaicoder.com/docs/en/build-with-zc/extended-thinking`
+Fetched `platform.zc.com/docs/en/build-with-zc/extended-thinking`
 and `.../adaptive-thinking` directly (not summaries) and cross-checked
 against `zc_thinking.py` and `zc_models.MODEL_CATALOG`. Finding:
 
 **`thinking.type: "enabled"` + `budget_tokens` — the only mode
 `zc_thinking.py` sent — is a hard 400 error on:**
-ZaiCoder Opus 4.8, ZaiCoder Opus 4.7, ZaiCoder Sonnet 5, ZaiCoder Fable 5, ZaiCoder
-Mythos 5, ZaiCoder Mythos Preview.
+zAICoder Opus 4.8, zAICoder Opus 4.7, zAICoder Sonnet 5, zAICoder Fable 5, zAICoder
+Mythos 5, zAICoder Mythos Preview.
 
 **...and deprecated (still works, but will be removed) on:**
-ZaiCoder Opus 4.6, ZaiCoder Sonnet 4.6.
+zAICoder Opus 4.6, zAICoder Sonnet 4.6.
 
 **...and is the only working mode (adaptive not supported) on:**
-ZaiCoder Opus 4.5, ZaiCoder Haiku 4.5, and earlier ZaiCoder 4 models.
+zAICoder Opus 4.5, zAICoder Haiku 4.5, and earlier zAICoder 4 models.
 
 Cross-referencing `zc_models.MODEL_CATALOG`, that first list covers
-5 of zcoder's 9 cataloged models — meaning `--thinking` was broken
+5 of wire's 9 cataloged models — meaning `--thinking` was broken
 outright on every current-tier and mythos-tier model in the catalog,
 and silently deprecated (would eventually break) on both legacy-tier
 4.6 models. Only `zc-opus-4-5`, `zc-haiku-4-5-20251001`, and
@@ -54,7 +54,7 @@ docs' own example JSON, is `usage.output_tokens_details.thinking_tokens`.
 The old code always printed `thinking=0`.
 
 **Third finding, `zc_structured.py`:** structured outputs went GA
-on January 29, 2026 (confirmed via `platform.zaicoder.com/docs/en/release-notes/overview`)
+on January 29, 2026 (confirmed via `platform.zc.com/docs/en/release-notes/overview`)
 — "a simplified integration path with no beta header required." The
 code still sent `zc-beta: structured-outputs-2025-11-13`
 unconditionally on every request, plus an entirely unused
@@ -66,7 +66,7 @@ need it.
 
 ## What was explicitly checked and NOT implemented
 
-One third-party blog post (not `platform.zaicoder.com`) claimed an
+One third-party blog post (not `platform.zc.com`) claimed an
 "Xhigh" effort level exists between "high" and "max" on Opus 4.7/4.8.
 The official `effort` docs page, fetched directly, lists only
 `"low" | "medium" | "high" (default) | "max"` — no "xhigh" anywhere.

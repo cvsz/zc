@@ -1,7 +1,7 @@
 # v1.20.0 upgrade notes — Dreaming, Outcomes, Webhooks
 
 This release comes from re-running `ROADMAP.md`'s own gap-audit
-methodology against the live docs at platform.zaicoder.com/docs. The
+methodology against the live docs at platform.zc.com/docs. The
 previous audit was dated 2026-07-08 (v1.19.0); this one is also dated
 2026-07-08 (same day, next cycle). Three findings closed, one further
 finding confirmed real and deliberately deferred.
@@ -12,8 +12,8 @@ The v1.19.0 audit note mentioned that "Dreaming" had been seen mentioned
 alongside the Managed Agents memory-store feature it closed, without
 being investigated further. This cycle's step 6 (explicitly check for
 drift/adjacent shipped features, not just net-new items) picked that
-thread back up: re-reading the Managed Agents docs and ZaiCoder's own
-"New in ZaiCoder Managed Agents" release post surfaced that Dreaming,
+thread back up: re-reading the Managed Agents docs and Anthropic's own
+"New in zAICoder Managed Agents" release post surfaced that Dreaming,
 Outcomes, and Webhooks all shipped in the same wave (Dreaming as a
 research preview; Outcomes, Multiagent orchestration, and Webhooks
 promoted to public beta the same day), alongside the pre-existing
@@ -171,7 +171,7 @@ orchestration:** `zc_agents_sdk.py` already has
 goal into steps and runs each as an independent Messages API call from
 the local process — no shared Managed Agents session, no shared
 sandbox, no persistent cross-subagent event stream. It's a legitimate,
-different pattern (and still useful for zcoder's actual usage: an
+different pattern (and still useful for wire's actual usage: an
 independent-subtasks decomposition doesn't need a shared filesystem),
 not a partial implementation of the native feature under a different
 name.
@@ -183,7 +183,7 @@ delegation model. A faithful implementation means designing how
 configuration on the Agent resource and handles multiple concurrent
 event-stream threads (`sessions.threads.*`, per the docs) — a
 meaningfully larger, more architecturally involved surface than the
-three items closed above, and there isn't yet a concrete zcoder use case
+three items closed above, and there isn't yet a concrete wire use case
 that needs subagents to share one live sandbox rather than run as
 independent calls. This is the same reasoning `ROADMAP.md` used for the
 Compliance API between v1.15.0 (documented as a gap, not built) and

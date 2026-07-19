@@ -1,6 +1,6 @@
 # Upgrade notes — v1.10.5 → v1.11.0 → v1.11.1
 
-Two passes, both prompted by fresh audits against platform.zaicoder.com/docs
+Two passes, both prompted by fresh audits against platform.zc.com/docs
 (checked 2026-07-02). This file was referenced from the README's "New in
 v1.11.0" section before it existed — it's the missing doc that closes that
 loop, plus the smaller v1.11.1 follow-up pass.
@@ -18,7 +18,7 @@ taken on faith from the audit text alone.
 | Task budgets | `zc_tools.py` — `build_task_budget()` | Beta `task-budgets-2026-03-13`. Opus 4.7/4.8, Fable 5, Mythos 5 only. Advisory, not a hard cap. |
 | Tool Use Examples | `zc_tools.py` — `with_input_examples()` | `input_examples` field, beta `advanced-tool-use-2025-11-20`. |
 | Programmatic Tool Calling (real implementation) | `zc_tools.py` — `with_allowed_callers()` | `allowed_callers`, `code_execution_20260120`, `caller` field on `tool_use` blocks. Previously a docstring bullet with no code. |
-| Embeddings | `zc_embeddings.py` (new) | ZaiCoder doesn't host an embedding model — wraps Voyage AI's HTTP endpoint (`voyage-3.5` default), which is what ZaiCoder's own embeddings doc page points to. |
+| Embeddings | `zc_embeddings.py` (new) | Anthropic doesn't host an embedding model — wraps Voyage AI's HTTP endpoint (`voyage-3.5` default), which is what Anthropic's own embeddings doc page points to. |
 | Compaction | `zc_tools.py` — `build_context_management(compact=True)`, `resume_after_compaction()` | Beta `compact-2026-01-12`. Distinct from context editing: compaction *summarizes*, clearing *drops*. |
 | Fine-grained tool streaming | `zc_stream.py` — `with_eager_input_streaming()`, `stream_with_tools()` | GA, no beta header — per-tool `eager_input_streaming` field, not the legacy blanket header (kept for back-compat). |
 | `stop_details` on refusals | `zc_stream.py` — `handle_refusal()` | Reads `category` (`cyber`/`bio`/null) + `explanation` off a refusal response. |
@@ -30,12 +30,12 @@ MCP tunnels — picked up in v1.11.1 below.
 ## v1.11.1 — follow-up pass
 
 A second check turned up items the v1.11.0 pass didn't cover, plus one
-functional bug introduced by ZaiCoder Sonnet 5 becoming the default model:
+functional bug introduced by zAICoder Sonnet 5 becoming the default model:
 
 - **MCP tunnels** (research preview, beta `mcp-tunnels-2026-06-22`,
   `/v1/tunnels`) — `zc_agents_sdk.py`, new `McpTunnel` class. Exposes a
-  local-only MCP server via a public ZaiCoder-routed URL so it can be
-  wired up as an `mcp_servers` entry without deploying it first. Wired to
+  local-only MCP server via a public Anthropic-routed URL so it can be
+  wired up as an `mcp_servers` entry without deploying it first. wired to
   `--code-agent-mcp-tunnel PORT` in `main.py`.
 - **`RETIRED_TOOL_VERSIONS` table** — `zc_tools.py`, new
   `RETIRED_TOOL_VERSIONS` dict + `check_retired_tool_version()`, mirroring
@@ -47,12 +47,12 @@ functional bug introduced by ZaiCoder Sonnet 5 becoming the default model:
   `optimized_call()` did not. Fixed to match: a refusal with zero output
   tokens now logs `$0.00` instead of running it through `estimate_cost()`.
 - **Sonnet-5 sampling-parameter bug** — not in either gap audit, found
-  while implementing the above. Per "What's new in ZaiCoder Sonnet 5":
+  while implementing the above. Per "What's new in zAICoder Sonnet 5":
   Sonnet 5 (and Fable 5 / Mythos 5) return a `400 invalid_request_error` if
   `temperature`/`top_p`/`top_k` are set to non-default values at all. Six
   modules hardcoded a `temperature=` value directly into a `messages.create`
   call/payload — harmless on older models, but a hard failure the moment
-  `model` defaults to `zc-sonnet-5` (which it does: `coder.py` and
+  `model` defaults to `claude-sonnet-5` (which it does: `coder.py` and
   `zc_cost_optimizer.py`'s `TIER_MODELS` both default there). Fixed by
   adding `utils.sampling_kwargs(model, temperature=...)`, which omits the
   parameter entirely for Sonnet-5-and-newer models and passes it through

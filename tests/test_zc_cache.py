@@ -12,9 +12,9 @@ Previously this module (zc_cache.py) had zero test coverage at all.
 """
 import pytest
 
-from zc_cache import (
-    CachingCoder,
+from wire.zc_cache import (
     MID_SYSTEM_SUPPORTED_MODELS,
+    CachingCoder,
     SystemMessagePlacementError,
     build_mid_system_message,
     validate_system_message_placement,
@@ -108,7 +108,6 @@ def test_diagnose_second_call_references_prior_message_id_and_surfaces_miss_reas
 
 
 def test_diagnose_adds_beta_header(monkeypatch):
-    from zc_cache import CachingCoder as _CC
 
     cc = CachingCoder(api_key="k", model="zc-sonnet-5")
     captured = {}

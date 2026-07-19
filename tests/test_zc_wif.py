@@ -7,8 +7,7 @@ import json
 
 import pytest
 
-import zc_wif as wif
-
+import wire.zc_wif as wif
 
 # ── resolve_wif_env() ─────────────────────────────────────────────────
 
@@ -78,7 +77,7 @@ def test_resolve_wif_env_unreadable_file_returns_none(tmp_path):
 class _FakeResp:
     def __init__(self, body: bytes):
         self._body = body
-        self.headers = {}
+        self.headers: dict[str, str] = {}
 
     def read(self):
         return self._body

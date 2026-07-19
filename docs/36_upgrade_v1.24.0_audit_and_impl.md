@@ -1,12 +1,12 @@
 # v1.24.0 audit cycle — cross-product gap findings + implementation prompts
 
-Per the explicit ask this cycle ("think deeper, search all ZaiCoder
+Per the explicit ask this cycle ("think deeper, search all zAICoder
 products"), this audit deliberately widened past Managed Agents (the
 last three cycles) and Admin/Auth (v1.23.0) to re-check
-platform.zaicoder.com/docs/en/release-notes/overview end to end, plus the
+platform.zc.com/docs/en/release-notes/overview end to end, plus the
 Web fetch tool, Web search tool, Code execution tool, and Analytics API
 reference pages it points to. Four real, buildable gaps found; a fifth
-candidate (the ZaiCoder Enterprise Analytics API) confirmed real but
+candidate (the zAICoder Enterprise Analytics API) confirmed real but
 deliberately left undocumented-as-built — see the non-gap note below.
 
 ## Finding 1 — Server tool version drift: `code_execution_20260521`, `web_search_20260318`, `web_fetch_20260318`
@@ -14,7 +14,7 @@ deliberately left undocumented-as-built — see the non-gap note below.
 **What it is:** Three tool-version bumps that shipped together (June 11,
 2026 per the release notes), all GA with no beta header:
 - `code_execution_20260521` discloses the sandbox's 90-second per-cell
-  wall-clock limit in the tool's own description, so ZaiCoder budgets
+  wall-clock limit in the tool's own description, so zAICoder budgets
   long-running cells instead of writing one loop that times out.
 - `web_search_20260318` and `web_fetch_20260318` add a
   `response_inclusion` parameter (currently one documented value,
@@ -67,7 +67,7 @@ matches. Second, differently-worded grep for `path_prefix|order_by`:
 also zero matches.
 
 **Priority: 🟠 P1.** Without this, a memory store built up over many
-Dreaming/Outcome/session runs is a black box from zcoder's side — the
+Dreaming/Outcome/session runs is a black box from wire's side — the
 only way to see what's in one is to mount it into a new session and ask
 the agent to describe it.
 
@@ -89,39 +89,39 @@ API returns. First grep for `expires_at` in the tree: zero matches.
 that's already in the response body costs nothing and closes a real
 "key is about to expire and nobody's watching" blind spot.
 
-## Finding 4 — ZaiCoder Code Analytics API
+## Finding 4 — zAICoder Analytics API
 
 **What it is:** `GET /v1/organizations/usage_report/zc_code` — a
 dedicated Admin-API endpoint (same Admin API key as the existing Usage
 & Cost API) returning one record per user per day: session counts,
-lines of code added/removed, commits/PRs created through ZaiCoder Code,
+lines of code added/removed, commits/PRs created through zAICoder,
 per-editing-tool accept/reject counts, and a per-model token/cost
 breakdown. Cursor-paginated via `starting_at` + `page`.
 
 **Why it's a gap:** `zc_admin_api.py` already implements the
 sibling org-wide Usage & Cost API but has no code path for this
-ZaiCoder-Code-specific report — first grep for `zc_code` (the
+zAICoder-Code-specific report — first grep for `zc_code` (the
 endpoint's own path segment) in `zc_admin_api.py`: zero matches.
 
 **Priority: 🟡 P2.** Same auth, same module, same client class as work
 already done — low-cost addition, and the natural companion to the
 Usage/Cost reporting this module already owns.
 
-## Non-gap checked this cycle, deliberately not built — ZaiCoder Enterprise Analytics API
+## Non-gap checked this cycle, deliberately not built — zAICoder Enterprise Analytics API
 
 Nine endpoints (user activity, org-level daily/weekly/monthly active
 users, project/skill/connector adoption, per-user cost) genuinely absent
 from the tree — but this is a structurally different, larger surface
 than every other Admin-API feature `zc_admin_api.py` owns: it
 authenticates with a separate **Analytics API key** (created in
-zaicoder.ai by an Enterprise org's Primary Owner, scoped
+zc.ai by an Enterprise org's Primary Owner, scoped
 `read:analytics`), not the Admin API key every existing method in that
 module takes. Bolting a second, incompatible auth-key type onto
 `AdminApiClient` — or forking a whole parallel client class — for nine
 endpoints with no expressed use case yet is exactly the kind of
 speculative scope the methodology says to defer (same call as
 Multiagent orchestration in v1.20.0, revisited only once a concrete
-zcoder use case existed). Recorded here so a future cycle doesn't
+wire use case existed). Recorded here so a future cycle doesn't
 re-flag it as newly discovered, and doesn't accidentally build it into
 `AdminApiClient` in a way that would need reworking once it is built.
 
@@ -212,7 +212,7 @@ re-flag it as newly discovered, and doesn't accidentally build it into
 > with `expires_at` absent/`None` prints the placeholder, not the word
 > `"None"`.
 
-### Prompt 4 — ZaiCoder Code Analytics API (P2)
+### Prompt 4 — zAICoder Analytics API (P2)
 
 > Add to `AdminApiClient`:
 > ```python
@@ -247,7 +247,7 @@ re-flag it as newly discovered, and doesn't accidentally build it into
    already-related modules together while the version research is fresh.
 2. Prompt 2 (memory listing) — independent, Managed Agents surface.
 3. Prompt 3 (`expires_at`) — smallest, presentation-only.
-4. Prompt 4 (ZaiCoder Code Analytics API) — same module as Prompt 3, do
+4. Prompt 4 (zAICoder Analytics API) — same module as Prompt 3, do
    last since it's the most net-new code in `zc_admin_api.py` this
    cycle.
 

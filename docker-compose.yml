@@ -1,26 +1,45 @@
 services:
-  zcoder:
-    build: .
-    image: zcoder:latest
-    container_name: zcoder
+  litellm:
+    image: ghcr.io/berriai/litellm:main-latest
+    container_name: litellm-gateway
     environment:
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:?ANTHROPIC_API_KEY must be set in the environment or .env file}
-      - ZCODER_LOG_FORMAT=json
-      - ZCODER_LOG_LEVEL=INFO
+      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY:-sk-litellm-master-key}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+    ports:
+      - "4000:4000"
+    command: [ "--config", "/app/config.yaml", "--detailed_debug" ]
     volumes:
-      # Persist config/cache across container restarts without baking
-      # secrets or state into the image.
-      - zcoder-home:/home/zcoder
+      - ./litellm-config.yaml:/app/config.yaml
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  zc:
+    build: .
+    image: zaicoder:latest
+    container_name: zc
+    depends_on:
+      litellm:
+        condition: service_healthy
+    environment:
+      # Route Anthropic API calls through the LiteLLM Proxy Gateway
+      - ANTHROPIC_BASE_URL=http://litellm:4000
+      - ANTHROPIC_API_KEY=${LITELLM_MASTER_KEY:-sk-litellm-master-key}
+      - zc_LOG_FORMAT=json
+      - zc_LOG_LEVEL=INFO
+    volumes:
+      - zc-home:/home/zc
     healthcheck:
       test: ["CMD", "python", "main.py", "--health-check"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 5s
     restart: unless-stopped
-    # Interactive CLI usage: docker compose run --rm zcoder -p "..."
     stdin_open: true
     tty: true
 
 volumes:
-  zcoder-home:
+  zc-home:

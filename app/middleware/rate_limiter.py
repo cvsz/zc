@@ -4,13 +4,14 @@ Enterprise-grade traffic control with token bucket and circuit breaker patterns.
 """
 
 import time
-from typing import Dict, Optional, Callable, Any
 from collections import defaultdict
-from datetime import datetime, timedelta
-from fastapi import Request, Response, HTTPException
+from typing import Any, Callable, Optional
+
+from fastapi import HTTPException, Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
-from redis.asyncio import Redis
-from app.core.cache import get_redis_client
+
+from app.core.cache import get_cache
+
 
 class TokenBucket:
     """Token bucket rate limiter implementation."""
@@ -18,7 +19,7 @@ class TokenBucket:
     def __init__(self, capacity: int, refill_rate: float):
         self.capacity = capacity  # Max tokens
         self.refill_rate = refill_rate  # Tokens per second
-        self.tokens = capacity
+        self.tokens: float = float(capacity)
         self.last_refill = time.time()
     
     def consume(self, tokens: int = 1) -> bool:
@@ -37,7 +38,10 @@ class TokenBucket:
     
     async def consume_async(self, tokens: int = 1) -> bool:
         """Async version using Redis for distributed rate limiting."""
-        redis = await get_redis_client()
+        cache = get_cache()
+        if not cache._connected or not cache.redis_client:
+            return True
+        redis = cache.redis_client
         key = f"ratelimit:{int(time.time()) // 60}"  # Per-minute buckets
         
         current = await redis.get(key)
@@ -97,7 +101,7 @@ class CircuitBreaker:
             return True
         
         if self.state == self.OPEN:
-            if (time.time() - self.last_failure_time) > self.recovery_timeout:
+            if self.last_failure_time is not None and (time.time() - self.last_failure_time) > self.recovery_timeout:
                 self.state = self.HALF_OPEN
                 self.half_open_calls = 0
                 return True
@@ -123,7 +127,7 @@ class CircuitBreaker:
             result = await func(*args, **kwargs)
             self.record_success()
             return result
-        except Exception as e:
+        except Exception:
             self.record_failure()
             raise
 
@@ -134,7 +138,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
     def __init__(self, app, requests_per_minute: int = 100, burst: int = 20):
         super().__init__(app)
         self.bucket = TokenBucket(capacity=burst, refill_rate=requests_per_minute / 60.0)
-        self.client_buckets: Dict[str, TokenBucket] = defaultdict(
+        self.client_buckets: dict[str, TokenBucket] = defaultdict(
             lambda: TokenBucket(capacity=burst, refill_rate=requests_per_minute / 60.0)
         )
     
@@ -166,7 +170,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
 
 # Global circuit breakers for different services
-circuit_breakers: Dict[str, CircuitBreaker] = {
+circuit_breakers: dict[str, CircuitBreaker] = {
     "database": CircuitBreaker(failure_threshold=5, recovery_timeout=30.0),
     "redis": CircuitBreaker(failure_threshold=3, recovery_timeout=10.0),
     "external_api": CircuitBreaker(failure_threshold=5, recovery_timeout=60.0),

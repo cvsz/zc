@@ -27,7 +27,8 @@ def thinking_mod(monkeypatch):
     monkeypatch.setitem(sys.modules, "anthropic", fake_anthropic)
 
     import importlib
-    import zc_thinking as mod
+
+    import wire.zc_thinking as mod
     importlib.reload(mod)
     return mod
 

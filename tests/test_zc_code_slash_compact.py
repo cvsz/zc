@@ -6,18 +6,18 @@ CHANGELOG for this fix, and tests/test_zc_code_context_editing.py
 for the sibling --agent-context-editing feature this reuses
 (zc_tools.build_context_management / COMPACTION_BETA).
 """
-import json
 
 import pytest
 
-from zc_code import CodeSession, cmd_code_slash
-from zc_tools import COMPACTION_BETA
+from wire.zc_code import CodeSession, cmd_code_slash
+from wire.zc_tools import COMPACTION_BETA
 
 
 @pytest.fixture(autouse=True)
 def isolated_sessions_dir(tmp_path, monkeypatch):
     """Keep CodeSession.save() out of the real ~/.ai-coder directory."""
-    monkeypatch.setattr("zc_code.SESSIONS_DIR", tmp_path)
+    monkeypatch.setattr(
+"wire.zc_code.SESSIONS_DIR", tmp_path)
 
 
 def _compaction_response(summary="Compacted summary of prior turns."):
@@ -38,7 +38,8 @@ def _session_with_turns(model="zc-sonnet-5"):
 
 def test_compact_without_session_id_does_not_call_api(monkeypatch, capsys):
     called = {"n": 0}
-    monkeypatch.setattr("zc_code.CodeAgent._post", lambda *a, **k: called.__setitem__("n", called["n"] + 1))
+    monkeypatch.setattr(
+"wire.zc_code.CodeAgent._post", lambda *a, **k: called.__setitem__("n", called["n"] + 1))
 
     cmd_code_slash("/compact", "key", "zc-sonnet-5", session_id=None)
 
@@ -60,7 +61,8 @@ def test_compact_sends_compaction_beta_and_edit(monkeypatch):
         captured["betas"] = betas
         return _compaction_response()
 
-    monkeypatch.setattr("zc_code.CodeAgent._post", fake_post)
+    monkeypatch.setattr(
+"wire.zc_code.CodeAgent._post", fake_post)
 
     cmd_code_slash("/compact", "key", session.model, session_id=session.id)
 
@@ -75,7 +77,8 @@ def test_compact_sends_compaction_beta_and_edit(monkeypatch):
 def test_compact_replaces_turns_with_summary_and_persists(monkeypatch):
     session = _session_with_turns()
     monkeypatch.setattr(
-        "zc_code.CodeAgent._post",
+
+        "wire.zc_code.CodeAgent._post",
         lambda self, payload, betas=None: _compaction_response("the summary text"),
     )
 
@@ -89,7 +92,8 @@ def test_compact_replaces_turns_with_summary_and_persists(monkeypatch):
 def test_compact_reports_api_error_without_touching_session(monkeypatch, capsys):
     session = _session_with_turns()
     monkeypatch.setattr(
-        "zc_code.CodeAgent._post",
+
+        "wire.zc_code.CodeAgent._post",
         lambda self, payload, betas=None: {"error": "rate limited"},
     )
 

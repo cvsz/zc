@@ -35,7 +35,8 @@ def _install_fake_anthropic_module():
 def agents_sdk(monkeypatch):
     _install_fake_anthropic_module()
     import importlib
-    import zc_agents_sdk as mod
+
+    import wire.zc_agents_sdk as mod
     importlib.reload(mod)
     return mod
 
@@ -163,7 +164,7 @@ def test_get_memory_uses_memory_store_beta_alone(agents_sdk):
     client.get_memory("store_1", "mem_1")
 
     client.client.beta.memory_stores.memories.retrieve.assert_called_once_with(
-        "store_1", "mem_1", betas=[agents_sdk.MEMORY_STORE_BETA],
+        "mem_1", memory_store_id="store_1", betas=[agents_sdk.MEMORY_STORE_BETA],
     )
 
 
@@ -185,7 +186,7 @@ def test_delete_memory_uses_memory_store_beta_alone(agents_sdk):
     result = client.delete_memory("store_1", "mem_1")
 
     client.client.beta.memory_stores.memories.delete.assert_called_once_with(
-        "store_1", "mem_1", betas=[agents_sdk.MEMORY_STORE_BETA],
+        "mem_1", memory_store_id="store_1", betas=[agents_sdk.MEMORY_STORE_BETA],
     )
     assert result == {"id": "mem_1", "deleted": True}
 

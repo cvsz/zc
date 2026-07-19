@@ -3,14 +3,13 @@ Enterprise Performance Configuration Module
 Optimized for 2026 production standards with zero-copy I/O, kernel tuning, and async optimizations.
 """
 
-import os
 import asyncio
 import mmap
+import os
 import socket
-from pathlib import Path
-from typing import Optional, Dict, Any
 from dataclasses import dataclass
-import struct
+from pathlib import Path
+from typing import Any, Optional
 
 # =============================================================================
 # ZERO-COPY FILE OPERATIONS
@@ -89,7 +88,7 @@ class OptimizedLockManager:
     """Fine-grained locking strategy for high-concurrency scenarios."""
     
     def __init__(self, max_locks: int = 1000):
-        self._locks: Dict[str, asyncio.Lock] = {}
+        self._locks: dict[str, asyncio.Lock] = {}
         self._max_locks = max_locks
         self._global_lock = asyncio.Lock()
     
@@ -162,7 +161,8 @@ class ParallelHasher:
             tasks.append((offset, size))
         
         # Execute in thread pool
-        with asyncio.ThreadPoolExecutor(max_workers=actual_workers) as executor:
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor(max_workers=actual_workers) as executor:
             chunk_hashes = await loop.run_in_executor(
                 executor,
                 lambda: list(executor.map(_hash_chunk, tasks))
@@ -291,7 +291,7 @@ class PerformanceMetrics:
     avg_latency_ms: float = 0.0
     throughput_mbps: float = 0.0
     
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             'zero_copy_savings_bytes': self.zero_copy_savings_bytes,
             'parallel_hash_speedup': self.parallel_hash_speedup,

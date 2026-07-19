@@ -4,7 +4,7 @@
 
 ```bash
 git clone <repo>
-cd zcoder
+cd wire
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements-dev.txt
 ```
@@ -30,7 +30,7 @@ fail.
   `Exception`, so `resilience.retry()` can classify them correctly. Wrap
   the call in `@resilience.retry(...)` rather than hand-rolling a retry
   loop. **Exception:** `zc_admin_api.py` and `zc_compliance_api.py`
-  implement their own retry/backoff directly, because ZaiCoder documents
+  implement their own retry/backoff directly, because Anthropic documents
   a specific retry contract for those endpoint families independently of
   the general API's; reusing `resilience.retry()` there would couple two
   contracts that happen to look similar today but aren't guaranteed to

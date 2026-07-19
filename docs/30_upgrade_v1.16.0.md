@@ -22,7 +22,7 @@ endpoint family (`/v1/compliance/*` vs `/v1/organizations/*`), different
 purpose, and — the single most important operational detail — a
 different key model:
 
-- A **Compliance Access Key** (`sk-ant-api01-...`, created in zaicoder.ai)
+- A **Compliance Access Key** (`sk-ant-api01-...`, created in zc.ai)
   reaches every endpoint here, but only the scopes it was granted at
   creation time (`read:compliance_activities`,
   `read:compliance_org_data`, `read:compliance_user_data`,
@@ -56,7 +56,7 @@ module for RBAC/SCIM inspection.
 
 ## Reliability contract
 
-Matches `platform.zaicoder.com/docs/en/manage-zc/compliance-errors`
+Matches `platform.zc.com/docs/en/manage-zc/compliance-errors`
 exactly rather than using a generic retry wrapper:
 
 - 429 and retryable 5xx (502/503/504/529, or 500 without

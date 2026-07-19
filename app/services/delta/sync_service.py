@@ -1,5 +1,5 @@
 """
-Enterprise-grade Delta Sync Service for Wire CLI.
+Enterprise-grade Delta Sync Service for wire CLI.
 Implements binary diffing (BSDiff/VCDIFF) for bandwidth-optimized file updates.
 
 2026 Standards:
@@ -9,12 +9,11 @@ Implements binary diffing (BSDiff/VCDIFF) for bandwidth-optimized file updates.
 - Automatic fallback to full upload when delta > threshold
 """
 
-import os
 import asyncio
-import hashlib
-from pathlib import Path
-from typing import Optional, Tuple, Dict, List
 from dataclasses import dataclass
+from pathlib import Path
+from typing import Optional, Any
+
 import blake3
 
 # Try optional high-performance diff libraries
@@ -74,8 +73,8 @@ class DeltaSyncService:
             return None
         
         async with asyncio.Lock():
-            async with open(cas_path, 'rb') as f:
-                return await f.read()
+            with open(cas_path, 'rb') as f:
+                return f.read()
     
     async def store_file(self, content: bytes) -> str:
         """Store file in CAS and return BLAKE3 hash."""
@@ -86,8 +85,8 @@ class DeltaSyncService:
             return content_hash  # Already stored (deduplication)
         
         async with asyncio.Lock():
-            async with open(cas_path, 'wb') as f:
-                await f.write(content)
+            with open(cas_path, 'wb') as f:
+                f.write(content)
         
         return content_hash
     
@@ -123,7 +122,7 @@ class DeltaSyncService:
             )
         
         original_size = len(target_content)
-        base_size = len(base_content)
+        len(base_content)
         
         # Compute target hash
         target_hash = blake3.blake3(target_content).hexdigest()
@@ -223,7 +222,7 @@ class DeltaSyncService:
         base_hash: str,
         patch_data: bytes,
         algorithm: str = "bsdiff"
-    ) -> Tuple[Optional[bytes], str]:
+    ) -> tuple[Optional[bytes], str]:
         """
         Apply patch to base version and return reconstructed content.
         
@@ -283,7 +282,7 @@ class DeltaSyncService:
         self,
         base_hash: str,
         target_size: int
-    ) -> Dict[str, float]:
+    ) -> dict[str, Any]:
         """
         Estimate potential bandwidth savings without computing full delta.
         Uses heuristics based on file size difference.

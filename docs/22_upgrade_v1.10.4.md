@@ -13,10 +13,10 @@ cause a production failure.
 
 - `MODEL_CATALOG["...']["tier"] == "legacy"` means superseded but still
   callable (Opus 4.5/4.6/4.7, Sonnet 4.5/4.6) — these keep working.
-- `RETIRED_MODELS` means the ID now errors: the original ZaiCoder 4.0
-  releases (`zc-opus-4-20250514`, `zc-sonnet-4-20250514`, and
-  their dateless `-4-0` aliases — retired 2026-06-15) and ZaiCoder Haiku 3
-  (`zc-haiku-3-20240307` — retired 2026-02-19), each with a
+- `RETIRED_MODELS` means the ID now errors: the original zAICoder 4.0
+  releases (`claude-opus-4-20250514`, `claude-sonnet-4-20250514`, and
+  their dateless `-4-0` aliases — retired 2026-06-15) and zAICoder Haiku 3
+  (`claude-haiku-3-20240307` — retired 2026-02-19), each with a
   recommended replacement ID.
 
 Conflating these two categories in one "legacy" bucket was the actual gap

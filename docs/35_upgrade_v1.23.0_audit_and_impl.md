@@ -4,7 +4,7 @@ Unlike the last three cycles (v1.20.0–v1.22.0, all Managed Agents), this
 cycle deliberately widened the net per the methodology's own instruction
 to check the *whole* Features overview, not just the area of the last
 few fixes — Managed Agents has been audited three cycles running and
-was due for a break. Searched platform.zaicoder.com/docs release notes
+was due for a break. Searched platform.zc.com/docs release notes
 across Authentication, Admin API, and Rate Limits, plus cross-referenced
 against `zc_admin_api.py` (the module most likely to already cover
 adjacent Admin-API surface) before writing anything up as a gap.
@@ -15,7 +15,7 @@ adjacent Admin-API surface) before writing anything up as a gap.
 workload exchange a short-lived OIDC JWT from an identity provider it
 already trusts (AWS IAM, Google Cloud, GitHub Actions, Kubernetes,
 Entra ID, Okta, SPIFFE, or any standards-compliant OIDC issuer) for a
-short-lived ZaiCoder API access token (`sk-ant-oat01-...`), instead of
+short-lived zAICoder API access token (`sk-ant-oat01-...`), instead of
 using a long-lived static API key. Mechanically: `POST /v1/oauth/token`
 with an RFC 7523 jwt-bearer grant; the response is a standard OAuth 2.0
 token response. First-party SDKs auto-detect a full federation
@@ -31,16 +31,16 @@ API key.
 **Why it's a gap:** grep for `workload identity|OIDC|oidc|federation` in
 the tree: zero matches. Second, differently-worded grep for
 `short-lived|token_exchange|id_token`: also zero matches. Every existing
-zcoder module authenticates with a single, always-present, static
+wire module authenticates with a single, always-present, static
 `api_key`/`admin_api_key` string — there is no code path anywhere that
 exchanges a JWT for anything.
 
-**Priority: 🔴 P0.** This is the flagship "keyless auth" story ZaiCoder
-is pushing across the whole platform (SDKs, ZaiCoder Code, GitHub Actions)
+**Priority: 🔴 P0.** This is the flagship "keyless auth" story Anthropic
+is pushing across the whole platform (SDKs, zAICoder, GitHub Actions)
 — a CLI wrapper that only supports static keys is missing the auth
 pattern ZaiCoder itself now recommends leading with.
 
-## Finding 2 — Spend Limits API (ZaiCoder Enterprise)
+## Finding 2 — Spend Limits API (zAICoder Enterprise)
 
 **What it is:** Eight Admin-API endpoints across two resources for
 per-member spend governance, Enterprise-only: `GET
@@ -83,18 +83,18 @@ building gateways/dashboards, per the docs' own stated use cases.
 
 ## Non-gaps checked this cycle
 
-**ZaiCoder Managed Agents vault credential background refresh for
+**zAICoder Managed Agents vault credential background refresh for
 `mcp_oauth` credentials** — a release-note line item alongside these
 three. Not a gap: this is server-side behavior (ZaiCoder now refreshes
 a stored OAuth credential's access token automatically instead of it
-going stale), not a new request shape or parameter zcoder's
+going stale), not a new request shape or parameter wire's
 `add_credential()` needs to send. Nothing to build.
 
-**ZaiCoder Managed Agents on ZaiCoder Platform on AWS** (webhooks, multi-
+**zAICoder Managed Agents on zAICoder Platform on AWS** (webhooks, multi-
 agent, self-hosted sandboxes) — not a gap: this is the same API surface
 `zc_agents_sdk.py` already covers, becoming available on a different
-deployment target (AWS-native endpoints vs. the direct ZaiCoder API).
-Deployment location isn't a code-level gap unless zcoder starts
+deployment target (AWS-native endpoints vs. the direct zAICoder API).
+Deployment location isn't a code-level gap unless wire starts
 supporting multiple base URLs/auth schemes per cloud, which is a bigger,
 separate architectural question outside a single audit finding.
 
@@ -108,7 +108,7 @@ separate architectural question outside a single audit finding.
 >
 > ```python
 > class WIFCredentialExchanger:
->     """Exchanges an IdP-issued JWT for a short-lived ZaiCoder API access
+>     """Exchanges an IdP-issued JWT for a short-lived zAICoder API access
 >     token via POST /v1/oauth/token (RFC 7523 jwt-bearer grant)."""
 >
 >     def exchange(self, federation_rule_id: str, organization_id: str,
@@ -204,7 +204,7 @@ separate architectural question outside a single audit finding.
 > def deny_spend_limit_increase_request(self, request_id: str, suppress_notification: bool = False) -> dict
 > ```
 > Note in the module docstring that this resource family is
-> Enterprise-only (a ZaiCoder Console/API-only org gets a 403) — surface
+> Enterprise-only (a zAICoder Console/API-only org gets a 403) — surface
 > that in the `cmd_*` error path the same way the existing functions
 > already surface the "wrong key type" 401/403 hint.
 >

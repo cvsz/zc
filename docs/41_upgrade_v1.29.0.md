@@ -1,12 +1,12 @@
 # v1.29.0 — Textual TUI + web console streaming/sessions/theme upgrade
 
 **Scope requested:** "Advanced Professional TUI / Frontend / Backend" —
-a deep-dive across all three of zcoder's non-argparse front ends: a new
+a deep-dive across all three of wire's non-argparse front ends: a new
 terminal TUI, and an upgrade to the existing web console's frontend and
 backend (added in v1.28.0).
 
-This was a feature deep-dive, not a `platform.zaicoder.com/docs` gap-audit
-cycle — no new ZaiCoder API surface is involved here beyond what
+This was a feature deep-dive, not a `platform.zc.com/docs` gap-audit
+cycle — no new Anthropic API surface is involved here beyond what
 `coder.py`/`zc_stream.py` already wrapped. `ROADMAP.md`'s "last
 audited" date is unchanged.
 

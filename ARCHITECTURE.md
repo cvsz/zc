@@ -2,7 +2,7 @@
 
 ## Overview
 
-zcoder is a single-process Python CLI that wraps the ZaiCoder Messages
+wire is a single-process Python CLI that wraps the Anthropic Messages
 API, plus a modular set of feature areas (one `zc_*.py` file per API
 surface: files, batches, vision, RAG, agents, etc). `main.py` is the only
 entrypoint; every feature is reachable as a CLI flag, there is no
@@ -65,13 +65,13 @@ for free instead of re-implementing it:
   and `CircuitBreaker` (fail-fast during an outage), plus
   `raise_for_http_error()` / `urlopen_json()` / `urlopen_text()`, shared
   helpers that translate a raw `urllib` HTTP/network exception into the
-  `AICoderError` hierarchy `retry()` reads. Wired into every module that
+  `AICoderError` hierarchy `retry()` reads. wired into every module that
   makes direct HTTP calls (`coder.py`, `zc_files.py`,
   `zc_tools.py`, `zc_code.py`, `zc_models.py`, and 15 others
   — one `CircuitBreaker` per module/downstream, since a GitHub outage
-  shouldn't trip the breaker that guards ZaiCoder API calls, or vice
+  shouldn't trip the breaker that guards Anthropic API calls, or vice
   versa). Two exceptions by design: `zc_batch.py` and
-  `zc_rag.py` call through the `zc` SDK client, which retries
+  `zc_rag.py` call through the `anthropic` SDK client, which retries
   internally, so there's nothing to wire. A handful of call sites that
   fetch an arbitrary caller-supplied URL rather than one fixed dependency
   (`zc_chrome.py`'s page fetch, `zc_research.py`'s source fetch,
@@ -106,7 +106,7 @@ not a crash:
 - An **Admin API key** (`sk-ant-admin01-...`) unlocks all of
   `zc_admin_api.py`, plus *only* the Activity Feed endpoint
   (`--compliance-activities`) in `zc_compliance_api.py`.
-- A **Compliance Access Key** (`sk-ant-api01-...`, created in zaicoder.ai
+- A **Compliance Access Key** (`sk-ant-api01-...`, created in zc.ai
   with specific scopes at creation time — scopes are immutable
   afterward) unlocks the rest of `zc_compliance_api.py`: reading or
   hard-deleting chats, files, and projects, plus directory endpoints.

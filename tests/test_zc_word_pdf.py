@@ -10,10 +10,10 @@ than duplicating a full interactive-session harness.
 """
 import pytest
 
-import zc_word
-import zc_pdf
-from zc_files import FilesAPI
-from zc_skills_api import SkillsApiClient
+import wire.zc_pdf as zc_pdf
+import wire.zc_word as zc_word
+from wire.zc_files import FilesAPI
+from wire.zc_skills_api import SkillsApiClient
 
 
 @pytest.fixture(autouse=True)
@@ -36,7 +36,7 @@ def _queue_inputs(monkeypatch, inputs):
 def test_docx_chat_no_input_file_skips_upload(monkeypatch, capsys):
     monkeypatch.setattr(FilesAPI, "upload", lambda self, path: pytest.fail("should not upload"))
     _queue_inputs(monkeypatch, ["/exit"])
-    out_path = zc_word.cmd_docx_chat("k", "zc-sonnet-5")
+    out_path = zc_word.cmd_docx_chat("k", "claude-sonnet-5")
     assert out_path == "docx_session.docx"
 
 
@@ -46,14 +46,14 @@ def test_docx_chat_uploads_input_file_once(monkeypatch):
     monkeypatch.setattr(SkillsApiClient, "call_with_skills_turn",
                         lambda self, *a, **k: {"content": []})
     _queue_inputs(monkeypatch, ["make it a memo", "/exit"])
-    zc_word.cmd_docx_chat("k", "zc-sonnet-5", input_path="draft.docx")
+    zc_word.cmd_docx_chat("k", "claude-sonnet-5", input_path="draft.docx")
     assert calls == ["draft.docx"]
 
 
 def test_docx_chat_upload_failure_exits(monkeypatch):
     monkeypatch.setattr(FilesAPI, "upload", lambda self, path: (_ for _ in ()).throw(OSError("nope")))
     with pytest.raises(SystemExit):
-        zc_word.cmd_docx_chat("k", "zc-sonnet-5", input_path="missing.docx")
+        zc_word.cmd_docx_chat("k", "claude-sonnet-5", input_path="missing.docx")
 
 
 def test_docx_chat_default_output_path_from_input():
@@ -74,7 +74,7 @@ def test_docx_chat_downloads_generated_file(monkeypatch):
     })
     # No file_id in this response -> nothing to download
     _queue_inputs(monkeypatch, ["write a memo", "/exit"])
-    zc_word.cmd_docx_chat("k", "zc-sonnet-5")
+    zc_word.cmd_docx_chat("k", "claude-sonnet-5")
     assert "fid" not in downloaded
 
     monkeypatch.setattr(SkillsApiClient, "call_with_skills_turn", lambda self, *a, **k: {
@@ -84,7 +84,7 @@ def test_docx_chat_downloads_generated_file(monkeypatch):
         "container": {"id": "cont_1"},
     })
     _queue_inputs(monkeypatch, ["write a memo", "/exit"])
-    zc_word.cmd_docx_chat("k", "zc-sonnet-5", output_path="memo.docx")
+    zc_word.cmd_docx_chat("k", "claude-sonnet-5", output_path="memo.docx")
     assert downloaded["fid"] == "file_out"
 
 
@@ -92,7 +92,7 @@ def test_docx_chat_api_error_does_not_crash(monkeypatch, capsys):
     monkeypatch.setattr(SkillsApiClient, "call_with_skills_turn",
                         lambda self, *a, **k: {"error": "rate limited"})
     _queue_inputs(monkeypatch, ["write a memo", "/exit"])
-    zc_word.cmd_docx_chat("k", "zc-sonnet-5")
+    zc_word.cmd_docx_chat("k", "claude-sonnet-5")
     assert "rate limited" in capsys.readouterr().out
 
 
@@ -105,7 +105,7 @@ def test_docx_chat_uses_docx_skill(monkeypatch):
 
     monkeypatch.setattr(SkillsApiClient, "call_with_skills_turn", fake_call)
     _queue_inputs(monkeypatch, ["hi", "/exit"])
-    zc_word.cmd_docx_chat("k", "zc-sonnet-5")
+    zc_word.cmd_docx_chat("k", "claude-sonnet-5")
     assert seen["skills"] == ["docx"]
 
 
@@ -115,7 +115,7 @@ def test_docx_chat_uses_docx_skill(monkeypatch):
 def test_pdf_chat_no_input_file_skips_upload(monkeypatch):
     monkeypatch.setattr(FilesAPI, "upload", lambda self, path: pytest.fail("should not upload"))
     _queue_inputs(monkeypatch, ["/exit"])
-    out_path = zc_pdf.cmd_pdf_chat("k", "zc-sonnet-5")
+    out_path = zc_pdf.cmd_pdf_chat("k", "claude-sonnet-5")
     assert out_path == "pdf_session.pdf"
 
 
@@ -125,14 +125,14 @@ def test_pdf_chat_uploads_input_file_once(monkeypatch):
     monkeypatch.setattr(SkillsApiClient, "call_with_skills_turn",
                         lambda self, *a, **k: {"content": []})
     _queue_inputs(monkeypatch, ["fill in the form", "/exit"])
-    zc_pdf.cmd_pdf_chat("k", "zc-sonnet-5", input_path="form.pdf")
+    zc_pdf.cmd_pdf_chat("k", "claude-sonnet-5", input_path="form.pdf")
     assert calls == ["form.pdf"]
 
 
 def test_pdf_chat_upload_missing_id_exits(monkeypatch):
     monkeypatch.setattr(FilesAPI, "upload", lambda self, path: {})  # no "id" key
     with pytest.raises(SystemExit):
-        zc_pdf.cmd_pdf_chat("k", "zc-sonnet-5", input_path="form.pdf")
+        zc_pdf.cmd_pdf_chat("k", "claude-sonnet-5", input_path="form.pdf")
 
 
 def test_pdf_chat_uses_pdf_skill(monkeypatch):
@@ -144,7 +144,7 @@ def test_pdf_chat_uses_pdf_skill(monkeypatch):
 
     monkeypatch.setattr(SkillsApiClient, "call_with_skills_turn", fake_call)
     _queue_inputs(monkeypatch, ["hi", "/exit"])
-    zc_pdf.cmd_pdf_chat("k", "zc-sonnet-5")
+    zc_pdf.cmd_pdf_chat("k", "claude-sonnet-5")
     assert seen["skills"] == ["pdf"]
 
 
@@ -157,5 +157,5 @@ def test_pdf_chat_reuses_container_id_across_turns(monkeypatch):
 
     monkeypatch.setattr(SkillsApiClient, "call_with_skills_turn", fake_call)
     _queue_inputs(monkeypatch, ["first turn", "second turn", "/exit"])
-    zc_pdf.cmd_pdf_chat("k", "zc-sonnet-5")
+    zc_pdf.cmd_pdf_chat("k", "claude-sonnet-5")
     assert container_ids_seen == [None, "cont_persist"]

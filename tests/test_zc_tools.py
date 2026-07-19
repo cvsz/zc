@@ -7,10 +7,9 @@ docs/36_upgrade_v1.24.0_audit_and_impl.md Finding 1.
 """
 import json
 
-import pytest
-
-import zc_tools as mod
-from zc_tools import ToolCoder, SERVER_TOOLS, RETIRED_TOOL_VERSIONS
+import wire.zc_tools as mod
+from wire.zc_tools import RETIRED_TOOL_VERSIONS, SERVER_TOOLS, ToolCoder
+from typing import Optional
 
 
 class _FakeResp:
@@ -27,7 +26,7 @@ class _FakeResp:
         return False
 
 
-def _install_fake_urlopen(monkeypatch, captured: dict, response_body: dict = None):
+def _install_fake_urlopen(monkeypatch, captured: dict, response_body: Optional[dict] = None):
     response_body = response_body or {"content": [], "usage": {}, "stop_reason": "end_turn"}
 
     def fake_urlopen(req, timeout=None):

@@ -1,0 +1,66 @@
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: default-deny
+  namespace: default
+spec:
+  endpointSelector:
+    matchLabels: {}
+  ingress: []
+  egress:
+    - toEntities:
+        - cluster
+        - host
+        - world
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: wire-api-policy
+  namespace: default
+spec:
+  endpointSelector:
+    matchLabels:
+      app: wire-api
+  ingress:
+    # Allow traffic from ingress controller
+    - fromEndpoints:
+        - matchLabels:
+            app.kubernetes.io/name: ingress-nginx
+      toPorts:
+        - ports:
+            - port: "8000"
+              protocol: TCP
+  egress:
+    # Allow API to talk to Redis and Database
+    - toEndpoints:
+        - matchLabels:
+            app: redis
+        - matchLabels:
+            app: postgres
+    # Allow external API calls (e.g., to LLM providers)
+    - toEntities:
+        - world
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: upload-worker-policy
+  namespace: default
+spec:
+  endpointSelector:
+    matchLabels:
+      app: upload-worker
+  ingress:
+    # Workers don't take direct ingress, they pull from Redis/NATS
+    []
+  egress:
+    # Allow workers to reach Redis and S3/MinIO
+    - toEndpoints:
+        - matchLabels:
+            app: redis
+        - matchLabels:
+            app: minio
+    # Allow external egress for webhooks or external storage
+    - toEntities:
+        - world

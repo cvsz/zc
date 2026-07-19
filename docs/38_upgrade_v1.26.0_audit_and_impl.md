@@ -2,18 +2,18 @@
 
 Continuation of the cross-product cycle (previous audit: 2026-07-11, per
 `ROADMAP.md`'s header). This one re-ran the sweep against
-`platform.zaicoder.com/docs/en/release-notes/overview`, the Managed Agents
-docs tree, and recent `zc-beta` header additions, plus a check of
+`platform.zc.com/docs/en/release-notes/overview`, the Managed Agents
+docs tree, and recent `anthropic-beta` header additions, plus a check of
 `zc_models.py`'s deprecation scanner against the live model-
 deprecations page. Model catalog re-checked first: no new model releases
-since ZaiCoder Sonnet 5 (June 30, 2026) launch and the Fable 5 / Mythos 5
+since zAICoder Sonnet 5 (June 30, 2026) launch and the Fable 5 / Mythos 5
 suspension-and-restore (suspended 2026-06-12, restored 2026-07-01) already
 on file — `MODEL_CATALOG` is current. One real gap found and closed; one
 housekeeping fix (a `VERSION` string that had drifted stale) and one
 pre-existing stale test assertion fixed along the way while the relevant
 files were already open.
 
-## Finding 1 — Self-hosted sandboxes for ZaiCoder Managed Agents (public beta)
+## Finding 1 — Self-hosted sandboxes for zAICoder Managed Agents (public beta)
 
 **What it is:** An alternative to ZaiCoder's cloud sandbox for Managed
 Agents tool execution. `client.beta.environments.create(config={"type":
@@ -64,7 +64,7 @@ ENVIRONMENT_ID`. See `tests/test_zc_agents_sdk.py` (6 new tests) and
 `IMPLEMENTATION_CHECKLIST.md` Form 11.
 
 **Deliberately not built this cycle:** the actual `EnvironmentWorker`
-poller / `ant beta:worker poll` equivalent — i.e., a zcoder-side process
+poller / `ant beta:worker poll` equivalent — i.e., a wire-side process
 that claims work items and executes tool calls locally. That's a
 different kind of component (a long-running daemon with its own
 container/process-orchestration story per work item) than anything else
@@ -75,7 +75,7 @@ guessing wrong the same way the CMEK finding in v1.25.0 flagged for an
 unconfirmed endpoint shape — except here the *endpoint* shapes are
 confirmed (both `environments.create` and `work.stats` were verified
 directly against current docs, unlike the v1.25.0 CMEK finding), it's the
-*worker deployment* that has no concrete zcoder use case yet. Revisit if
+*worker deployment* that has no concrete wire use case yet. Revisit if
 a specific self-hosted deployment target comes up, the same exit
 condition used for Compliance API (v1.16.0) and native Multiagent
 orchestration (v1.20.0 → v1.21.0).
@@ -89,7 +89,7 @@ with a confirmed request/response shape on both the create and read side
 **MCP tunnels management API's move off the Admin API** (`/v1/tunnels`
 instead of `/v1/organizations/tunnels`, `mcp-tunnels-2026-06-22` beta
 header) — confirmed **not** a gap: `zc_agents_sdk.py`'s `McpTunnel`
-already targets `TUNNELS_ENDPOINT = "https://api.zc.com/v1/tunnels"`
+already targets `TUNNELS_ENDPOINT = "https://api.anthropic.com/v1/tunnels"`
 with `MCP_TUNNELS_BETA = "mcp-tunnels-2026-06-22"`.
 
 **Advisor tool `max_tokens` cap** — confirmed **not** a gap:
@@ -101,15 +101,15 @@ minimum version)** — confirmed **not** a gap: `zc_code_exec.py`'s
 `DEFAULT_CODE_EXEC_VERSION` is already `code_execution_20260521`, newer
 than the version this finding would have required.
 
-**Fast mode deprecation for ZaiCoder Opus 4.7** (removal 2026-07-24) —
+**Fast mode deprecation for zAICoder Opus 4.7** (removal 2026-07-24) —
 confirmed **not** a gap: `zc_models.py`'s `FAST_MODE_DEPRECATED` set
-already contains `"zc-opus-4-7"` with the correct removal date in its
+already contains `"claude-opus-4-7"` with the correct removal date in its
 comment, from the 2026-07-02 audit pass.
 
 **Managed Agents webhooks / multi-agent orchestration / self-hosted
-sandboxes reaching ZaiCoder Platform on AWS** — the AWS-specific IAM
-actions (`ZaiCoderSelfHostedEnvironmentAccess` managed policy, etc.) are
-infra/deployment configuration on ZaiCoder's AWS offering, not a
+sandboxes reaching zAICoder Platform on AWS** — the AWS-specific IAM
+actions (`AnthropicSelfHostedEnvironmentAccess` managed policy, etc.) are
+infra/deployment configuration on Anthropic's AWS offering, not a
 client-library API surface; nothing for `zc_agents_sdk.py` to call
 differently. Noted here so a future cycle doesn't re-discover and
 mis-flag it as a code gap.

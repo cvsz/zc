@@ -46,7 +46,7 @@ python main.py --memory-agent "Remember that this project uses pytest"
 # Advisor tool — a stronger model consulted mid-generation
 python main.py --advisor "Refactor auth.py to use JWT, then write tests"
 
-# Real hosted ZaiCoder Managed Agents (cloud sandbox, not local)
+# Real hosted zAICoder Managed Agents (cloud sandbox, not local)
 python main.py --agent-managed-run "Set up a FastAPI project with tests"
 
 # Embeddings (needs VOYAGE_API_KEY — see .env.example)

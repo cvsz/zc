@@ -1,7 +1,7 @@
 # ROADMAP.md
 
-**AI Model Coder CLI (zcoder) — v1.32.0**
-Last audited against `platform.zaicoder.com/docs`: 2026-07-14 (extended
+**AI Model Coder CLI (wire) — v1.32.0**
+Last audited against `platform.zc.com/docs`: 2026-07-14 (extended
 thinking / adaptive thinking / effort — see `docs/42_upgrade_v1.30.0.md`)
 
 v1.32.0 closes the one open follow-up from the v1.31.0 wiring audit:
@@ -13,7 +13,7 @@ gets expressed as a flag — see
 `docs/44_upgrade_v1.32.0_route_add_agent.md`. v1.31.0 was a different kind
 of cycle: not a docs re-audit, but a CLI-to-API *wiring* audit —
 cross-referencing every `zc_*.py` module's own `cmd_*` functions
-against `main.py`'s dispatch, rather than against platform.zaicoder.com/docs.
+against `main.py`'s dispatch, rather than against platform.zc.com/docs.
 Found four fully-implemented, fully undocumented-in-`main.py` modules
 (`zc_github.py`, `zc_router.py`, `zc_prompt_optimizer.py`,
 `zc_metrics.py`) — see `docs/43_upgrade_v1.31.0_cli_wiring_audit.md`.
@@ -28,10 +28,10 @@ not a docs re-audit.
 
 This roadmap has two parts:
 
-1. **Where zcoder stands today** — a full inventory of what's implemented,
-   module by module, mapped to the ZaiCoder feature it covers.
-2. **What's missing** — every gap found by cross-referencing zcoder against
-   the live Features overview and API reference at platform.zaicoder.com/docs,
+1. **Where wire stands today** — a full inventory of what's implemented,
+   module by module, mapped to the Anthropic feature it covers.
+2. **What's missing** — every gap found by cross-referencing wire against
+   the live Features overview and API reference at platform.zc.com/docs,
    with a concrete implementation plan for each one, ranked by priority.
 
 Nothing in Part 2 is speculative. Each gap was confirmed by grepping the
@@ -48,7 +48,7 @@ different name either.
 | Feature | Module | Notes |
 |---|---|---|
 | Model catalog (Opus 4.8, Sonnet 5, Haiku 4.5, legacy tiers) | `zc_models.py` | Local cache + live `/v1/models` |
-| ZaiCoder Fable 5 / ZaiCoder Mythos 5 | `zc_fable5.py`, `zc_mythos5.py` | Refusal detection, client-side fallback, fallback-credit header |
+| zAICoder Fable 5 / zAICoder Mythos 5 | `zc_fable5.py`, `zc_mythos5.py` | Refusal detection, client-side fallback, fallback-credit header |
 | Retired-model registry / deprecation scanner | `zc_models.py` | `--check-deprecated PATH` |
 | Computer use | `zc_models.py` | `--computer-use PROMPT` |
 | Adaptive / interleaved thinking, fast mode, effort levels | `zc_models.py`, `zc_thinking.py` | Mode auto-selected per model *(fixed v1.30.0 — see docs/42)* |
@@ -88,7 +88,7 @@ different name either.
 | Token budgets | `zc_tools.py` |
 | Context editing (`clear_tool_uses`, `clear_thinking`) | `zc_tools.py` (`build_context_management`), wired into `zc_code.py`'s agent loop via `--agent-context-editing` *(v1.15.0)* |
 
-### ZaiCoder Code / Agent SDK
+### zAICoder / Agent SDK
 | Feature | Module |
 |---|---|
 | Agent loop, sessions, rewind/checkpointing | `zc_code.py` |
@@ -113,26 +113,26 @@ different name either.
 | Server tool version bumps: `code_execution_20260521`, `web_search_20260318`, `web_fetch_20260318`, `response_inclusion` *(v1.24.0)* | `zc_tools.py`, `zc_search.py` (`--response-inclusion`), `zc_code_exec.py` |
 | Managed Agents memory listing (`agent-memory-2026-07-22` list behavior) *(v1.24.0)* | `zc_agents_sdk.py` (`--agent-memory-list`) |
 | Admin API key `expires_at` surfaced *(v1.24.0)* | `zc_admin_api.py` (`--admin-list-keys`) |
-| ZaiCoder Code Analytics API *(v1.24.0)* | `zc_admin_api.py` (`--zc-code-usage-report`) |
+| zAICoder Analytics API *(v1.24.0)* | `zc_admin_api.py` (`--claude-code-usage-report`) |
 | Extended thinking `display: "omitted"` (GA) *(v1.25.0)* | `zc_thinking.py` (`--thinking-display-omitted`) |
 | CMEK `external_keys` Admin API *(v1.25.0, ⚠️ unverified endpoint shape — see docs/37)* | `zc_admin_api.py` (`--cmek-list`) |
 | Managed Agents self-hosted sandboxes (public beta) *(v1.26.0)* | `zc_agents_sdk.py` (`--agent-env-self-hosted`, `--agent-env-work-stats`) |
 | Server-side model fallback (`fallbacks` param) | `zc_fable5.py` (`--fable5-fallback-chain`) *(v1.15.0)* |
 | Admin API: usage/cost reporting, API key list/revoke | `zc_admin_api.py` *(v1.15.0)* |
-| Admin API: Spend Limits API (ZaiCoder Enterprise only) *(v1.23.0)* | `zc_admin_api.py` (`--spend-limits-list`, `--spend-limit-set`, `--spend-limit-get`, `--spend-limit-delete`, `--spend-limit-requests-list`, `--spend-limit-request-approve`, `--spend-limit-request-deny`) |
+| Admin API: Spend Limits API (zAICoder Enterprise only) *(v1.23.0)* | `zc_admin_api.py` (`--spend-limits-list`, `--spend-limit-set`, `--spend-limit-get`, `--spend-limit-delete`, `--spend-limit-requests-list`, `--spend-limit-request-approve`, `--spend-limit-request-deny`) |
 | Admin API: Rate Limits API (read-only) *(v1.23.0)* | `zc_admin_api.py` (`--rate-limits`, `--rate-limits-workspace`) |
 | Compliance API: Activity Feed, chats/files/projects, directory | `zc_compliance_api.py` *(v1.16.0)* |
 | Workload Identity Federation (WIF, GA): token exchange + env-var auto-detection + service account/issuer/rule setup *(v1.23.0)* | `zc_wif.py` (`--wif-exchange-token`, `--wif-status`, `--wif-create-service-account`, `--wif-create-issuer`, `--wif-create-rule`, `--wif-list-*`) |
 
-### ZaiCoder apps / product surfaces (non-API products)
+### zAICoder apps / product surfaces (non-API products)
 | Product | Module |
 |---|---|
-| ZaiCoder Cowork (12 task types) | `cowork.py` |
-| ZaiCoder in Excel analog | `zc_excel.py` |
-| ZaiCoder in PowerPoint analog | `zc_powerpoint.py` *(v1.15.0)* |
-| ZaiCoder in Chrome analog (headless browse loop) | `zc_chrome.py` *(v1.15.0)* |
+| zAICoder Cowork (12 task types) | `cowork.py` |
+| zAICoder in Excel analog | `zc_excel.py` |
+| zAICoder in PowerPoint analog | `zc_powerpoint.py` *(v1.15.0)* |
+| zAICoder in Chrome analog (headless browse loop) | `zc_chrome.py` *(v1.15.0)* |
 
-### zcoder's own front ends (not an ZaiCoder product surface — how zcoder itself is used)
+### wire's own front ends (not an Anthropic product surface — how wire itself is used)
 | Front end | Module | Notes |
 |---|---|---|
 | Argparse CLI | `main.py` | One-shot flags, `-p`/`-f`/`-o` |
@@ -167,7 +167,7 @@ Full per-flag reference: see `README.md`.
 
 ---
 
-## Part 2 — Gap Audit vs. platform.zaicoder.com/docs
+## Part 2 — Gap Audit vs. platform.zc.com/docs
 
 Checked 2026-07-04 against the Features overview, API reference, and
 Admin/Usage/Compliance API sections. Six real gaps, ranked by priority.
@@ -227,7 +227,7 @@ round trip — no second HTTP call from the client.
 implemented the *client-side manual* pattern (a second, separate `_post()`
 call to `self.fallback_model`). That's a legitimate documented pattern
 too, but it's a different one from the `fallbacks` param, and at the time
-zcoder only had the manual path.
+wire only had the manual path.
 
 **What changed:** `Fable5Client` now takes a `fallback_chain` param; when
 set, `call()` sends `payload["fallbacks"] = fallback_chain` and reads back
@@ -282,17 +282,17 @@ thinking-block handling) is now wired into both `zc_code.py`'s and
 
 ---
 
-### 🟠 P1 — Agent Skills via the API (`skill_id`, not ZaiCoder Code's local loader) ✅ IMPLEMENTED (v1.15.0)
+### 🟠 P1 — Agent Skills via the API (`skill_id`, not zAICoder's local loader) ✅ IMPLEMENTED (v1.15.0)
 
-**What it is:** A platform-level Skills feature distinct from ZaiCoder
-Code's local `.zc/skills/*/SKILL.md` convention: ZaiCoder-provided
+**What it is:** A platform-level Skills feature distinct from zAICoder
+Code's local `.zc/skills/*/SKILL.md` convention: Anthropic-provided
 pre-built Skills (PowerPoint, Excel, Word, PDF generation/editing) plus
 custom Skills, referenced by `skill_id` in a Messages API request and
 loaded server-side with progressive disclosure (the model only pulls in
 skill content as needed rather than the whole thing up front).
 
 **Why it was a gap:** `zc_code.py`'s skill loader
-(`_load_skills_from_dir`) was real but was ZaiCoder Code's *local
+(`_load_skills_from_dir`) was real but was zAICoder's *local
 filesystem* convention — it reads a directory on the caller's machine and
 stuffs `SKILL.md` content into context itself. Nothing sent `skill_id` in
 a request, listed available Skills, or uploaded a custom Skill.
@@ -302,7 +302,7 @@ Skills endpoints and builds the `skill_id` container reference for a
 Messages request (`--skills-list`, `--skills-info ID`). The originally
 planned follow-up also shipped in the same cycle: `zc_excel.py` and
 `zc_powerpoint.py` gained `--excel-native` / `--pptx-native` flags
-that route through the ZaiCoder-maintained pre-built Skill instead of
+that route through the Anthropic-maintained pre-built Skill instead of
 the local pandas/openpyxl or python-pptx loop, with the hand-rolled
 implementation kept as the no-Skills-access fallback. See
 `tests/test_zc_skills_api.py` and `IMPLEMENTATION_CHECKLIST.md` Form 3.
@@ -384,18 +384,18 @@ beta header (in addition to `managed-agents-2026-04-01`).
 touched a `memory_stores` endpoint, and `create_session` never sent a
 `resources` param at all.
 
-**Why P1, not P2:** without it, every Managed Agents session in zcoder is
+**Why P1, not P2:** without it, every Managed Agents session in wire is
 necessarily stateless past the one throwaway session `cmd_managed_agent_run`
 creates — there's no supported way for a hosted agent's work to survive
 into a second session. That's a capability gap for the CLI's stated use
 case (multi-session agentic coding), not just an admin/reporting nicety.
 
-**Why this isn't a duplicate of existing "memory" features:** zcoder
+**Why this isn't a duplicate of existing "memory" features:** wire
 already has two other things called "memory" — `zc_memory.py`'s
-`memory_20250818` client-side tool, and ZaiCoder Code's local
+`memory_20250818` client-side tool, and zAICoder's local
 `.zc`/`MEMORY.md` auto-memory. Both are real, different features, not
 this one: the client-side tool requires the caller's own app to implement
-storage and is scoped to a single Messages API conversation; ZaiCoder Code's
+storage and is scoped to a single Messages API conversation; zAICoder's
 auto-memory never leaves the developer's machine. Managed Agents memory
 stores are the only one of the three that's ZaiCoder-hosted, versioned,
 and shared across a Managed Agents agent's sessions.
@@ -530,10 +530,10 @@ that the lead agent can "check back in with... mid-workflow." Building
 a faithful wrapper means designing how `zc_agents_sdk.py` exposes
 per-subagent model/prompt/tool configuration and multi-thread event
 handling, which is a meaningfully larger surface than the other three
-gaps closed this cycle, and zcoder doesn't yet have a concrete
+gaps closed this cycle, and wire doesn't yet have a concrete
 multi-subagent-in-one-session use case to build it against (the
 existing `--agent-orchestrate` already covers "decompose a goal into
-independent subtasks" for zcoder's actual usage patterns). Same
+independent subtasks" for wire's actual usage patterns). Same
 reasoning the Compliance API used between v1.15.0 and v1.16.0.
 
 **Exit condition:** revisit if there's an actual concrete need for
@@ -551,7 +551,7 @@ pattern.
 | 🟠 P1 | Context editing | ✅ Done v1.15.0 — wired existing `build_context_management()` into `zc_code.py` |
 | 🟠 P1 | Agent Skills API (`skill_id`) | ✅ Done v1.15.0 — plus the `--excel-native`/`--pptx-native` follow-up (v1.16.0) and `--docx-native`/`--pdf-native` (v1.33.0), closing out all four pre-built Skills |
 | 🟡 P2 | Usage and Cost API | ✅ Done v1.15.0 — folded into `zc_admin_api.py` |
-| 🟡 P2 | API key management | ✅ Done v1.15.0 — same module; no create-key (ZaiCoder doesn't expose one) |
+| 🟡 P2 | API key management | ✅ Done v1.15.0 — same module; no create-key (Anthropic doesn't expose one) |
 | 🟡 P2 | Compliance API | ✅ Done v1.16.0 — exit condition ("concrete request") was met |
 | 🟠 P1 | Mid-conversation system messages | ✅ Done v1.18.0 — new in `zc_cache.py`, Opus 4.8 only |
 | 🟡 P2 | Cache diagnostics CLI wiring | ✅ Done v1.18.0 — client support existed since ~v1.10.x, `--cache-diagnose` was the missing piece |
@@ -620,7 +620,7 @@ closed in this cycle — see `CHANGELOG.md` and
 
 Checked for false positives on the two other names in the tree that
 contain "memory" (`zc_memory.py`'s `memory_20250818` tool,
-ZaiCoder Code's local `MEMORY.md` auto-memory) before writing the gap —
+zAICoder's local `MEMORY.md` auto-memory) before writing the gap —
 neither implements the `memory_store` resource type or talks to a
 `memory_stores` endpoint, so this was not a case of the grep missing an
 existing implementation under a different name.
@@ -702,13 +702,13 @@ two findings — one regression, one gap — see `CHANGELOG.md` and
   `delete`) were never built beyond the `create`/`list` pair from
   v1.19.0/v1.24.0. Closed this cycle; memory *versions*
   (`list`/`retrieve`/`redact`) deliberately deferred as an
-  audit/compliance-shaped feature with no concrete zcoder use case yet
+  audit/compliance-shaped feature with no concrete wire use case yet
   — same reasoning pattern as the Compliance API (v1.15.0 → v1.16.0)
   and native Multiagent orchestration (v1.20.0 → still deferred).
 
 Also checked for drift (not just net-new features) per this cycle's
 methodology: `zc_models.py`'s catalog still matches the live Models
-overview exactly — no new releases since ZaiCoder Sonnet 5 (June 30,
+overview exactly — no new releases since zAICoder Sonnet 5 (June 30,
 2026). Two release notes since the last cycle were checked and
 confirmed non-gaps: API key expiration (July 8 — Console-only UI
 feature, not a new API parameter) and the CMEK content-preservation
@@ -726,8 +726,8 @@ implemented and tested, not just planned.
 ## Methodology note
 
 This audit was produced by fetching the live Features overview and API
-reference from `platform.zaicoder.com/docs` (checked 2026-07-08) and grepping
-the zcoder source tree for the concrete API surface of each feature —
+reference from `platform.zc.com/docs` (checked 2026-07-08) and grepping
+the wire source tree for the concrete API surface of each feature —
 parameter names (`fallbacks`, `skill_id`, `clear_tool_uses`, `diagnostics`,
 `role: "system"`), endpoint paths, and beta header strings — rather than
 trusting module docstrings or README changelog entries at face value.

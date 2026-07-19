@@ -66,7 +66,7 @@ New in `zc_models.py`, wired into `main.py`'s existing Models API
 group:
 
 ```
---upgrade-all PATH             Rewrite every known ZaiCoder model ID under PATH
+--upgrade-all PATH             Rewrite every known zAICoder model ID under PATH
                                 to --upgrade-target. Dry-run by default.
 --upgrade-target {fable5,opus} fable5 -> zc-fable-5 (default)
                                 opus   -> zc-opus-4-8

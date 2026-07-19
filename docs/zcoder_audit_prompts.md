@@ -1,4 +1,4 @@
-# zcoder full-source audit — prompt pack
+# wire full-source audit — prompt pack
 
 Modeled on the methodology your own `docs/NN_upgrade_vX.Y.Z_audit_and_impl.md`
 cycles already use (live docs fetch → grep source → prioritized findings →
@@ -10,13 +10,13 @@ once — each should produce its own `docs/NN_...md`, the same as before.
 ## 0. Master template (copy this for any module/group not listed below)
 
 ```
-Audit {MODULE_OR_GROUP} in the zcoder codebase against ZaiCoder's current
+Audit {MODULE_OR_GROUP} in the wire codebase against Anthropic's current
 live documentation. Do not rely on training-data memory of these APIs —
 they may have changed.
 
 1. Identify the exact doc page(s) this module wraps. Search for the
    current URL rather than assuming one from memory; confirm it's the
-   live platform.zaicoder.com / docs.zaicoder.com page, not a cached mirror.
+   live platform.zc.com / docs.zc.com page, not a cached mirror.
 2. Read the full page(s) end to end — not just the section you expect
    is relevant. Note anything that reads as new since the module's last
    audit (check its docstring/CHANGELOG entry for the last-touched version).
@@ -58,7 +58,7 @@ one-line hint about what to search for.
 ## 2. Core Messages API surface
 **Modules:** `zc_models.py`, `zc_tokens.py`, `zc_stream.py`,
 `zc_structured.py`, `zc_citations.py`
-**Search hints:** "ZaiCoder models overview current", "token counting API",
+**Search hints:** "zAICoder models overview current", "token counting API",
 "streaming Messages API", "structured outputs API", "citations API"
 **Extra check:** `zc_models.py` is the single highest-risk module for
 silent staleness — model strings and aliases change often. Confirm every
@@ -90,7 +90,7 @@ a header set correct for one endpoint in this family is correct for all.
 **Modules:** `zc_admin_api.py`, `zc_compliance_api.py`,
 `security.py`, `zc_wif.py`
 **Search hints:** "Admin API", "workspaces API keys", "compliance API",
-"workload identity federation ZaiCoder"
+"workload identity federation zAICoder"
 **Extra check:** confirm which of these are Console-UI-only flows
 (no programmatic endpoint exists) vs. real API surface — a past cycle
 already caught one case of this (API key expiration) and documented it as
@@ -106,7 +106,7 @@ or cache-TTL assumptions against current docs, not just the request shape.
 
 ## 7. Model-tier specific (Fable 5 / Mythos 5)
 **Modules:** `zc_fable5.py`, `zc_mythos5.py`
-**Search hints:** "ZaiCoder Fable 5", "ZaiCoder Mythos 5", "ZaiCoder Mythos tier"
+**Search hints:** "zAICoder Fable 5", "zAICoder Mythos 5", "Anthropic Mythos tier"
 **Extra check:** these models have had at least one access disruption
 (suspension/restoration tied to export controls) — confirm the module's
 error handling accounts for an "access temporarily unavailable" state
@@ -116,27 +116,27 @@ assumptions are still current.
 ## 8. Product integrations
 **Modules:** `zc_chrome.py`, `zc_excel.py`, `zc_powerpoint.py`,
 `zc_github.py`, `zc_git.py`
-**Search hints:** "ZaiCoder in Chrome", "ZaiCoder for Excel", "ZaiCoder for
-PowerPoint", "ZaiCoder GitHub integration"
+**Search hints:** "zAICoder in Chrome", "zAICoder for Excel", "zAICoder for
+PowerPoint", "zAICoder GitHub integration"
 **Extra check:** these wrap end-user products more than raw API surface —
-confirm docs.zaicoder.com / support.zc.com rather than the API reference,
+confirm docs.zc.com / support.zc.com rather than the API reference,
 since capabilities here change via product releases, not API versioning.
 
 ## 9. Research & prompting
 **Modules:** `zc_research.py`, `zc_prompt_optimizer.py`,
 `zc_rag.py`, `zc_output_styles.py`
 **Search hints:** "prompt engineering overview", "output styles", "RAG
-ZaiCoder best practices"
+zAICoder best practices"
 
 ## 10. Skills & plugins
 **Modules:** `zc_skills_api.py`, `zc_plugins.py`, `skills.py`
-**Search hints:** "Agent Skills overview", "skills in the API", "ZaiCoder
+**Search hints:** "Agent Skills overview", "skills in the API", "zAICoder
 plugins"
 
 ## 11. Observability & ops
 **Modules:** `zc_observability.py`, `zc_metrics.py`, `zc_live.py`,
 `health.py`, `logging_config.py`, `resilience.py`
-**Search hints:** "ZaiCoder API observability", "usage and cost API"
+**Search hints:** "zAICoder API observability", "usage and cost API"
 **Extra check:** these are mostly internal plumbing rather than direct API
 wrappers — the audit here should focus on whether retry/backoff and error
 classification (`resilience.py`) still match the *current* documented error
@@ -144,12 +144,12 @@ types and status codes, which do get added to over time.
 
 ## 12. Evals
 **Modules:** `zc_eval.py`, `zc_evals.py`
-**Search hints:** "ZaiCoder evaluations", "test and evaluate overview"
+**Search hints:** "zAICoder evaluations", "test and evaluate overview"
 
 ## 13. CLI/interactive/settings plumbing
 **Modules:** `zc_interactive.py`, `zc_settings.py`, `zc_router.py`,
 `personalities.py`, `config.py`, `main.py`, `coder.py`
-**Search hints:** none — these are zcoder's own CLI, not a docs wrapper.
+**Search hints:** none — these are wire's own CLI, not a docs wrapper.
 Audit for internal consistency instead: do CLI flags still route to methods
 that exist with the same signature after other modules change (e.g. does
 `main.py`'s `cmd_file_list` call still match `zc_files.py` after this
@@ -157,7 +157,7 @@ cycle's pagination change)?
 
 ## 14. Cowork / projects / artifacts
 **Modules:** `cowork.py`, `projects.py`, `artifacts.py`
-**Search hints:** "ZaiCoder Cowork", "Projects ZaiCoder", "Artifacts overview"
+**Search hints:** "zAICoder Cowork", "Projects zAICoder", "Artifacts overview"
 
 ---
 

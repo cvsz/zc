@@ -37,10 +37,10 @@ This project ships the following controls (see `security.py`,
   non-`https` schemes (`file://`, `javascript:`, `data:`, etc.) before a
   URL reaches any fetch/download code path.
 - **Input size limits** — `security.check_file_size()` / `MAX_FILE_SIZE_BYTES`
-  (default 25 MB, override via `ZCODER_MAX_FILE_SIZE_BYTES`) bound memory
+  (default 25 MB, override via `wire_MAX_FILE_SIZE_BYTES`) bound memory
   use from `--file`/`--file-upload` before any API call is made.
 - **Least-privilege container** — the Docker image runs as a non-root
-  `zcoder` user (see `Dockerfile`); config/cache are volume-mounted under
+  `wire` user (see `Dockerfile`); config/cache are volume-mounted under
   that user's home rather than baked into the image.
 - **No secrets in the image** — `.dockerignore` excludes `.env`, `.bak`
   files, and git history from the build context.
@@ -57,7 +57,7 @@ This project ships the following controls (see `security.py`,
 
 - **Local code execution**: this CLI does not execute model-generated
   code locally. `zc_sandbox.py` and `zc_code_exec.py` delegate to
-  ZaiCoder's hosted code-execution tool. If you extend this project to
+  Anthropic's hosted code-execution tool. If you extend this project to
   run generated code locally, that requires its own sandboxing (containers,
   seccomp, no network) which is *not* provided here.
 - **API key storage**: `~/.ai-coder-config.json` stores the key in plain

@@ -1,5 +1,5 @@
 """
-gRPC Service Implementation for Wire CLI-to-API Communication.
+gRPC Service Implementation for wire CLI-to-API Communication.
 Provides high-performance bidirectional streaming with Protobuf serialization.
 
 2026 Standards:
@@ -11,22 +11,24 @@ Provides high-performance bidirectional streaming with Protobuf serialization.
 
 import asyncio
 import time
-from typing import AsyncIterator, Optional, Dict, Any
+from collections.abc import AsyncIterator
+from concurrent import futures
 from pathlib import Path
+from typing import Any, Optional
+
 import grpc
 from grpc.aio import Server, ServicerContext
 
 # Import generated protobuf classes
 from app.proto import wire_pb2, wire_pb2_grpc
-
-from app.services.upload_manager import UploadManager
 from app.services.delta.sync_service import DeltaSyncService
+from app.services.upload_manager import UploadManager
 from app.telemetry.otel_service import get_telemetry
 
 
 class WireServiceServicer:
     """
-    gRPC service implementation for Wire CLI operations.
+    gRPC service implementation for wire CLI operations.
     
     Supports:
     - Unary RPC for simple requests (init, finalize)
@@ -45,7 +47,7 @@ class WireServiceServicer:
         self.telemetry = get_telemetry()
         
         # Active session tracking
-        self._active_sessions: Dict[str, Dict[str, Any]] = {}
+        self._active_sessions: dict[str, dict[str, Any]] = {}
     
     async def InitUpload(
         self,
@@ -61,28 +63,31 @@ class WireServiceServicer:
             total_size=request.total_size
         ) as span:
             try:
-                existing_hashes = set(request.existing_chunks)
+                existing_hashes: dict[int, str] = {}
                 
                 result = await self.upload_manager.init_upload(
                     file_id=request.file_id,
+                    file_name=getattr(request, 'file_name', request.file_id),
                     total_size=request.total_size,
-                    client_hashes=existing_hashes
+                    client_chunk_hashes=existing_hashes
                 )
                 
                 # Track session
-                self._active_sessions[result['session_id']] = {
+                self._active_sessions[result.session_id] = {
                     'file_id': request.file_id,
                     'started_at': time.time(),
                     'total_size': request.total_size,
-                    'chunks_received': 0
+                    'chunks_received': 0,
+                    'chunk_size': result.chunk_size,
+                    'total_chunks': (request.total_size + result.chunk_size - 1) // result.chunk_size if result.chunk_size else 1
                 }
                 
                 # Build response
-                response = wire_pb2.UploadInitResponse(
-                    upload_session_id=result['session_id'],
-                    missing_chunk_indices=result['missing_chunk_indices'],
-                    chunk_size=result['chunk_size'],
-                    estimated_transfer_bytes=len(result['missing_chunk_indices']) * result['chunk_size'],
+                response = wire_pb2.UploadInitResponse(  # type: ignore[attr-defined]
+                    upload_session_id=result.session_id,
+                    missing_chunk_indices=result.missing_chunks(),
+                    chunk_size=result.chunk_size,
+                    estimated_transfer_bytes=len(result.missing_chunks()) * result.chunk_size,
                     storage_endpoint=""  # Could be S3 presigned URL
                 )
                 
@@ -108,7 +113,7 @@ class WireServiceServicer:
             chunk_index=request.chunk_index
         ):
             try:
-                success = await self.upload_manager.process_chunk(
+                success = await self.upload_manager.upload_chunk(
                     session_id=request.session_id,
                     chunk_index=request.chunk_index,
                     data=request.data,
@@ -124,14 +129,14 @@ class WireServiceServicer:
                     total_chunks = session.get('total_chunks', 1)
                     progress = (session['chunks_received'] / total_chunks) * 100
                     
-                    response = wire_pb2.ChunkUploadResponse(
+                    response = wire_pb2.ChunkUploadResponse(  # type: ignore[attr-defined]
                         success=success,
                         chunk_storage_key=f"chunk_{request.chunk_index}",
                         bytes_received=len(request.data),
                         progress_percent=progress
                     )
                 else:
-                    response = wire_pb2.ChunkUploadResponse(
+                    response = wire_pb2.ChunkUploadResponse(  # type: ignore[attr-defined]
                         success=False,
                         chunk_storage_key="",
                         bytes_received=0,
@@ -166,15 +171,12 @@ class WireServiceServicer:
                 break
             
             # Check if upload is complete
-            redis_progress = await self.upload_manager.redis.hget(
-                f"progress:{session_id}", "received_chunks"
-            )
+            chunks_received = session.get('chunks_received', 0)
             
-            if redis_progress:
-                chunks_received = int(redis_progress)
+            if True:
                 total_size = session['total_size']
-                chunk_size = self.upload_manager.chunk_size
-                total_chunks = (total_size + chunk_size - 1) // chunk_size
+                chunk_size = session.get('chunk_size', 1024 * 1024)
+                total_chunks = session.get('total_chunks', 1)
                 
                 bytes_transferred = chunks_received * chunk_size
                 percent_complete = (chunks_received / total_chunks) * 100
@@ -185,7 +187,7 @@ class WireServiceServicer:
                 remaining_bytes = total_size - bytes_transferred
                 eta_seconds = (remaining_bytes / transfer_rate / 1_000_000) if transfer_rate > 0 else 0
                 
-                yield wire_pb2.UploadProgressStream(
+                yield wire_pb2.UploadProgressStream(  # type: ignore[attr-defined]
                     session_id=session_id,
                     percent_complete=percent_complete,
                     bytes_transferred=bytes_transferred,
@@ -234,7 +236,7 @@ class WireServiceServicer:
                 # Record metrics
                 self.telemetry.record_delta_savings(bytes_saved)
                 
-                return wire_pb2.DeltaSyncResponse(
+                return wire_pb2.DeltaSyncResponse(  # type: ignore[attr-defined]
                     success=True,
                     new_version_hash=stored_hash,
                     bytes_saved=bytes_saved,
@@ -257,7 +259,7 @@ class WireServiceServicer:
         
         uptime = time.time() - psutil.Process().create_time()
         
-        return wire_pb2.HealthCheckResponse(
+        return wire_pb2.HealthCheckResponse(  # type: ignore[attr-defined]
             status="healthy",
             version="2026.1.0",
             uptime_seconds=int(uptime),
@@ -291,7 +293,6 @@ async def create_grpc_server(
     Returns:
         Configured gRPC aio server
     """
-    from app.proto import wire_pb2_grpc
     
     # Create server with optimization options
     options = [
@@ -325,13 +326,13 @@ async def create_grpc_server(
 
 async def run_grpc_server(host: str = "0.0.0.0", port: int = 50051):
     """Run gRPC server until shutdown signal."""
-    from app.core.config import settings
+    from app.core.config import get_config
     
     server = await create_grpc_server(
         host=host,
         port=port,
         upload_manager=UploadManager(),
-        delta_service=DeltaSyncService(Path(settings.STORAGE_PATH))
+        delta_service=DeltaSyncService(get_config().upload_temp_dir)
     )
     
     await server.start()

@@ -8,7 +8,7 @@ this release; see "v1.12.0" below for exactly what came from where.
 
 ## Unreleased — post-v1.33.0 audit fixes
 
-External audit of v1.33.0 plus a fresh pass against platform.zaicoder.com/docs
+External audit of v1.33.0 plus a fresh pass against platform.zc.com/docs
 turned up one real functional bug and one time-sensitive model-catalog gap;
 both fixed here rather than just logged, since they were small and precisely
 scoped:
@@ -26,15 +26,15 @@ scoped:
   `tests/test_zc_code_slash_compact.py`.
 - **`zc_models.py` gets an "upcoming retirement" lane**, separate from
   `RETIRED_MODELS` (which only holds models that have already stopped
-  working). First entry: `zc-mythos-preview`, which retires 2026-07-21
-  per platform.zaicoder.com/docs/en/about-zc/model-deprecations — wired
+  working). First entry: `claude-mythos-preview`, which retires 2026-07-21
+  per platform.zc.com/docs/en/about-zc/model-deprecations — wired
   into `cmd_model_info()` alongside the existing `check_retired()` check so
   it's actually surfaced, not just recorded.
 
 ## v1.33.0 — `--docx-native` / `--pdf-native`: the last two pre-built Skills get a CLI path
 
 `zc_skills_api.py`'s `PREBUILT_SKILLS` has listed all four
-ZaiCoder-maintained Skills (pptx, xlsx, docx, pdf) since v1.15.0, but
+Anthropic-maintained Skills (pptx, xlsx, docx, pdf) since v1.15.0, but
 only pptx/xlsx got native routing (v1.16.0, `--pptx-native` /
 `--excel-native`). docx and pdf sat fully documented in `--skills-list`
 output with zero CLI access for seventeen releases. Closed this cycle
@@ -142,10 +142,10 @@ every environment).
 ## v1.30.0 — Extended thinking gap-audit: adaptive/effort routing was broken on 5 of 9 catalog models
 
 Re-ran the docs gap-audit methodology against
-`platform.zaicoder.com/docs/en/build-with-zc/extended-thinking` and
+`platform.zc.com/docs/en/build-with-zc/extended-thinking` and
 `.../adaptive-thinking` directly. Finding: `zc_thinking.py`'s
 `--thinking` always sent manual `thinking.type="enabled"` +
-`budget_tokens`, which is a **400 error** on ZaiCoder Opus 4.8, Opus 4.7,
+`budget_tokens`, which is a **400 error** on zAICoder Opus 4.8, Opus 4.7,
 Sonnet 5, Fable 5, Mythos 5, and Mythos Preview (5 of 9 models in
 `zc_models.MODEL_CATALOG`), and **deprecated** on Opus 4.6/Sonnet
 4.6. The `--adaptive` flag didn't fix this either: it sent
@@ -174,13 +174,13 @@ at all.
   instead of a traceback.
 - **`zc_structured.py`** — removed the unconditional
   `structured-outputs-2025-11-13` beta header (structured outputs went
-  GA on the ZaiCoder API January 29, 2026 — "no beta header required")
+  GA on the zAICoder API January 29, 2026 — "no beta header required")
   and the dead, unreferenced `BETA = "output-128k-2025-02-19"` class
   attribute. No behavioral change — `output_config.format` was already
   correct.
 - **Explicitly not implemented**: an "Xhigh" effort level a third-party
-  (non-ZaiCoder) blog claimed exists between "high" and "max" on Opus
-  4.7/4.8. The official `platform.zaicoder.com/docs/en/build-with-zc/effort`
+  (non-Anthropic) blog claimed exists between "high" and "max" on Opus
+  4.7/4.8. The official `platform.zc.com/docs/en/build-with-zc/effort`
   page lists only `low | medium | high (default) | max` — unconfirmed
   against the primary source, so not added.
 - **Tests** — `tests/test_zc_thinking.py` rewritten (routing matrix,
@@ -431,7 +431,7 @@ closed in this release — full detail in `docs/31_upgrade_v1.18.0.md`.
 
 **Mid-conversation system messages** (new, genuinely missing): Opus
 4.8-only feature that lets you append a `role: "system"` message partway
-through a conversation to update ZaiCoder's instructions without touching
+through a conversation to update zAICoder's instructions without touching
 the top-level `system` field — so the cached prefix that came before it
 stays intact. Added to `zc_cache.py`: `build_mid_system_message()`,
 `validate_system_message_placement()` (encodes all five documented
@@ -465,7 +465,7 @@ independent of the two feature gaps above.
 Closes the gap `ARCHITECTURE.md` had flagged since it was written:
 `resilience.retry()` / `CircuitBreaker` was only used by `coder.py`.
 Audited every module for raw `urllib` calls (as opposed to going through
-the `zc` SDK client, which already retries internally) and found
+the `anthropic` SDK client, which already retries internally) and found
 19, not the SDK-based `zc_batch.py`/`zc_rag.py` sometimes lumped
 in with them, plus one the earlier audit missed entirely: `cowork.py`.
 
@@ -506,7 +506,7 @@ compliance-errors contract exactly (see `docs/30_upgrade_v1.16.0.md`).
 ## v1.15.0 — Roadmap gap-audit implementation
 
 Implements the five buildable items from `ROADMAP.md`'s gap audit against
-platform.zaicoder.com/docs (checked 2026-07-04); the sixth (Compliance API)
+platform.zc.com/docs (checked 2026-07-04); the sixth (Compliance API)
 stays a documented gap per the roadmap's own recommendation. See
 `docs/29_upgrade_v1.15.0.md` for the full write-up and `CHECKLIST.md` for
 the itemized task list this release closes out.
@@ -565,15 +565,15 @@ See `docs/26_upgrade_v1.12.1.md` for full detail.
 - Fixed `coder.py`'s `Coder.generate()` silently mishandling responses from
   thinking-capable models (Sonnet 5, Opus 4.8, Fable 5/Mythos 5) and any
   multi-text-block response — was reading only `content[0]["text"]`.
-- Wired three previously dead-on-arrival CLI flags: `--skill`, `--agent`
+- wired three previously dead-on-arrival CLI flags: `--skill`, `--agent`
   (accepted, never read anywhere), and `--cache-stats` (accepted, but
   `--cache` always showed stats regardless of it).
 - Added `--personality` / `--list-personalities`, exposing `personalities.py`'s
   `PersonalityManager`, which was fully implemented and already wired into
   `Coder.__init__` but unreachable from the CLI.
 - **New:** `--upgrade-all PATH [--upgrade-target fable5|opus] [--upgrade-yes]
-  [--upgrade-no-backup]` — bulk-rewrites every known ZaiCoder model ID under a
-  file or directory to ZaiCoder Fable 5 or ZaiCoder Opus 4.8. Dry-run by
+  [--upgrade-no-backup]` — bulk-rewrites every known zAICoder model ID under a
+  file or directory to zAICoder Fable 5 or zAICoder Opus 4.8. Dry-run by
   default; writes `.bak` backups on apply. Distinct from the existing
   `--check-deprecated` (report-only, retired IDs only).
 
@@ -587,10 +587,10 @@ Packaging-only release. No API/functional changes from v1.11.1.
   no local Python required), `setup.sh` / `setup.bat` (venv + `.env` setup
   for running from source), `ai-coder.spec`, `LICENSE` (MIT).
 - Added `.env.example` (referenced by `setup.sh`/`setup.bat` but missing
-  from both source projects) documenting `ZC_API_KEY` (required),
+  from both source projects) documenting `ANTHROPIC_API_KEY` (required),
   `VOYAGE_API_KEY` (optional, `zc_embeddings.py`), `GITHUB_TOKEN`
   (optional, `zc_github.py`).
-- `requirements.txt`: bumped minimum `zc` SDK to `>=0.75.0`,
+- `requirements.txt`: bumped minimum `anthropic` SDK to `>=0.75.0`,
   required for `client.beta.agents/.environments/.sessions`
   (`--agent-managed-run`, see `zc_agents_sdk.ManagedAgentsClient`).
 - Everything else in `ai-coder-cli-v2` (`coder.py`, `config.py`, `utils.py`,
@@ -621,6 +621,6 @@ See `docs/*_upgrade_*.md` for the full per-release history, starting from
   fine-grained tool streaming, `stop_details` on refusals.
 - **v1.10.x**: native memory tool, context editing, tool search tool,
   full model catalog + retired-model registry, verified pricing.
-- **v1.9.x – v1.0**: ZaiCoder Code / Agent SDK, Cowork, plugins, output
+- **v1.9.x – v1.0**: zAICoder / Agent SDK, Cowork, plugins, output
   styles, sandbox, RAG, evals, batch API, prompt caching, vision, and the
   rest of the modular `zc_*.py` feature set.

@@ -27,7 +27,7 @@ models that are superseded but still respond to API calls (Opus
   structured outputs) instead of only ID/name/context/created-date.
 
 **Pricing corrections** (verified against
-platform.zaicoder.com/docs/en/about-zc/models/overview,
+platform.zc.com/docs/en/about-zc/models/overview,
 2026-07-02) in `zc_cost_optimizer.py`, `zc_metrics.py`, and
 `zc_tokens.py`:
 

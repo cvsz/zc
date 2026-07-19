@@ -2,8 +2,8 @@
 
 **Scope:** `zc_files.py` and the Files-API integration point in
 `zc_code_exec.py`, re-audited end to end against a live fetch of
-`platform.zaicoder.com/docs/en/build-with-zc/files` and
-`platform.zaicoder.com/docs/en/agents-and-tools/tool-use/code-execution-tool`
+`platform.zc.com/docs/en/build-with-zc/files` and
+`platform.zc.com/docs/en/agents-and-tools/tool-use/code-execution-tool`
 (fetched July 13, 2026), not against cached notes from prior cycles.
 
 ## Finding 1 — Files fed to the code execution tool used the wrong block type (🔴 P0)
@@ -16,14 +16,14 @@ content.append({"type": "document", "source": {"type": "file", "file_id": fid}})
 The docs' File type → Content block table is explicit that `container_upload`
 is the block type for anything meant to go *into the sandbox's filesystem*
 for Python/Bash to open (datasets, CSVs, spreadsheets, images to process
-programmatically) — `document` is for PDFs/text ZaiCoder reads directly in
+programmatically) — `document` is for PDFs/text zAICoder reads directly in
 the conversation turn. The code execution tool's own docs show the intended
 shape:
 ```python
 {"type": "container_upload", "file_id": file_object.id}
 ```
 
-**Why it was a gap:** `zc_code_exec.py` is zcoder's only call site that
+**Why it was a gap:** `zc_code_exec.py` is wire's only call site that
 attaches files to a code-execution request, and it predates this project's
 adoption of the Files API in `zc_files.py`; nothing in the two modules'
 overlap was re-checked when `container_upload` was documented. A grep for
@@ -32,7 +32,7 @@ cycle.
 
 **Impact:** every `--code-exec` (or programmatic `execute(file_ids=...)`)
 call that attached a file was not actually placing that file on the
-sandbox's disk. ZaiCoder could only work from whatever it inferred about the
+sandbox's disk. zAICoder could only work from whatever it inferred about the
 file from the `document` block's own (limited, non-code-execution) reading
 of it — a silent correctness bug for exactly the workflow (analyze a
 CSV/Excel file with real code) this file's own module docstring advertises
@@ -85,7 +85,7 @@ common case of a garbage path or an oversized file.
 
 **What it is:** `downloadable` is `false` for every file *you* upload —
 only Skills- or code-execution-created files are downloadable. Since
-zcoder's `--file-download` command has no other purpose than fetching
+wire's `--file-download` command has no other purpose than fetching
 your own uploads back, the *only* files a user would ever pass to it are
 categorically un-downloadable, and the old code always made the network
 call anyway, surfacing whatever raw error string the API happened to
@@ -105,7 +105,7 @@ server-side.
 `document` blocks. There was no way to ask a question about a file that
 needs the code execution tool (CSV/XLSX analysis, chart generation) through
 this method — `zc_code_exec.py` is a separate module with its own
-(buggy, see Finding 1) path, so zcoder had two disconnected code paths for
+(buggy, see Finding 1) path, so wire had two disconnected code paths for
 "do something with an uploaded file" instead of one that covers the whole
 File type → Content block table.
 
@@ -128,14 +128,14 @@ tool, matching the docs' worked example for analyzing an uploaded CSV.
   this is a server-side property, not something `zc_files.py` needs to
   model.
 - **ZDR eligibility** — the Files API is explicitly *not* ZDR-eligible.
-  Nothing in zcoder claims otherwise; no change needed.
-- **Bedrock / Vertex AI** — Files API isn't available on either. zcoder
+  Nothing in wire claims otherwise; no change needed.
+- **Bedrock / Vertex AI** — Files API isn't available on either. wire
   doesn't target those platforms for this module; no change needed.
 
 ## Methodology note
 
-Confirmed via a live fetch of `platform.zaicoder.com/docs/en/build-with-zc/files`
-and `platform.zaicoder.com/docs/en/agents-and-tools/tool-use/code-execution-tool`
+Confirmed via a live fetch of `platform.zc.com/docs/en/build-with-zc/files`
+and `platform.zc.com/docs/en/agents-and-tools/tool-use/code-execution-tool`
 (not cached from a previous cycle), then grepping the source tree for
 `container_upload`, `"type": "document"`, and `list_files(` to find every
 call site touched by the File type → Content block table, rather than

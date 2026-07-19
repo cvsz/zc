@@ -1,7 +1,7 @@
 """tests/test_utils.py"""
 import pytest
 
-from utils import sampling_kwargs, format_code_block, wrap_text
+from wire.utils import format_code_block, sampling_kwargs, wrap_text
 
 
 @pytest.mark.parametrize("model", [

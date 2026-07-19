@@ -23,11 +23,10 @@ jobs:
       
       - name: Install dependencies
         run: |
-          pip install -r requirements-enterprise.txt
-          pip install pytest pytest-async pytest-cov
+          pip install -r requirements.txt -r requirements-dev.txt
       
       - name: Run unit tests
-        run: pytest tests/unit -v --cov=app --cov-report=xml
+        run: pytest tests -v --cov=wire --cov-report=xml
       
       - name: Upload coverage
         uses: codecov/codecov-action@v4

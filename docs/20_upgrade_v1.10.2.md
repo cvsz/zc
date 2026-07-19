@@ -24,7 +24,7 @@ current lineup:
 Files touched: `zc_models.py` (offline fallback list — deduped
 from 7 entries with 3 near-identical Opus rows down to 5 real ones),
 `zc_cost_optimizer.py` and `zc_metrics.py` (pricing tables —
-same dedup, `zc_metrics.py` also gained a `zc-mythos-5` row it
+same dedup, `zc_metrics.py` also gained a `claude-mythos-5` row it
 was missing), `zc_tokens.py` (cost-estimate table — filled in the
 previously-absent Fable 5 / Mythos 5 rows), `main.py` (`--model`
 default and `_model()` fallback), and every `zc_*.py` module that
@@ -45,12 +45,12 @@ problem in bug reports written after the fact.
 - `zc-mythos-5`'s access-gating behavior (`MythosAccessError` on
   403/404) — still correct, unrelated to the ID cleanup.
 - Actual USD pricing figures — these were already flagged as "ballpark
-  only, verify against platform.zaicoder.com/docs" in every table that
+  only, verify against platform.zc.com/docs" in every table that
   has them, and this release didn't have a way to re-verify live
   pricing, so the numbers are carried over unchanged.
 - The Mythos-tier *chat* model info in this doc set is scoped to what
   the API-facing modules need (Fable 5 / Mythos 5). This CLI has no
-  module for the not-yet-public `ZaiCoder Mythos Preview`
+  module for the not-yet-public `zAICoder Mythos Preview`
   (Project Glasswing) since it isn't reachable via the standard
   Messages API this CLI wraps.
 
