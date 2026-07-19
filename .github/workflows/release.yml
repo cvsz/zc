@@ -37,17 +37,17 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.9", "3.12"]  # floor + ceiling of requires-python
+        python-version: ["3.11", "3.12"]  # floor + ceiling of requires-python
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - run: pip install -r requirements-dev.txt
+      - run: pip install -r requirements-dev.txt -r webapp/requirements-web.txt
       - run: ruff check .
-      - run: black --check .
+      - run: black --check src app webapp scripts tests google ./*.py
       - run: mypy . --ignore-missing-imports
-      - run: bandit -r . -ll -x ./tests,./build,./dist
+      - run: bandit -r src app webapp scripts ./*.py -ll -x tests
       - run: pytest --cov --cov-report=term-missing
 
   publish-image:

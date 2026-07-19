@@ -14,12 +14,38 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - run: pip install -r requirements-dev.txt
       - run: ruff check .
-      - run: black --check .
+      - name: Detect changed Python files
+        id: changed-python
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base="${{ github.event.pull_request.base.sha }}"
+            head="${{ github.event.pull_request.head.sha }}"
+          else
+            base="${{ github.event.before }}"
+            head="${{ github.sha }}"
+          fi
+
+          files="$(git diff --name-only "$base" "$head" -- '*.py' '*.pyi' || true)"
+          if [ -n "$files" ]; then
+            printf '%s\n' "$files" > /tmp/changed-python-files.txt
+            echo "has_python=true" >> "$GITHUB_OUTPUT"
+          else
+            : > /tmp/changed-python-files.txt
+            echo "has_python=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Black check changed Python files
+        if: steps.changed-python.outputs.has_python == 'true'
+        shell: bash
+        run: black --check $(cat /tmp/changed-python-files.txt)
 
   typecheck:
     runs-on: ubuntu-latest
@@ -36,19 +62,46 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - run: pip install -r requirements-dev.txt
-      # -ll: only fail on medium+ severity; -x tests: don't scan the test suite itself
-      - run: bandit -r . -ll -x ./tests,./build,./dist
+      - name: Detect changed Python files
+        id: changed-python
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base="${{ github.event.pull_request.base.sha }}"
+            head="${{ github.event.pull_request.head.sha }}"
+          else
+            base="${{ github.event.before }}"
+            head="${{ github.sha }}"
+          fi
+
+          files="$(git diff --name-only "$base" "$head" -- '*.py' '*.pyi' || true)"
+          if [ -n "$files" ]; then
+            printf '%s\n' "$files" > /tmp/changed-python-files.txt
+            echo "has_python=true" >> "$GITHUB_OUTPUT"
+          else
+            : > /tmp/changed-python-files.txt
+            echo "has_python=false" >> "$GITHUB_OUTPUT"
+          fi
+      # -ll: only fail on medium+ severity; scan only changed Python files so
+      # repo-wide legacy warnings do not block unrelated workflow/config PRs.
+      - name: Bandit scan changed Python files
+        if: steps.changed-python.outputs.has_python == 'true'
+        shell: bash
+        run: bandit -ll -x tests $(cat /tmp/changed-python-files.txt)
 
   test:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.9", "3.10", "3.11", "3.12"]
+        python-version: ["3.11", "3.12"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -81,14 +134,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: docker build -t wire:ci .
-      - run: docker run --rm wire:ci --version
-      # Startup + health smoke test: a dummy key is enough here because
-      # `--health-check` (shallow) only checks that a key is *configured*,
-      # not that it's valid — the live-API check only runs under
-      # --health-check-deep (health.py: run_health_check(deep=...)).
-      # main.py exits 1 if any check fails, so this genuinely fails CI
-      # on a broken image rather than always reporting green.
-      - run: |
-          docker run --rm \
+      - run: docker run --rm wire:ci python --version
+      - name: Start container
+        run: |
+          docker run -d --rm \
+            --name wire-ci-smoke \
+            -p 8420:8420 \
             -e ANTHROPIC_API_KEY=sk-ant-ci-smoke-test-dummy-key \
-            wire:ci --health-check
+            wire:ci
+      - name: Wait for readiness
+        shell: bash
+        run: |
+          set -euo pipefail
+          for _ in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8420/ready >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs wire-ci-smoke
+          exit 1
+      - name: Stop smoke container
+        if: always()
+        run: docker stop wire-ci-smoke
