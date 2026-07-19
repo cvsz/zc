@@ -1,67 +1,86 @@
 # Quickstart
 
+This guide covers the verified FastAPI runtime on the current branch. The repository also contains CLI-oriented and agent modules, but the installed `zc`/`zcoder` console-script entry points require correction before they should be treated as a supported installation path.
+
+## Prerequisites
+
+- Python 3.11 or 3.12
+- `pip`
+- Redis only when Redis-backed features are enabled
+- Docker only for the container workflow
+
 ## Run from source
 
 ```bash
-./setup.sh              # macOS/Linux — creates venv, installs deps, makes .env
-# or setup.bat on Windows
-
-# edit .env and set ZC_API_KEY
-
-source venv/bin/activate
-python main.py -p "Write a function to reverse a string"
+python3.11 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -r requirements-enterprise.txt
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
-## Build a standalone executable
+Windows PowerShell activation:
 
-No local Python needed to *run* the result — only to build it:
+```powershell
+py -3.11 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -r requirements-enterprise.txt
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+## Verify the service
 
 ```bash
-./build.sh               # macOS/Linux — produces dist/ai-coder
-# or build.bat on Windows — produces dist\ai-coder.exe
-
-export ZC_API_KEY=sk-ant-...
-./dist/ai-coder -p "Create a Flask REST API"
+curl -fsS http://127.0.0.1:8000/ready
+curl -fsS http://127.0.0.1:8000/v1/wire/health/live
 ```
 
-## A few places to start
+Expected readiness response:
+
+```json
+{"status":"ready"}
+```
+
+The OpenAPI UI is exposed at `http://127.0.0.1:8000/docs` only when debug configuration enables documentation endpoints.
+
+## Development checks
 
 ```bash
-# Basic generation
-python main.py -p "Write a Python function to reverse a string"
-
-# Analyze a file
-python main.py -f mycode.py -p "Explain this and suggest improvements"
-
-# List every server tool, and the newer per-tool features (Tool Use
-# Examples, Programmatic Tool Calling, task budgets, compaction)
-python main.py --list-server-tools
-
-# Agentic tool loop
-python main.py --tool-agent -p "Find and fix the bug in app.py"
-
-# Native memory tool (persists across runs, in ~/.ai-coder/memory)
-python main.py --memory-agent "Remember that this project uses pytest"
-
-# Advisor tool — a stronger model consulted mid-generation
-python main.py --advisor "Refactor auth.py to use JWT, then write tests"
-
-# Real hosted zAICoder Managed Agents (cloud sandbox, not local)
-python main.py --agent-managed-run "Set up a FastAPI project with tests"
-
-# Embeddings (needs VOYAGE_API_KEY — see .env.example)
-python main.py --embed-similarity "cat" "kitten"
-
-# Everything else
-python main.py --help
+python -m pip install -r requirements-dev.txt
+ruff check .
+mypy . --ignore-missing-imports
+pytest --ignore=tests/test_webapp_server.py --cov --cov-report=term-missing
 ```
 
-If you have an Admin API key or Compliance Access Key (org-level,
-different from a regular `ZC_API_KEY`), `--usage-report`,
-`--admin-list-keys`, and `--compliance-activities` are the entry points
-into that surface — see `README.md`'s "New in v1.15.0" / "New in
-v1.16.0" sections before using them, since a few of those flags
-(`--compliance-*-delete`) are permanent, org-wide deletes.
+Run the web application tests with their additional dependencies:
 
-See `README.md` for the full feature list and `docs/` for the detailed,
-dated history of what was added, changed, or fixed in each release.
+```bash
+python -m pip install -r webapp/requirements-web.txt httpx
+pytest tests/test_webapp_server.py -v
+```
+
+## Docker
+
+```bash
+docker build -t zcoder:local .
+docker run --rm --name zcoder-local -p 8000:8000 zcoder:local
+```
+
+In another terminal:
+
+```bash
+curl -fsS http://127.0.0.1:8000/v1/wire/health/live
+```
+
+## Configuration
+
+Configuration is resolved by `app.core.config`. Keep secrets out of source control and inject them through environment variables or the deployment secret manager.
+
+Before enabling Redis, gRPC, external providers, or production CORS, review the applicable configuration module and deployment profile. Startup currently tolerates initialization failure for several components, so `/ready` should not yet be interpreted as proof that every optional integration is healthy.
+
+## Known limitation
+
+`setup.cfg` currently maps the installed commands `zc` and `zcoder` to `app.main:cli`, while the audited module does not define that function. Use the Uvicorn command above for the verified API workflow until the console entry point is repaired and covered by an installation smoke test.
+
+For findings, risk priorities, and the remediation plan, see [Repository Audit — 2026-07-20](docs/REPOSITORY_AUDIT_2026-07-20.md).
