@@ -54,7 +54,11 @@ from wire.personalities import PersonalityManager
 from wire.skills import SkillManager
 from wire.tui_streaming import StreamRenderGate
 
-DEFAULT_MODEL = "claude-sonnet-5"
+def _default_model() -> str:
+    for model_id, info in MODEL_CATALOG.items():
+        if info.get("tier") == "current":
+            return model_id
+    return next(iter(MODEL_CATALOG))
 
 
 def _agent_prompts() -> dict:
@@ -105,7 +109,7 @@ class SessionSidebar(Vertical):
         ]
 
         yield Label("model", classes="side-label")
-        yield Select(model_options, value=DEFAULT_MODEL, id="model_select")
+        yield Select(model_options, value=_default_model(), id="model_select")
         yield Label("personality", classes="side-label")
         yield Select(personality_options, value="", id="personality_select")
         yield Label("agent role", classes="side-label")
@@ -235,7 +239,7 @@ class wireTUI(App):
         transcript.mount(ChatMessage("user", text))
         transcript.scroll_end(animate=False)
 
-        model = self._selected("model_select") or DEFAULT_MODEL
+        model = self._selected("model_select") or _default_model()
         system = self._build_system_prompt()
         temperature = self._temperature()
         streaming = self.query_one("#stream_switch", Switch).value

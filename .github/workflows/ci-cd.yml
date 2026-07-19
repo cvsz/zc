@@ -23,7 +23,7 @@ jobs:
       
       - name: Install dependencies
         run: |
-          pip install -r requirements.txt -r requirements-dev.txt
+          pip install -r requirements.txt -r requirements-dev.txt -r webapp/requirements-web.txt
       
       - name: Run unit tests
         run: pytest tests -v --cov=wire --cov-report=xml
