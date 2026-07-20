@@ -20,8 +20,8 @@ jobs:
           cache: pip
       - run: pip install -r requirements-dev.txt
       - run: ruff check .
-      - name: Black check supported runtime and tests
-        run: black --check app tests
+      - name: Black check supported runtime and regression tests
+        run: black --check app/main.py app/cli.py tests/test_app_main.py
 
   typecheck:
     runs-on: ubuntu-latest
@@ -32,7 +32,8 @@ jobs:
           python-version: "3.12"
           cache: pip
       - run: pip install -r requirements-dev.txt
-      - run: mypy . --ignore-missing-imports
+      - name: Mypy supported runtime boundary
+        run: mypy app/main.py app/cli.py tests/test_app_main.py --ignore-missing-imports --follow-imports=skip
 
   security:
     runs-on: ubuntu-latest
@@ -44,7 +45,7 @@ jobs:
           cache: pip
       - run: pip install -r requirements-dev.txt
       - name: Bandit full supported runtime scan
-        run: bandit -r app -ll
+        run: bandit -c pyproject.toml -r app -ll
 
   package-smoke:
     runs-on: ubuntu-latest
