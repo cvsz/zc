@@ -1,46 +1,41 @@
 FROM python:3.11-slim-bookworm
 
-# Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    APP_NAME=zcoder \
+    APP_VERSION=1.33.0 \
+    API_HOST=0.0.0.0 \
+    API_PORT=8000 \
+    REDIS_ENABLED=false \
+    PROTOBUF_ENABLED=false \
+    NATS_ENABLED=false \
+    OTEL_ENABLED=false
 
-# Create non-root user for security
 RUN groupadd --gid 1000 appgroup && \
-    useradd --uid 1000 --gid appgroup --shell /bin/bash --create-home appuser
+    useradd --uid 1000 --gid appgroup --shell /usr/sbin/nologin --create-home appuser
 
 WORKDIR /app
 
-# Install system dependencies
 RUN apt-get update && \
-    apt-get upgrade -y && \
-    apt-get install -y --no-install-recommends \
-    curl && \
+    apt-get install -y --no-install-recommends curl && \
     rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first for better caching
-COPY requirements-enterprise.txt .
-RUN pip install --no-cache-dir -r requirements-enterprise.txt
+COPY requirements-enterprise.txt ./
+RUN python -m pip install --no-cache-dir -r requirements-enterprise.txt
 
-# Copy application code
 COPY app/ ./app/
-COPY AGENTS.md .
-COPY README.md .
+COPY AGENTS.md README.md ./
 
-# Create necessary directories with proper permissions
-RUN mkdir -p /app/data/uploads /app/logs && \
-    chown -R appuser:appgroup /app
+RUN mkdir -p /app/data/uploads /app/logs /tmp/uploads && \
+    chown -R appuser:appgroup /app /tmp/uploads
 
-# Switch to non-root user
 USER appuser
 
-# Expose ports
-EXPOSE 8000 9090
+EXPOSE 8000 8001
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/v1/wire/health/live || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+    CMD curl -fsS http://127.0.0.1:8000/ready || exit 1
 
-# Run the application
 CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
