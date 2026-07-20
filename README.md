@@ -1,284 +1,122 @@
-# wire Enterprise CLI-to-API System
+# zcoder
 
-## Enterprise-Grade Production-Ready Implementation (2026 Standards)
+`zcoder` 1.33.0 is a Python 3.11+ repository containing a FastAPI API service, installed `zc`/`zcoder` server commands, web components, tests, container packaging, and additional agent and enterprise integration modules.
 
-A highly optimized, full-stack system for wire CLI-to-API workflows with advanced file uploads, real-time control panel, and enterprise resiliency patterns.
+Historical modules and documents may still use the legacy names `wire` or `wire-enterprise`. The canonical distribution and runtime identity for the supported API surface is `zcoder`; existing `/v1/wire` routes remain unchanged for backward compatibility.
 
-## 🚀 Features
+## Verified runtime contract
 
-### Phase 1: Core Infrastructure ✅
-- Multi-layer Redis caching with circuit breaker
-- High-performance async HTTP client
-- Chunked file upload service (4MB chunks)
-- Content-addressable storage with BLAKE3 hashing
-- Real-time progress tracking
+- Distribution: `zcoder==1.33.0`
+- Console aliases: `zc`, `zcoder`
+- FastAPI application: `app.main:app`
+- Default HTTP port: `8000`
+- Readiness: `GET /ready`
+- Liveness: `GET /v1/wire/health/live`
+- Supported Python: 3.11 and 3.12
+- Container user: non-root
+- CI: Ruff, Black, mypy, full `app/` Bandit scan, package-install smoke tests, pytest, CodeQL, and Docker smoke tests
 
-### Phase 2: CLI-to-API Optimization ✅
-- Protocol Buffers serialization (7.5x faster than JSON)
-- gRPC service implementation
-- Delta synchronization (125x bandwidth reduction)
-- OpenTelemetry distributed tracing
-- Real-time streaming support
+Historical phase-completion reports and benchmark tables are point-in-time records. Reproduce benchmarks before using numerical performance claims for sizing or service-level objectives.
 
-### Phase 3: Control Panel & Resiliency ✅
-- GraphQL API with subscriptions
-- WebSocket real-time metrics streaming
-- Token bucket rate limiting
-- Circuit breaker pattern
-- Feature flag management
-- Activity logging
+## Quick start
 
-### Phase 4: Observability & Control Panel ✅
-- Distributed tracing with OpenTelemetry
-- GraphQL API with subscriptions
-- WebSocket real-time metrics streaming
-- Feature flag management & Activity logging
+```bash
+python3.11 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install .
+zc --host 127.0.0.1 --port 8000 --workers 1
+```
 
-### Phase 5: Security & Resiliency ✅
-- JWT, mTLS, and OPA (Open Policy Agent) integration
-- End-to-end payload encryption
-- Token bucket rate limiting (Redis Lua)
-- Circuit breaker pattern & Bulkheads (Semaphore)
+Verify the service:
 
-### Phase 6: Deployment & GitOps ✅
-- k3s optimized manifests & Cilium zero-trust networking
-- HPA/VPA custom metrics auto-scaling
-- GitOps-ready ArgoCD architecture
-- Enterprise monitoring stack (Prometheus & Grafana)
+```bash
+curl -fsS http://127.0.0.1:8000/ready
+curl -fsS http://127.0.0.1:8000/v1/wire/health/live
+```
 
-## 📚 Documentation Directory
+The `zcoder` command is an alias of `zc`. Direct execution remains available:
 
-The project documentation has been organized into logical sections:
+```bash
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+```
 
-**Enterprise Implementation**
-- [Enterprise Implementation Plan](docs/enterprise/ENTERPRISE_IMPLEMENTATION_PLAN.md)
-- [Enterprise Summary](docs/enterprise/ENTERPRISE_SUMMARY.md)
-- [Implementation Checklist](docs/enterprise/IMPLEMENTATION_CHECKLIST.md)
+API documentation is available at `/docs` when `DEBUG=true`.
 
-**Phase Completion Reports**
-- [Phase 2 Complete](docs/enterprise/PHASE2_COMPLETE.md)
-- [Phase 3 Complete](docs/enterprise/PHASE3_COMPLETE.md)
-- [Phase 4 Complete](docs/enterprise/PHASE4_COMPLETE.md)
-- [Phase 5 Complete](docs/enterprise/PHASE5_COMPLETE.md)
-- [Phase 6 Complete](docs/enterprise/PHASE6_COMPLETE.md)
-- [Performance Optimization Complete](docs/enterprise/PERFORMANCE_OPTIMIZATION_COMPLETE.md)
+## Readiness semantics
 
-**Guides & SDKs**
-- [Quickstart Guide](QUICKSTART.md)
+Startup records structured health for Redis, the shared HTTP client, upload manager, and optional gRPC server.
+
+- Default: failed optional integrations produce `status: degraded` with HTTP 200.
+- `STRICT_READINESS=true`: an enabled failed integration produces HTTP 503.
+- The standalone Docker image disables Redis, gRPC, NATS, and OpenTelemetry by default. Enable them explicitly when the corresponding infrastructure is present.
+
+## Development validation
+
+```bash
+python -m pip install -r requirements-dev.txt
+ruff check .
+black --check app tests
+mypy . --ignore-missing-imports
+bandit -r app -ll
+pytest --ignore=tests/test_webapp_server.py --cov --cov-report=term-missing
+```
+
+Web console tests:
+
+```bash
+python -m pip install -r webapp/requirements-web.txt httpx
+pytest tests/test_webapp_server.py -v
+```
+
+## Docker
+
+```bash
+docker build -t zcoder:local .
+docker run --rm --name zcoder-local -p 8000:8000 zcoder:local
+```
+
+The image uses the same port and health contract as local execution and removes the nondeterministic `apt-get upgrade` build step.
+
+## Repository map
+
+```text
+app/                    Supported FastAPI service and runtime modules
+webapp/                 Web application surface
+tests/                  Python test suite
+src/wire/               Additional legacy/experimental wire modules
+.zc/                    Agent runtime, tests, and skill definitions
+docs/                   Guides, historical records, and audit reports
+.github/workflows/      CI, security, release, and delivery automation
+k8s/, argocd/           Deployment and GitOps assets
+monitoring/             Observability assets
+```
+
+## Documentation
+
+- [Quickstart](QUICKSTART.md)
 - [Architecture](ARCHITECTURE.md)
-- [Agents Architecture](AGENTS.md)
-- [Config Generator Guide](docs/guides/config_generator.md)
-- [File SDK Guide](docs/guides/file_sdk.md)
+- [Agents](AGENTS.md)
+- [Roadmap](ROADMAP.md)
+- [Changelog](CHANGELOG.md)
+- [Repository audit — 2026-07-20](docs/REPOSITORY_AUDIT_2026-07-20.md)
 
-## 📁 Project Structure
+Living documents must match executable repository state. Historical upgrade and phase-completion documents remain immutable evidence unless a separate correction notice is added. `.zc/skills/**/SKILL.md` files are operational agent instructions and change only with the corresponding skill behavior.
 
-```
-/workspace
-├── app/
-│   ├── api/
-│   │   ├── v1/
-│   │   │   └── routes.py          # wire CLI REST endpoints
-│   │   └── control_panel.py       # GraphQL control panel
-│   ├── core/
-│   │   ├── config.py              # Configuration management
-│   │   ├── cache.py               # Redis caching layer
-│   │   └── http_client.py         # Optimized HTTP client
-│   ├── grpc/
-│   │   └── wire_servicer.py       # gRPC service implementation
-│   ├── middleware/
-│   │   └── rate_limiter.py        # Rate limiting & circuit breaker
-│   ├── proto/
-│   │   └── wire.proto             # Protocol Buffers definitions
-│   ├── services/
-│   │   ├── upload_manager.py      # Chunked upload service
-│   │   └── delta/
-│   │       └── sync_service.py    # Delta synchronization
-│   └── telemetry/
-│       └── otel_service.py        # OpenTelemetry integration
-├── docs/
-│   ├── enterprise/                # Enterprise implementation plans & reports
-│   └── guides/                    # Developer guides & SDKs
-├── k8s/
-│   └── network-policies.yaml      # Kubernetes manifests
-├── argocd/                        # GitOps application configurations
-├── monitoring/                    # Observability stack manifests
-├── AGENTS.md                      # Agent architecture specification
-├── requirements-enterprise.txt    # Enterprise dependencies
-└── README.md                      # This file
-```
+## Remaining release-hardening work
 
-## 🛠️ Quick Start
+The runtime and packaging defects identified by the audit are repaired. Remaining non-blocking release engineering work includes:
 
-### Prerequisites
-- Python 3.11+
-- Redis 7.x
-- k3s cluster (for production deployment)
+1. Generate hash-locked deployment dependencies.
+2. Pin critical GitHub Actions to reviewed commit SHAs.
+3. Generate SBOM and provenance attestations for release images.
+4. Gradually replace broad legacy Ruff/Bandit suppressions with scoped justifications outside the supported `app/` runtime.
+5. Consolidate or formally separate `app/`, `src/wire/`, web, and agent product surfaces.
 
-### Installation
+## Security
 
-```bash
-# Install dependencies
-pip install -r requirements-enterprise.txt
+Do not commit provider credentials or production secrets. Configure them through the deployment environment or an approved secret manager. Review [SECURITY.md](SECURITY.md) before reporting vulnerabilities.
 
-# Set environment variables
-export REDIS_URL=redis://localhost:6379
-export ENVIRONMENT=development
+## License
 
-# Run the application
-python -m uvicorn app.main:app --host 0.0.0.0 --port 8420 --workers 4
-```
-
-### Access Points
-
-| Service | Endpoint | Description |
-|---------|----------|-------------|
-| REST API | `http://localhost:8420/v1/wire` | wire CLI REST endpoints |
-| GraphQL | `http://localhost:8420/admin/graphql` | Control panel GraphQL API |
-| gRPC | `localhost:9090` | gRPC service |
-| Docs | `http://localhost:8420/docs` | OpenAPI documentation |
-| Metrics | `http://localhost:8420/metrics` | Prometheus metrics |
-
-## 📊 Performance Benchmarks
-
-| Metric | Baseline | Optimized | Improvement |
-|--------|----------|-----------|-------------|
-| Serialization | 150μs (JSON) | 20μs (Protobuf) | 7.5x faster |
-| Bandwidth (1GB file) | 1GB | 8MB (delta) | 125x reduction |
-| Cache Hit Latency | 50ms | <1ms | 50x faster |
-| Upload Throughput | 100MB/s | 450MB/s | 4.5x faster |
-
-## 🔒 Security Features
-
-- **Rate Limiting**: Token bucket algorithm (100 req/min default)
-- **Circuit Breakers**: Prevent cascade failures
-- **Input Validation**: Protobuf schema validation
-- **Audit Logging**: Complete activity trail
-- **RBAC**: Granular access control
-
-## 📈 Monitoring
-
-### Key Metrics
-- Active upload sessions
-- Queue depth
-- Average latency (p50, p95, p99)
-- Error rate
-- Requests per second
-- CPU/Memory usage
-
-### Dashboards
-- Grafana dashboards included in `k8s/monitoring/`
-- Real-time WebSocket metrics stream
-- Distributed tracing via Tempo/Jaeger
-
-## 🚢 Kubernetes Deployment
-
-```bash
-# Apply Cilium CNI (required for eBPF routing)
-kubectl apply -f https://raw.githubusercontent.com/cilium/cilium/master/install/kubernetes/quick-install.yaml
-
-# Deploy the application
-kubectl apply -f k8s/wire-api-deployment.yaml
-
-# Check status
-kubectl get pods -l app=wire-api
-kubectl get hpa wire-api-hpa
-```
-
-## 🧪 Testing
-
-```bash
-# Run unit tests
-pytest tests/unit -v
-
-# Run integration tests
-pytest tests/integration -v
-
-# Load testing
-locust -f tests/load/locustfile.py --host=http://localhost:8420
-```
-
-## 📝 API Examples
-
-### Initialize Upload (gRPC)
-```python
-request = UploadInitRequest(
-    file_id="doc_123",
-    file_name="large_file.bin",
-    total_size=1073741824,
-    content_hash="blake3_hash_here",
-    existing_chunks=["chunk_hash_1", "chunk_hash_2"]
-)
-response = stub.UploadInit(request)
-```
-
-### Query Metrics (GraphQL)
-```graphql
-query {
-  systemMetrics {
-    activeUploads
-    queueDepth
-    avgLatencyMs
-    requestsPerSecond
-    timestamp
-  }
-}
-```
-
-### Subscribe to Real-time Metrics
-```graphql
-subscription {
-  metricsStream(intervalSeconds: 1.0) {
-    activeUploads
-    avgLatencyMs
-    timestamp
-  }
-}
-```
-
-## 🔄 CI/CD Pipeline
-
-```yaml
-# .github/workflows/deploy.yml
-name: Deploy
-on:
-  push:
-    branches: [main]
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Build & Push
-        run: docker build -t wire-enterprise:$GITHUB_SHA .
-      - name: Deploy to k3s
-        run: kubectl rollout restart deployment/wire-api
-```
-
-## 📚 Documentation
-
-- [AGENTS.md](./AGENTS.md) - Agent architecture specification
-- [PHASE2_COMPLETE.md](./PHASE2_COMPLETE.md) - Phase 2 implementation details
-- [OpenAPI Docs](http://localhost:8420/docs) - Interactive API documentation
-- [GraphQL Playground](http://localhost:8420/admin/graphql) - GraphQL explorer
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit changes (`git commit -m 'Add amazing feature'`)
-4. Push to branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## 📄 License
-
-Proprietary - Enterprise License Required
-
-## 🏢 Support
-
-For enterprise support, contact: support@wire-enterprise.io
-
----
-
-**Version**: 2026.1.0  
-**Last Updated**: January 2026  
-**Status**: Production Ready
+Package metadata declares MIT. Confirm repository-level license documents and third-party assets remain consistent before distribution.

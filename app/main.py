@@ -1,122 +1,119 @@
-"""
-app/main.py - Enterprise FastAPI Application
+"""FastAPI application and supported console entry point for zcoder."""
 
-Main entry point for the enterprise-grade wire API server.
-Features:
-- OpenTelemetry instrumentation
-- Prometheus metrics endpoint
-- Graceful shutdown handling
-- CORS configuration
-- Request/response logging
-"""
+import argparse
+import logging
 import time
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from typing import Optional
 
 import uvicorn
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.responses import JSONResponse
 
 from .api.v1.routes import router as wire_router
-from .core.cache import init_cache, shutdown_cache
+from .core.cache import get_cache, init_cache, shutdown_cache
 from .core.config import get_config
 from .core.http_client import init_http_client, shutdown_http_client
 from .services.upload_manager import init_upload_manager
-from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 
-# Track request timing for metrics
+def _set_component_state(app: FastAPI, name: str, ready: bool, error: str | None = None) -> None:
+    app.state.components[name] = {"ready": ready, "error": error}
+
+
 @asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncGenerator:
-    """Application lifespan manager for startup/shutdown."""
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    """Initialize optional integrations and expose their state to readiness."""
     config = get_config()
-    
-    # Startup
-    print(f"🚀 Starting wire-enterprise v{config.version}")
-    print(f"   Environment: {config.environment}")
-    print(f"   Redis: {'enabled' if config.redis_enabled else 'disabled'}")
-    print(f"   Protobuf: {'enabled' if config.protobuf_enabled else 'disabled'}")
-    
-    try:
-        await init_cache()
-        print("✓ Cache initialized")
-    except Exception as e:
-        print(f"⚠ Cache initialization failed: {e}")
-    
+    app.state.components = {}
+
+    logger.info(
+        "Starting %s v%s in %s", config.app_name, config.version, config.environment
+    )
+
+    if config.redis_enabled:
+        try:
+            await init_cache()
+            _set_component_state(app, "redis", True)
+        except Exception as exc:  # startup state is reported by /ready
+            logger.exception("Cache initialization failed")
+            _set_component_state(app, "redis", False, str(exc))
+    else:
+        _set_component_state(app, "redis", True, "disabled")
+
     try:
         await init_http_client()
-        print("✓ HTTP client initialized")
-    except Exception as e:
-        print(f"⚠ HTTP client initialization failed: {e}")
-    
+        _set_component_state(app, "http_client", True)
+    except Exception as exc:
+        logger.exception("HTTP client initialization failed")
+        _set_component_state(app, "http_client", False, str(exc))
+
     try:
         await init_upload_manager()
-        print("✓ Upload manager initialized")
-    except Exception as e:
-        print(f"⚠ Upload manager initialization failed: {e}")
-    
+        _set_component_state(app, "upload_manager", True)
+    except Exception as exc:
+        logger.exception("Upload manager initialization failed")
+        _set_component_state(app, "upload_manager", False, str(exc))
+
     if config.protobuf_enabled:
         try:
             from .grpc.wire_servicer import create_grpc_server
             from .services.upload_manager import get_upload_manager
-            
+
             grpc_server = await create_grpc_server(
-                host=config.api_host if hasattr(config, 'api_host') else "0.0.0.0",
-                port=(config.api_port + 1) if hasattr(config, 'api_port') else 50051,
+                host=config.api_host,
+                port=config.api_port + 1,
                 upload_manager=get_upload_manager(),
-                delta_service=None  # will use default in create_grpc_server
+                delta_service=None,
             )
             await grpc_server.start()
-            print("✓ gRPC server started")
             app.state.grpc_server = grpc_server
-        except Exception as e:
-            print(f"⚠ gRPC server initialization failed: {e}")
-    
+            _set_component_state(app, "grpc", True)
+        except Exception as exc:
+            logger.exception("gRPC server initialization failed")
+            _set_component_state(app, "grpc", False, str(exc))
+    else:
+        _set_component_state(app, "grpc", True, "disabled")
+
     yield
-    
-    # Shutdown
-    print("\n🛑 Shutting down wire-enterprise...")
-    
-    await shutdown_cache()
-    print("✓ Cache shutdown complete")
-    
-    await shutdown_http_client()
-    print("✓ HTTP client shutdown complete")
-    
-    if hasattr(app.state, 'grpc_server'):
+
+    if hasattr(app.state, "grpc_server"):
         await app.state.grpc_server.stop(grace=5.0)
-        print("✓ gRPC server shutdown complete")
+    await shutdown_http_client()
+    await shutdown_cache()
 
 
-# Create FastAPI application
 config = get_config()
-
 app = FastAPI(
     title=config.app_name,
     version=config.version,
-    description="Enterprise-grade wire CLI-to-API backend with optimized file uploads",
+    description="zcoder API service",
     docs_url="/docs" if config.debug else None,
     redoc_url="/redoc" if config.debug else None,
     openapi_url="/openapi.json" if config.debug else None,
     lifespan=lifespan,
 )
 
-# Add middleware
+# Wildcard origins and credentialed requests are mutually unsafe. Development
+# permits any origin without credentials; production enables no cross-origin
+# callers unless an explicit policy is added by the deployment layer.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"] if config.debug else ["http://localhost:*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=["*"] if config.debug else [],
+    allow_credentials=False,
+    allow_methods=["*"] if config.debug else [],
+    allow_headers=["*"] if config.debug else [],
 )
-
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 
 @app.middleware("http")
 async def add_timing_header(request: Request, call_next) -> Response:
-    """Add X-Process-Time header to all responses."""
     start_time = time.perf_counter()
     response = await call_next(request)
     process_time = (time.perf_counter() - start_time) * 1000
@@ -124,33 +121,47 @@ async def add_timing_header(request: Request, call_next) -> Response:
     return response
 
 
-# Include routers
 app.include_router(wire_router)
 
 
 @app.get("/")
-async def root() -> dict:
-    """Root endpoint with API information."""
+async def root() -> dict[str, str]:
     return {
         "name": config.app_name,
         "version": config.version,
-        "description": "Enterprise-grade wire CLI-to-API backend",
+        "description": "zcoder API service",
         "docs": "/docs" if config.debug else "Disabled in production",
         "health": "/v1/wire/health/live",
-        "metrics": "/v1/wire/metrics/performance",
+        "readiness": "/ready",
     }
 
 
 @app.get("/ready")
-async def readiness() -> dict:
-    """Simple readiness check."""
-    return {"status": "ready"}
+async def readiness() -> Response:
+    components = getattr(app.state, "components", {})
+    failed = sorted(name for name, value in components.items() if not value["ready"])
+    payload = {
+        "status": "ready" if not failed else "degraded",
+        "components": components,
+        "failed": failed,
+    }
+    if failed and config.strict_readiness:
+        return JSONResponse(payload, status_code=status.HTTP_503_SERVICE_UNAVAILABLE)
+    return JSONResponse(payload, status_code=status.HTTP_200_OK)
 
 
-def run_server(host: Optional[str] = None, port: Optional[int] = None, workers: Optional[int] = None):
-    """Run the FastAPI server with uvicorn."""
+@app.get("/health/cache")
+async def cache_health() -> dict:
+    """Expose cache state without leaking connection credentials."""
+    return await get_cache().health_check()
+
+
+def run_server(
+    host: Optional[str] = None,
+    port: Optional[int] = None,
+    workers: Optional[int] = None,
+) -> None:
     cfg = get_config()
-    
     uvicorn.run(
         "app.main:app",
         host=host or cfg.api_host,
@@ -158,10 +169,21 @@ def run_server(host: Optional[str] = None, port: Optional[int] = None, workers: 
         workers=workers or cfg.api_workers,
         log_level="info" if cfg.debug else "warning",
         access_log=cfg.debug,
-        loop="uvloop",  # High-performance event loop
-        http="httptools",  # Fast HTTP parser
+        loop="uvloop",
+        http="httptools",
     )
 
 
+def cli() -> None:
+    """Console entry point installed as both ``zc`` and ``zcoder``."""
+    cfg = get_config()
+    parser = argparse.ArgumentParser(description="Run the zcoder API service")
+    parser.add_argument("--host", default=cfg.api_host)
+    parser.add_argument("--port", type=int, default=cfg.api_port)
+    parser.add_argument("--workers", type=int, default=cfg.api_workers)
+    args = parser.parse_args()
+    run_server(host=args.host, port=args.port, workers=args.workers)
+
+
 if __name__ == "__main__":
-    run_server()
+    cli()

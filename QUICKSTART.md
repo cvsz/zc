@@ -1,67 +1,93 @@
 # Quickstart
 
-## Run from source
+Validated for `zcoder` 1.33.0 on Python 3.11 and 3.12.
+
+## Install from source
 
 ```bash
-./setup.sh              # macOS/Linux — creates venv, installs deps, makes .env
-# or setup.bat on Windows
-
-# edit .env and set ZC_API_KEY
-
-source venv/bin/activate
-python main.py -p "Write a function to reverse a string"
+python3.11 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install .
 ```
 
-## Build a standalone executable
+Windows PowerShell:
 
-No local Python needed to *run* the result — only to build it:
+```powershell
+py -3.11 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install .
+```
+
+## Run through the installed command
+
+Both commands are supported aliases:
 
 ```bash
-./build.sh               # macOS/Linux — produces dist/ai-coder
-# or build.bat on Windows — produces dist\ai-coder.exe
-
-export ZC_API_KEY=sk-ant-...
-./dist/ai-coder -p "Create a Flask REST API"
+zc --host 127.0.0.1 --port 8000 --workers 1
+# or
+zcoder --host 127.0.0.1 --port 8000 --workers 1
 ```
 
-## A few places to start
+Direct Uvicorn execution remains available:
 
 ```bash
-# Basic generation
-python main.py -p "Write a Python function to reverse a string"
-
-# Analyze a file
-python main.py -f mycode.py -p "Explain this and suggest improvements"
-
-# List every server tool, and the newer per-tool features (Tool Use
-# Examples, Programmatic Tool Calling, task budgets, compaction)
-python main.py --list-server-tools
-
-# Agentic tool loop
-python main.py --tool-agent -p "Find and fix the bug in app.py"
-
-# Native memory tool (persists across runs, in ~/.ai-coder/memory)
-python main.py --memory-agent "Remember that this project uses pytest"
-
-# Advisor tool — a stronger model consulted mid-generation
-python main.py --advisor "Refactor auth.py to use JWT, then write tests"
-
-# Real hosted zAICoder Managed Agents (cloud sandbox, not local)
-python main.py --agent-managed-run "Set up a FastAPI project with tests"
-
-# Embeddings (needs VOYAGE_API_KEY — see .env.example)
-python main.py --embed-similarity "cat" "kitten"
-
-# Everything else
-python main.py --help
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
-If you have an Admin API key or Compliance Access Key (org-level,
-different from a regular `ZC_API_KEY`), `--usage-report`,
-`--admin-list-keys`, and `--compliance-activities` are the entry points
-into that surface — see `README.md`'s "New in v1.15.0" / "New in
-v1.16.0" sections before using them, since a few of those flags
-(`--compliance-*-delete`) are permanent, org-wide deletes.
+## Verify the service
 
-See `README.md` for the full feature list and `docs/` for the detailed,
-dated history of what was added, changed, or fixed in each release.
+```bash
+curl -fsS http://127.0.0.1:8000/ready
+curl -fsS http://127.0.0.1:8000/v1/wire/health/live
+```
+
+Readiness returns structured component state. With `STRICT_READINESS=true`, a required enabled component failure returns HTTP 503; otherwise the service reports `degraded` with HTTP 200 so optional integrations can fail independently.
+
+OpenAPI UI is exposed at `http://127.0.0.1:8000/docs` only when `DEBUG=true`.
+
+## Development checks
+
+```bash
+python -m pip install -r requirements-dev.txt
+ruff check .
+black --check app tests
+mypy . --ignore-missing-imports
+bandit -r app -ll
+pytest --ignore=tests/test_webapp_server.py --cov --cov-report=term-missing
+```
+
+Web console tests require the additional web dependencies:
+
+```bash
+python -m pip install -r webapp/requirements-web.txt httpx
+pytest tests/test_webapp_server.py -v
+```
+
+## Docker
+
+The container uses the same HTTP contract as local execution: port `8000`, `/ready`, and `/v1/wire/health/live`.
+
+```bash
+docker build -t zcoder:local .
+docker run --rm --name zcoder-local -p 8000:8000 zcoder:local
+```
+
+The default standalone image disables Redis, gRPC, NATS, and OpenTelemetry. Enable integrations explicitly through environment variables and provide their infrastructure before turning on strict readiness.
+
+## Important configuration
+
+| Variable | Default | Purpose |
+|---|---:|---|
+| `APP_NAME` | `zcoder` | API and runtime identity |
+| `APP_VERSION` | `1.33.0` | Runtime version |
+| `API_PORT` | `8000` | HTTP listen port |
+| `STRICT_READINESS` | `false` | Return 503 when an enabled component fails |
+| `REDIS_ENABLED` | `true` from source; `false` in Docker | Redis cache integration |
+| `PROTOBUF_ENABLED` | `true` from source; `false` in Docker | gRPC integration |
+| `DEBUG` | `false` | Development CORS and API documentation |
+
+Keep secrets out of source control. Inject them through environment variables or a deployment secret manager.
+
+For findings, completed remediation, and remaining release-hardening work, see [Repository Audit — 2026-07-20](docs/REPOSITORY_AUDIT_2026-07-20.md).
