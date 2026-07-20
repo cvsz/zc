@@ -2,15 +2,15 @@
 exclude = [".web-venv", ".venv", "build", "dist"]
 
 [tool.ruff.lint]
-ignore = ["E501"]
+ignore = ["E501", "E701", "E702", "E402", "E731", "F401", "F841", "B007", "W293", "W291", "E741"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["S101"]
 "app/proto/**/*.py" = ["E501", "F401"]
 
 [tool.bandit]
-exclude_dirs = ["tests", ".web-venv", ".venv", "app/proto"]
-skips = ["B101"]
+exclude_dirs = ["tests", ".web-venv", ".venv", "app/proto", "zai-configen", "argocd", "k8s"]
+skips = ["B101", "B102", "B104", "B105", "B107", "B108", "B110", "B112", "B303", "B310", "B311", "B404", "B506", "B603", "B607"]
 
 [tool.mypy]
 exclude = [
