@@ -1,79 +1,92 @@
-# zcoder / wire
+# zcoder
 
-Python 3.11+ repository containing a FastAPI API service, supporting web components, CLI-oriented modules, tests, container packaging, and enterprise integration experiments.
+`zcoder` 1.33.0 is a Python 3.11+ repository containing a FastAPI API service, installed `zc`/`zcoder` server commands, web components, tests, container packaging, and additional agent and enterprise integration modules.
 
-> The repository currently contains overlapping product identities (`zcoder`, `wire`, and `wire-enterprise`). Treat `app.main:app` as the verified API entry point on this branch. See the repository audit for known packaging and documentation inconsistencies.
+Historical modules and documents may still use the legacy names `wire` or `wire-enterprise`. The canonical distribution and runtime identity for the supported API surface is `zcoder`; existing `/v1/wire` routes remain unchanged for backward compatibility.
 
-## Current verified capabilities
+## Verified runtime contract
 
-- FastAPI application with Uvicorn runtime
-- REST routes under `/v1/wire`
-- Readiness endpoint at `/ready`
-- Liveness endpoint at `/v1/wire/health/live`
-- Optional Redis-backed cache
-- Upload manager and HTTP client lifecycle management
-- Optional gRPC startup when enabled by configuration
-- Python 3.11 and 3.12 test coverage in CI
-- Ruff, Black, mypy, Bandit, CodeQL, and Docker smoke checks
+- Distribution: `zcoder==1.33.0`
+- Console aliases: `zc`, `zcoder`
+- FastAPI application: `app.main:app`
+- Default HTTP port: `8000`
+- Readiness: `GET /ready`
+- Liveness: `GET /v1/wire/health/live`
+- Supported Python: 3.11 and 3.12
+- Container user: non-root
+- CI: Ruff, Black, mypy, full `app/` Bandit scan, package-install smoke tests, pytest, CodeQL, and Docker smoke tests
 
-Claims in historical phase-completion documents and benchmark tables are not automatically equivalent to current production validation. Consult the dated audit report and reproduce benchmarks before using performance figures in capacity planning.
+Historical phase-completion reports and benchmark tables are point-in-time records. Reproduce benchmarks before using numerical performance claims for sizing or service-level objectives.
 
 ## Quick start
-
-### Create an environment
 
 ```bash
 python3.11 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
-python -m pip install -r requirements-enterprise.txt
+python -m pip install .
+zc --host 127.0.0.1 --port 8000 --workers 1
 ```
 
-### Run the API
-
-```bash
-python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
-```
-
-Verify readiness:
+Verify the service:
 
 ```bash
 curl -fsS http://127.0.0.1:8000/ready
+curl -fsS http://127.0.0.1:8000/v1/wire/health/live
 ```
 
-API documentation is available at `/docs` only when debug mode enables the documentation endpoints.
+The `zcoder` command is an alias of `zc`. Direct execution remains available:
+
+```bash
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+```
+
+API documentation is available at `/docs` when `DEBUG=true`.
+
+## Readiness semantics
+
+Startup records structured health for Redis, the shared HTTP client, upload manager, and optional gRPC server.
+
+- Default: failed optional integrations produce `status: degraded` with HTTP 200.
+- `STRICT_READINESS=true`: an enabled failed integration produces HTTP 503.
+- The standalone Docker image disables Redis, gRPC, NATS, and OpenTelemetry by default. Enable them explicitly when the corresponding infrastructure is present.
 
 ## Development validation
 
 ```bash
 python -m pip install -r requirements-dev.txt
 ruff check .
+black --check app tests
 mypy . --ignore-missing-imports
+bandit -r app -ll
 pytest --ignore=tests/test_webapp_server.py --cov --cov-report=term-missing
-pytest tests/test_webapp_server.py -v
 ```
 
-The CI workflow also builds the Docker image and performs a readiness smoke test.
+Web console tests:
+
+```bash
+python -m pip install -r webapp/requirements-web.txt httpx
+pytest tests/test_webapp_server.py -v
+```
 
 ## Docker
 
 ```bash
 docker build -t zcoder:local .
-docker run --rm -p 8000:8000 zcoder:local
-curl -fsS http://127.0.0.1:8000/v1/wire/health/live
+docker run --rm --name zcoder-local -p 8000:8000 zcoder:local
 ```
 
-The Dockerfile currently serves `app.main:app` on port `8000` as a non-root user.
+The image uses the same port and health contract as local execution and removes the nondeterministic `apt-get upgrade` build step.
 
 ## Repository map
 
 ```text
-app/                    FastAPI service and enterprise runtime modules
+app/                    Supported FastAPI service and runtime modules
 webapp/                 Web application surface
 tests/                  Python test suite
-src/wire/               Additional wire modules; packaging relationship requires consolidation
+src/wire/               Additional legacy/experimental wire modules
 .zc/                    Agent runtime, tests, and skill definitions
-docs/                   Guides, historical upgrade records, and audit reports
+docs/                   Guides, historical records, and audit reports
 .github/workflows/      CI, security, release, and delivery automation
 k8s/, argocd/           Deployment and GitOps assets
 monitoring/             Observability assets
@@ -88,26 +101,22 @@ monitoring/             Observability assets
 - [Changelog](CHANGELOG.md)
 - [Repository audit — 2026-07-20](docs/REPOSITORY_AUDIT_2026-07-20.md)
 
-Historical `docs/*upgrade*`, `docs/enterprise/*COMPLETE*`, and skill `SKILL.md` files serve different purposes:
+Living documents must match executable repository state. Historical upgrade and phase-completion documents remain immutable evidence unless a separate correction notice is added. `.zc/skills/**/SKILL.md` files are operational agent instructions and change only with the corresponding skill behavior.
 
-- Upgrade and completion documents are point-in-time records.
-- Living documents such as this README and the Quickstart must match executable repository state.
-- `.zc/skills/**/SKILL.md` files are operational agent instructions and should change only with the relevant skill implementation.
+## Remaining release-hardening work
 
-## Known high-priority issues
+The runtime and packaging defects identified by the audit are repaired. Remaining non-blocking release engineering work includes:
 
-1. `setup.cfg` declares `zc` and `zcoder` console scripts targeting `app.main:cli`, but the audited `app/main.py` does not define `cli`.
-2. Package metadata, README, and roadmap use conflicting names and versions.
-3. Docker, CI, and historical documentation contain inconsistent port assumptions.
-4. Ruff and Bandit use broad global exclusions that should be narrowed and justified.
-5. Dependency locking, SBOM generation, and release provenance are not yet enforced as a single reproducible release contract.
-
-See the [full repository audit](docs/REPOSITORY_AUDIT_2026-07-20.md) for severity, evidence, limitations, and remediation sequencing.
+1. Generate hash-locked deployment dependencies.
+2. Pin critical GitHub Actions to reviewed commit SHAs.
+3. Generate SBOM and provenance attestations for release images.
+4. Gradually replace broad legacy Ruff/Bandit suppressions with scoped justifications outside the supported `app/` runtime.
+5. Consolidate or formally separate `app/`, `src/wire/`, web, and agent product surfaces.
 
 ## Security
 
-Do not commit provider credentials or production secrets. Configure them through the deployment environment or an approved secret manager. Review [SECURITY.md](SECURITY.md) before reporting or remediating vulnerabilities.
+Do not commit provider credentials or production secrets. Configure them through the deployment environment or an approved secret manager. Review [SECURITY.md](SECURITY.md) before reporting vulnerabilities.
 
 ## License
 
-Package metadata declares the project license as MIT. Confirm that all repository-level license documents and third-party assets remain consistent with that declaration before distribution.
+Package metadata declares MIT. Confirm repository-level license documents and third-party assets remain consistent before distribution.
