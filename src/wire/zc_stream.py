@@ -82,7 +82,7 @@ def handle_refusal(response_or_stop_details: Any) -> Optional[dict[str, Any]]:
 class StreamCoder:
     """zAICoder client with streaming support."""
 
-    def __init__(self, api_key: str, model: str = "zc-sonnet-5",
+    def __init__(self, api_key: str, model: str = "zc-xxx",
                  max_tokens: int = 4096):
         self.client     = anthropic.Anthropic(api_key=api_key)
         self.model      = model

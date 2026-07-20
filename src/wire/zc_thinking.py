@@ -59,7 +59,7 @@ EFFORT_BUDGETS = {
 ADAPTIVE_THINKING_MODELS = {
     "zc-mythos-5", "zc-fable-5",
     "zc-opus-4-8", "zc-opus-4-7",
-    "zc-sonnet-5",
+    "zc-xxx",
     "zc-opus-4-6", "zc-sonnet-4-6",
     "zc-mythos-preview",
 }
@@ -69,7 +69,7 @@ ADAPTIVE_THINKING_MODELS = {
 BUDGET_TOKENS_UNSUPPORTED_MODELS = {
     "zc-mythos-5", "zc-fable-5",
     "zc-opus-4-8", "zc-opus-4-7",
-    "zc-sonnet-5",
+    "zc-xxx",
     "zc-mythos-preview",
 }
 

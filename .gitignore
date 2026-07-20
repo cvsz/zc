@@ -21,6 +21,7 @@ venv/
 .env
 .env.local
 .env.*
+.env.cloudflare
 
 # Logs
 *.log
@@ -106,3 +107,12 @@ Thumbs.db
 .pytest_cache/
 .mypy_cache/
 venv2/
+.web.pid
+*.save
+/scripts/setup-production-secrets.sh
+infra/cloudflare/.terraform/
+infra/cloudflare/*.tfstate
+infra/cloudflare/*.tfstate.*
+infra/cloudflare/*.tfplan
+infra/cloudflare/crash.log
+infra/cloudflare/*.auto.tfvars

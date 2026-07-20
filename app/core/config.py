@@ -26,9 +26,9 @@ class Config:
     debug: bool = False
     environment: str = "production"
 
-    api_host: str = "0.0.0.0"
+    api_host: str = "127.0.0.1"
     api_port: int = DEFAULT_API_PORT
-    api_workers: int = 4
+    api_workers: int = 1
     api_timeout: int = 30
     strict_readiness: bool = False
 
@@ -38,7 +38,7 @@ class Config:
     redis_url: str = "redis://localhost:6379"
     redis_pool_size: int = 10
     redis_ttl_default: int = 3600
-    redis_enabled: bool = True
+    redis_enabled: bool = False
 
     database_url: Optional[str] = None
     db_pool_size: int = 20
@@ -46,8 +46,8 @@ class Config:
 
     upload_chunk_size: int = 4 * 1024 * 1024
     upload_max_size: int = 50 * 1024 * 1024 * 1024
-    upload_temp_dir: Path = field(default_factory=lambda: Path("/tmp/uploads"))
-    storage_backend: str = "s3"
+    upload_temp_dir: Path = field(default_factory=lambda: Path("./data/uploads"))
+    storage_backend: str = "local"
     storage_s3_bucket: str = "wire-uploads"
     storage_s3_endpoint: Optional[str] = None
     storage_s3_access_key: Optional[str] = None
@@ -56,24 +56,26 @@ class Config:
 
     nats_url: str = "nats://localhost:4222"
     nats_cluster: list[str] = field(default_factory=list)
-    nats_enabled: bool = True
+    nats_enabled: bool = False
 
     jwt_secret: Optional[str] = None
     jwt_algorithm: str = "HS256"
     jwt_expiry_seconds: int = 3600
+    auth_required: bool = True
     mtls_enabled: bool = False
     mtls_ca_cert: Optional[Path] = None
     encryption_key: Optional[str] = None
+    cors_origins: list[str] = field(default_factory=list)
 
-    rate_limit_enabled: bool = True
+    rate_limit_enabled: bool = False
     rate_limit_requests: int = 1000
     rate_limit_window: int = 60
 
-    otel_enabled: bool = True
+    otel_enabled: bool = False
     otel_exporter_endpoint: str = "http://otel-collector:4317"
     otel_service_name: str = "zcoder-api"
     otel_tracing_sample_rate: float = 0.1
-    prometheus_metrics_enabled: bool = True
+    prometheus_metrics_enabled: bool = False
     prometheus_port: int = 9090
 
     control_panel_enabled: bool = True
@@ -96,9 +98,9 @@ class Config:
             version=os.getenv("APP_VERSION", APP_VERSION),
             debug=_env_bool("DEBUG", False),
             environment=os.getenv("ENVIRONMENT", "production"),
-            api_host=os.getenv("API_HOST", "0.0.0.0"),
+            api_host=os.getenv("API_HOST", "127.0.0.1"),
             api_port=int(os.getenv("API_PORT", str(DEFAULT_API_PORT))),
-            api_workers=int(os.getenv("API_WORKERS", "4")),
+            api_workers=int(os.getenv("API_WORKERS", "1")),
             api_timeout=int(os.getenv("API_TIMEOUT", "30")),
             strict_readiness=_env_bool("STRICT_READINESS", False),
             protobuf_enabled=_env_bool("PROTOBUF_ENABLED", True),
@@ -106,14 +108,14 @@ class Config:
             redis_url=os.getenv("REDIS_URL", "redis://localhost:6379"),
             redis_pool_size=int(os.getenv("REDIS_POOL_SIZE", "10")),
             redis_ttl_default=int(os.getenv("REDIS_TTL_DEFAULT", "3600")),
-            redis_enabled=_env_bool("REDIS_ENABLED", True),
+            redis_enabled=_env_bool("REDIS_ENABLED", False),
             database_url=os.getenv("DATABASE_URL"),
             db_pool_size=int(os.getenv("DB_POOL_SIZE", "20")),
             db_max_overflow=int(os.getenv("DB_MAX_OVERFLOW", "10")),
             upload_chunk_size=int(os.getenv("UPLOAD_CHUNK_SIZE", "4194304")),
             upload_max_size=int(os.getenv("UPLOAD_MAX_SIZE", "53687091200")),
-            upload_temp_dir=Path(os.getenv("UPLOAD_TEMP_DIR", "/tmp/uploads")),
-            storage_backend=os.getenv("STORAGE_BACKEND", "s3"),
+            upload_temp_dir=Path(os.getenv("UPLOAD_TEMP_DIR", "./data/uploads")),
+            storage_backend=os.getenv("STORAGE_BACKEND", "local"),
             storage_s3_bucket=os.getenv("STORAGE_S3_BUCKET", "wire-uploads"),
             storage_s3_endpoint=os.getenv("STORAGE_S3_ENDPOINT"),
             storage_s3_access_key=os.getenv("STORAGE_S3_ACCESS_KEY"),
@@ -125,19 +127,25 @@ class Config:
                 if os.getenv("NATS_CLUSTER")
                 else []
             ),
-            nats_enabled=_env_bool("NATS_ENABLED", True),
+            nats_enabled=_env_bool("NATS_ENABLED", False),
             jwt_secret=os.getenv("JWT_SECRET"),
             jwt_algorithm=os.getenv("JWT_ALGORITHM", "HS256"),
             jwt_expiry_seconds=int(os.getenv("JWT_EXPIRY_SECONDS", "3600")),
+            auth_required=_env_bool("AUTH_REQUIRED", True),
             mtls_enabled=_env_bool("MTLS_ENABLED", False),
             mtls_ca_cert=(
                 Path(os.environ["MTLS_CA_CERT"]) if os.getenv("MTLS_CA_CERT") else None
             ),
             encryption_key=os.getenv("ENCRYPTION_KEY"),
-            rate_limit_enabled=_env_bool("RATE_LIMIT_ENABLED", True),
+            cors_origins=[
+                origin.strip()
+                for origin in os.getenv("CORS_ORIGINS", "").split(",")
+                if origin.strip()
+            ],
+            rate_limit_enabled=_env_bool("RATE_LIMIT_ENABLED", False),
             rate_limit_requests=int(os.getenv("RATE_LIMIT_REQUESTS", "1000")),
             rate_limit_window=int(os.getenv("RATE_LIMIT_WINDOW", "60")),
-            otel_enabled=_env_bool("OTEL_ENABLED", True),
+            otel_enabled=_env_bool("OTEL_ENABLED", False),
             otel_exporter_endpoint=os.getenv(
                 "OTEL_EXPORTER_ENDPOINT", "http://otel-collector:4317"
             ),
@@ -146,7 +154,7 @@ class Config:
                 os.getenv("OTEL_TRACING_SAMPLE_RATE", "0.1")
             ),
             prometheus_metrics_enabled=_env_bool(
-                "PROMETHEUS_METRICS_ENABLED", True
+                "PROMETHEUS_METRICS_ENABLED", False
             ),
             prometheus_port=int(os.getenv("PROMETHEUS_PORT", "9090")),
             control_panel_enabled=_env_bool("CONTROL_PANEL_ENABLED", True),
@@ -173,6 +181,19 @@ class Config:
 
     def ensure_dirs(self) -> None:
         self.upload_temp_dir.mkdir(parents=True, exist_ok=True)
+
+    def validate(self) -> None:
+        """Fail closed when production security invariants are not configured."""
+        if self.environment == "production" and self.auth_required and not self.jwt_secret:
+            raise RuntimeError("JWT_SECRET is required when production authentication is enabled")
+        if self.upload_chunk_size <= 0 or self.upload_chunk_size > self.max_message_size:
+            raise RuntimeError("UPLOAD_CHUNK_SIZE must be within MAX_MESSAGE_SIZE")
+        if self.upload_max_size < self.upload_chunk_size:
+            raise RuntimeError("UPLOAD_MAX_SIZE must be at least UPLOAD_CHUNK_SIZE")
+        if self.rate_limit_enabled and not self.redis_enabled and self.api_workers != 1:
+            raise RuntimeError(
+                "API_WORKERS must be 1 when rate limiting uses in-memory state"
+            )
 
 
 _config: Optional[Config] = None

@@ -494,7 +494,7 @@ class ToolCoder:
     ENDPOINT = "https://api.anthropic.com/v1/messages"
     _breaker = CircuitBreaker(failure_threshold=5, reset_timeout=30)
 
-    def __init__(self, api_key: str, model: str = "zc-sonnet-5",
+    def __init__(self, api_key: str, model: str = "zc-xxx",
                  max_tokens: int = 4096):
         self.api_key    = api_key
         self.model      = model

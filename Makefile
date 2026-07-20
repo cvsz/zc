@@ -1,5 +1,5 @@
 .PHONY: install install-dev test test-cov lint format typecheck security check run tui docker-build docker-run health clean \
-        build start stop restart update upgrade status logs bootstrap
+        build start stop restart update upgrade updgrade status logs bootstrap requirements-lock requirements-lock-check
 
 # ── Web console (webapp/) ───────────────────────────────────────────────
 # `build`/`start`/`stop`/`restart`/`update`/`upgrade` all target the
@@ -20,6 +20,9 @@ PID_FILE    := .web.pid
 LOG_FILE    := logs/web.log
 HOST        ?= 0.0.0.0
 PORT        ?= 8420
+
+# Idempotent developer and CI setup entrypoint.
+setup: bootstrap
 
 # Build: create the venv (idempotent) and install/refresh every dependency
 # the web console needs — the CLI core's requirements.txt (Coder/etc. import
@@ -42,7 +45,7 @@ start:
 	fi
 	@test -x $(VENV_UVICORN) || { echo "❌ not built yet — run 'make build' first"; exit 1; }
 	@mkdir -p logs
-	@setsid nohup $(VENV_UVICORN) webapp.backend.server:app --app-dir . \
+	@setsid nohup env PYTHONPATH=src $(VENV_UVICORN) webapp.backend.server:app --app-dir . \
 		--host $(HOST) --port $(PORT) < /dev/null > $(LOG_FILE) 2>&1 & echo $$! > $(PID_FILE)
 	@sleep 1
 	@if kill -0 $$(cat $(PID_FILE)) 2>/dev/null; then \
@@ -81,14 +84,17 @@ update:
 # currently-running server so the upgrade takes effect immediately instead
 # of silently running stale code until someone remembers to restart it.
 upgrade: update
-	@echo "🔎 version: $$($(VENV_PY) main.py --version 2>/dev/null || echo unknown)"
+	@echo "🔎 version: $$(PYTHONPATH=src $(VENV_PY) -m wire.main --version 2>/dev/null || echo unknown)"
 	@if [ -f $(PID_FILE) ] && kill -0 $$(cat $(PID_FILE)) 2>/dev/null; then \
 		echo "🔁 restarting running server to pick up the upgrade…"; \
 		$(MAKE) restart; \
 	else \
 		echo "ℹ️  server wasn't running — 'make start' whenever you're ready"; \
 	fi
-	@$(VENV_PY) main.py --health-check || true
+	@PYTHONPATH=src $(VENV_PY) -m wire.main --health-check || true
+
+# Backward-compatible spelling retained for existing operator runbooks.
+updgrade: upgrade
 
 # Convenience (not part of the core lifecycle, but cheap and useful
 # alongside it): current status, and a tail of the live log.
@@ -108,11 +114,22 @@ install:
 install-dev:
 	pip install --break-system-packages -r requirements-dev.txt
 
+requirements-lock:
+	uv pip compile --python-version 3.11 --python-platform x86_64-unknown-linux-gnu \
+		--generate-hashes --custom-compile-command "make requirements-lock" \
+		--output-file requirements-deploy.lock requirements-deploy.in
+
+requirements-lock-check:
+	uv pip compile --quiet --python-version 3.11 --python-platform x86_64-unknown-linux-gnu \
+		--generate-hashes --custom-compile-command "make requirements-lock" \
+		--output-file /tmp/requirements-deploy.lock requirements-deploy.in
+	cmp requirements-deploy.lock /tmp/requirements-deploy.lock
+
 test:
 	PYTHONPATH=src pytest
 
 test-cov:
-	PYTHONPATH=src pytest --cov=app --cov=webapp tests/ --cov-report=term-missing
+	PYTHONPATH=src pytest --cov=src tests/ --cov-report=term-missing
 
 lint:
 	ruff check .
@@ -124,12 +141,12 @@ typecheck:
 	mypy app scripts tests src/wire/main.py --ignore-missing-imports || echo "Ignoring mypy system package bug"
 
 security:
-	bandit -c pyproject.toml -r app src scripts webapp
+	bandit -c pyproject.toml -r app
 
 audit:
 	ruff check .
-	bandit -c pyproject.toml -r app src scripts webapp
-	pytest --cov=app --cov=webapp tests/ --cov-report=term-missing
+	bandit -c pyproject.toml -r app
+	PYTHONPATH=src pytest --cov=src tests/ --cov-report=term-missing
 
 proto-gen:
 	python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. app/proto/wire.proto

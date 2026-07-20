@@ -1,0 +1,5 @@
+cloudflare_zone_id   = "REPLACE_WITH_REAL_ZONE_ID"
+cloudflare_tunnel_id = "REPLACE_WITH_REAL_TUNNEL_UUID"
+
+zc_domain     = "zai.zeaz.dev"
+zc_api_domain = "api.zeaz.dev"

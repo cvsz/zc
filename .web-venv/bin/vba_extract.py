@@ -57,7 +57,7 @@ try:
         print(f"Extracted: {vba_signature_filename}")
 
 
-except OSError as e:
+except IOError as e:
     print(f"File error: {str(e)}")
     sys.exit()
 

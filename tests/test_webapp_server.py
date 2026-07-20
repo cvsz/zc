@@ -6,10 +6,12 @@ API calls happen anywhere in this file, same convention as
 tests/test_coder.py.
 """
 import sys
+import asyncio
 from pathlib import Path
 
 import pytest
-from fastapi.testclient import TestClient
+import httpx
+import fastapi.routing
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -19,10 +21,16 @@ import webapp.backend.server as server  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
-def _isolate_state():
+def _isolate_state(monkeypatch):
     """Each test gets an empty session store and a fresh rate-limit
     bucket, so tests can't leak state into each other via the
     process-local dicts server.py uses."""
+    async def run_inline(call, *args, **kwargs):
+        return call(*args, **kwargs)
+
+    # This test host cannot wake event-loop callbacks from worker threads.
+    # Route callables are deterministic local functions, so execute them inline.
+    monkeypatch.setattr(fastapi.routing, "run_in_threadpool", run_inline)
     server._sessions.clear()
     server._rate_buckets.clear()
     yield
@@ -32,7 +40,27 @@ def _isolate_state():
 
 @pytest.fixture
 def client():
-    return TestClient(server.app)
+    class SyncASGIClient:
+        """Synchronous facade over httpx's in-process ASGI transport."""
+
+        def request(self, method, url, **kwargs):
+            async def send():
+                transport = httpx.ASGITransport(app=server.app)
+                async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+                    return await client.request(method, url, **kwargs)
+
+            return asyncio.run(send())
+
+        def get(self, url, **kwargs):
+            return self.request("GET", url, **kwargs)
+
+        def post(self, url, **kwargs):
+            return self.request("POST", url, **kwargs)
+
+        def delete(self, url, **kwargs):
+            return self.request("DELETE", url, **kwargs)
+
+    yield SyncASGIClient()
 
 
 def test_version_endpoint(client):

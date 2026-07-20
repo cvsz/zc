@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: upload-processor
-        image: wire:latest
+        image: wire-enterprise:2.0.0
         command: ["python", "-m", "app.workers.upload_processor"]
         env:
         - name: S3_BUCKET

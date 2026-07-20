@@ -17,9 +17,9 @@ def test_set_and_get_roundtrip(isolated_config):
 
 def test_set_persists_to_disk(isolated_config):
     cfg = Config()
-    cfg.set("model", "zc-sonnet-5")
+    cfg.set("model", "zc-xxx")
     on_disk = json.loads(isolated_config.read_text())
-    assert on_disk["model"] == "zc-sonnet-5"
+    assert on_disk["model"] == "zc-xxx"
 
 
 def test_new_instance_reads_persisted_value(isolated_config):

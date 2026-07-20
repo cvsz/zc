@@ -189,7 +189,7 @@ class CachingCoder:
 
     ENDPOINT = "https://api.anthropic.com/v1/messages"
 
-    def __init__(self, api_key: str, model: str = "zc-sonnet-5",
+    def __init__(self, api_key: str, model: str = "zc-xxx",
                  max_tokens: int = 4096, ttl: str = "5m"):
         self.api_key    = api_key
         self.model      = model

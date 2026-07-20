@@ -34,7 +34,13 @@ async def test_missing_api_key_shows_error_message():
 
 
 @pytest.mark.asyncio
-async def test_submitting_prompt_adds_user_and_assistant_messages():
+async def test_submitting_prompt_adds_user_and_assistant_messages(monkeypatch):
+    # Keep the UI test hermetic and avoid leaving a provider worker running
+    # after Textual's test harness exits. Generation has its own unit tests.
+    def fake_generation(self, prompt, model, system, temperature, streaming, reply_widget):
+        reply_widget.update_text("mock assistant reply")
+
+    monkeypatch.setattr(tui.wireTUI, "_run_generation", fake_generation)
     app = tui.wireTUI(api_key="test-key")
     async with app.run_test() as pilot:
         await pilot.pause()

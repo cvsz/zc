@@ -1,6 +1,30 @@
 # Architecture
 
-## Overview
+## Current product boundaries
+
+The canonical deployment is a local FastAPI origin published through
+Cloudflare Tunnel and protected by Cloudflare Access. Application
+authorization remains mandatory for mutating routes. The HTTP and gRPC
+origins bind to loopback in the local-first profile.
+
+```text
+Browser / CLI
+      |
+Cloudflare Access + Tunnel
+      |
+app/ FastAPI on 127.0.0.1:8000
+      |
+local files + atomic session metadata
+```
+
+The repository also retains an installed compatibility CLI under `src/wire/`,
+an optional local web adapter under `webapp/`, and development-only agent
+configuration. Their ownership, dependency direction, and migration gates are
+defined by
+[ADR-001](docs/adr/ADR-001-product-surface-boundaries.md) and enforced by
+tests.
+
+## Legacy CLI architecture
 
 wire is a single-process Python CLI that wraps the Anthropic Messages
 API, plus a modular set of feature areas (one `zc_*.py` file per API

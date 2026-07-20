@@ -260,7 +260,7 @@ WORKFLOW:
 class CoworkAgent:
     """Autonomous multi-step task executor."""
 
-    def __init__(self, api_key: str, model: str = "zc-sonnet-5",
+    def __init__(self, api_key: str, model: str = "zc-xxx",
                  max_tokens: int = 8192):
         self.api_key    = api_key
         self.model      = model

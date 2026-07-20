@@ -61,7 +61,7 @@ class EvalRun:
 class LLMJudge:
     """Uses zAICoder to judge whether a response satisfies the expected criterion."""
 
-    def __init__(self, api_key: str, judge_model: str = "zc-sonnet-5"):
+    def __init__(self, api_key: str, judge_model: str = "zc-xxx"):
         self.client = anthropic.Anthropic(api_key=api_key)
         self.model  = judge_model
 
@@ -94,8 +94,8 @@ class LLMJudge:
 
 
 class EvalRunner:
-    def __init__(self, api_key: str, model: str = "zc-sonnet-5",
-                 judge_model: str = "zc-sonnet-5", pass_threshold: float = 0.7):
+    def __init__(self, api_key: str, model: str = "zc-xxx",
+                 judge_model: str = "zc-xxx", pass_threshold: float = 0.7):
         self.client    = anthropic.Anthropic(api_key=api_key)
         self.model     = model
         self.judge     = LLMJudge(api_key, judge_model)
@@ -151,7 +151,7 @@ def _save_run(run: EvalRun):
 # ── CLI commands ──────────────────────────────────────────────────────────────
 
 def cmd_eval_run(suite_path: str, api_key: str, model: str,
-                 judge_model: str = "zc-sonnet-5",
+                 judge_model: str = "zc-xxx",
                  threshold: float = 0.7, output: Optional[str] = None):
     """Run an eval suite (JSON file of [{case_id, prompt, expected, tags}])"""
     data  = json.loads(Path(suite_path).read_text())
@@ -167,7 +167,7 @@ def cmd_eval_run(suite_path: str, api_key: str, model: str,
 
 
 def cmd_eval_compare(suite_path: str, model_a: str, model_b: str,
-                     api_key: str, judge_model: str = "zc-sonnet-5"):
+                     api_key: str, judge_model: str = "zc-xxx"):
     """Compare two models head-to-head on the same eval suite."""
     data  = json.loads(Path(suite_path).read_text())
     cases = [EvalCase(**c) for c in data]

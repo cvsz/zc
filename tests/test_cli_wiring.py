@@ -129,10 +129,10 @@ def test_ab_test_flags_parse(parsed_args):
 
 
 def test_metrics_show_and_modifiers_parse(parsed_args):
-    args = parsed_args(["--metrics-show", "--metrics-today", "--metrics-model", "zc-sonnet-5"])
+    args = parsed_args(["--metrics-show", "--metrics-today", "--metrics-model", "zc-xxx"])
     assert args.metrics_show is True
     assert args.metrics_today is True
-    assert args.metrics_model == "zc-sonnet-5"
+    assert args.metrics_model == "zc-xxx"
 
 
 def test_metrics_export_flag_parses(parsed_args):

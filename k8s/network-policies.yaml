@@ -7,11 +7,7 @@ spec:
   endpointSelector:
     matchLabels: {}
   ingress: []
-  egress:
-    - toEntities:
-        - cluster
-        - host
-        - world
+  egress: []
 ---
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
@@ -31,6 +27,8 @@ spec:
         - ports:
             - port: "8000"
               protocol: TCP
+            - port: "8001"
+              protocol: TCP
   egress:
     # Allow API to talk to Redis and Database
     - toEndpoints:
@@ -38,9 +36,6 @@ spec:
             app: redis
         - matchLabels:
             app: postgres
-    # Allow external API calls (e.g., to LLM providers)
-    - toEntities:
-        - world
 ---
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
@@ -50,7 +45,7 @@ metadata:
 spec:
   endpointSelector:
     matchLabels:
-      app: upload-worker
+      app: wire-workers
   ingress:
     # Workers don't take direct ingress, they pull from Redis/NATS
     []
@@ -61,6 +56,3 @@ spec:
             app: redis
         - matchLabels:
             app: minio
-    # Allow external egress for webhooks or external storage
-    - toEntities:
-        - world

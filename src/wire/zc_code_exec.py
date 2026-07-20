@@ -60,7 +60,7 @@ CODE_EXEC_TOOL = {
 class CodeExecutionCoder:
     """zAICoder client with server-side code execution."""
 
-    def __init__(self, api_key: str, model: str = "zc-sonnet-5",
+    def __init__(self, api_key: str, model: str = "zc-xxx",
                  max_tokens: int = 8192,
                  code_exec_version: str = DEFAULT_CODE_EXEC_VERSION):
         self.api_key           = api_key

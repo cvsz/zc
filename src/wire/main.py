@@ -58,7 +58,7 @@ def _api_key(args):
     return k
 
 def _model(args):
-    return getattr(args, "model", "zc-sonnet-5") or "zc-sonnet-5"
+    return getattr(args, "model", "zc-xxx") or "zc-xxx"
 
 def _read_file(path):
     try:
@@ -83,7 +83,7 @@ def build_parser():
     g.add_argument("--tui", action="store_true",
                    help="Launch the full-screen Textual TUI (see tui.py) — model/personality/"
                         "agent/skill sidebar plus a streaming chat transcript, in the terminal")
-    g.add_argument("--model", default="zc-sonnet-5")
+    g.add_argument("--model", default="zc-xxx")
     g.add_argument("--temperature", type=float, default=0.3)
     g.add_argument("--max-tokens", type=int, default=4096, dest="max_tokens")
     g.add_argument("--api-key", default="", dest="api_key")
@@ -1078,6 +1078,19 @@ def main():
             print(f"  {p_['name']:<12} — {p_['description']}")
         return
 
+    # Specialized domains are now server-owned resources. This dispatcher
+    # only maps known flags to explicit REST paths; it cannot execute an
+    # arbitrary CLI command on the API host.
+    from wire.api_client import EnterpriseAPIError
+    from wire.enterprise_commands import dispatch_enterprise_resource_command
+
+    try:
+        if dispatch_enterprise_resource_command(args):
+            return
+    except EnterpriseAPIError as exc:
+        print(f"[API ERROR] {exc}", file=sys.stderr)
+        sys.exit(1)
+
     # ── Plugins & Marketplaces (no API key required) ──
     if args.plugin_marketplace_add:
         from wire.zc_plugins import cmd_plugin_marketplace_add
@@ -1341,66 +1354,6 @@ def main():
         cmd_upgrade_all(args.upgrade_all, target=args.upgrade_target,
                         apply=args.upgrade_yes, no_backup=args.upgrade_no_backup); return
 
-    if args.project_list:
-        from wire.projects import cmd_project_list; cmd_project_list(); return
-    if args.project_templates:
-        from wire.projects import cmd_project_templates; cmd_project_templates(); return
-    if args.project_show:
-        from wire.projects import cmd_project_show; cmd_project_show(args.project_show); return
-    if args.project_delete:
-        from wire.exceptions import SecurityError, ValidationError
-        from wire.projects import ProjectManager
-        try:
-            ProjectManager().delete_project(args.project_delete)
-            print("✓ Deleted.")
-        except (SecurityError, ValidationError) as e:
-            print(f"✗ Error: {e}")
-            sys.exit(1)
-        return
-    if args.project_archive:
-        from wire.projects import ProjectManager; ProjectManager().archive_project(args.project_archive)
-        print("✓ Archived."); return
-    if args.project_create:
-        from wire.projects import cmd_project_create
-        cmd_project_create(args.project_create, args.project_desc, args.project_template); return
-    if args.project_add_task:
-        from wire.projects import cmd_project_add_task
-        cmd_project_add_task(args.project_add_task, args.task_title or args.prompt or "",
-                             args.task_desc, args.task_agent, args.task_priority); return
-    if args.artifact_types:
-        from wire.artifacts import cmd_artifact_types; cmd_artifact_types(); return
-    if args.artifact_list:
-        from wire.artifacts import cmd_artifact_list
-        cmd_artifact_list(query=args.artifact_query,
-            artifact_type=args.artifact_type if args.artifact_type!="code" else "",
-            project_id=args.artifact_project, tag=args.tag); return
-    if args.artifact_show:
-        from wire.artifacts import cmd_artifact_show
-        cmd_artifact_show(args.artifact_show, args.artifact_version); return
-    if args.artifact_export:
-        from wire.artifacts import cmd_artifact_export
-        cmd_artifact_export(args.artifact_export, args.output or "", args.artifact_version); return
-    if args.artifact_export_all:
-        from wire.artifacts import cmd_artifact_export_all
-        cmd_artifact_export_all(args.artifact_export_all, args.artifact_output_dir); return
-    if args.artifact_diff:
-        from wire.artifacts import cmd_artifact_diff
-        cmd_artifact_diff(args.artifact_diff, args.v1, args.v2); return
-    if args.artifact_delete:
-        from wire.artifacts import cmd_artifact_delete
-        from wire.exceptions import SecurityError, ValidationError
-        try:
-            cmd_artifact_delete(args.artifact_delete)
-            print("✓ Deleted.")
-        except (SecurityError, ValidationError) as e:
-            print(f"✗ Error: {e}")
-            sys.exit(1)
-        return
-    if args.artifact_tag:
-        from wire.artifacts import cmd_artifact_tag; cmd_artifact_tag(args.artifact_tag, args.tag); return
-    if args.artifact_attach:
-        from wire.artifacts import cmd_artifact_attach
-        cmd_artifact_attach(args.artifact_attach, args.to_project); return
     if args.list_server_tools:
         from wire.zc_tools import cmd_list_server_tools; cmd_list_server_tools(); return
     if args.cowork_list:
@@ -1551,14 +1504,8 @@ def main():
         # --temperature was accepted by the parser but never reached cmd_live,
         # so live mode always used LiveSession's 0.7 default regardless of the
         # flag. Now threaded through (still safely dropped by sampling_kwargs()
-        # for zc-sonnet-5 and later, which reject it).
+        # for zc-xxx and later, which reject it).
         cmd_live(key, model=model, temperature=args.temperature); return
-
-    # ── Deep Research ──
-    if args.research:
-        from wire.zc_research import cmd_research
-        cmd_research(args.research, key, model, depth=args.research_depth,
-                     source_urls=args.research_urls, output=args.output); return
 
     # ── RAG (query needs the key for generation; index/list handled above) ──
     if args.rag_query:
@@ -1800,21 +1747,6 @@ def main():
     if args.structured_extract:
         from wire.zc_structured import cmd_structured_extract
         cmd_structured_extract(args.structured_extract, args.schema, key, model); return
-    if args.file_upload:
-        from wire.zc_files import cmd_file_upload
-        cmd_file_upload(args.file_upload, key, model); return
-    if args.file_list:
-        from wire.zc_files import cmd_file_list; cmd_file_list(key, model); return
-    if args.file_delete:
-        from wire.zc_files import cmd_file_delete; cmd_file_delete(args.file_delete, key); return
-    if args.file_ask:
-        from wire.zc_files import cmd_file_ask
-        cmd_file_ask(args.file_ask, args.prompt or "Summarise.", key, model,
-                     media_type=args.file_media_type); return
-    if args.file_download:
-        from wire.zc_files import cmd_file_download
-        cmd_file_download(args.file_download,
-                          args.file_output or args.output or f"{args.file_download}.bin", key); return
     if args.code_exec:
         from wire.zc_code_exec import cmd_code_exec
         cmd_code_exec(args.prompt or "", key, model,
@@ -1849,147 +1781,6 @@ def main():
             cmd_agent_chat(args.prompt or "", key, model,
                            session_id=args.agent_session)
         return
-    if args.agent_dream:
-        from wire.zc_agents_sdk import cmd_agent_dream
-        sess_ids = [s.strip() for s in args.agent_dream_sessions.split(",") if s.strip()] or None
-        cmd_agent_dream(args.agent_dream, key, model=model, session_ids=sess_ids,
-                        instructions=args.agent_dream_instructions or None); return
-    if args.agent_dream_get:
-        from wire.zc_agents_sdk import cmd_agent_dream_get
-        cmd_agent_dream_get(args.agent_dream_get, key); return
-    if args.agent_dream_list:
-        from wire.zc_agents_sdk import cmd_agent_dream_list
-        cmd_agent_dream_list(key); return
-    if args.agent_webhook_register:
-        from wire.zc_agents_sdk import cmd_agent_webhook_register
-        events = [e.strip() for e in args.agent_webhook_events.split(",") if e.strip()] or None
-        cmd_agent_webhook_register(args.agent_webhook_register, key, events=events); return
-    if args.agent_vault_create:
-        from wire.zc_agents_sdk import cmd_agent_vault_create
-        cmd_agent_vault_create(args.agent_vault_create, key,
-                               external_user_id=args.agent_vault_external_user or None); return
-    if args.agent_vault_add_credential:
-        from wire.zc_agents_sdk import cmd_agent_vault_add_credential
-        if not args.agent_vault_cred_type:
-            print("[ERROR] --agent-vault-add-credential requires --agent-vault-cred-type"); sys.exit(1)
-        domains = [d.strip() for d in args.agent_vault_allowed_domains.split(",") if d.strip()] or None
-        cmd_agent_vault_add_credential(
-            args.agent_vault_add_credential, args.agent_vault_cred_type, key,
-            mcp_server_url=args.agent_vault_mcp_url or None,
-            secret_name=args.agent_vault_secret_name or None,
-            secret_value=args.agent_vault_secret,
-            allowed_domains=domains,
-            injection_location=args.agent_vault_injection_location or None,
-        ); return
-    if args.agent_vault_list:
-        from wire.zc_agents_sdk import cmd_agent_vault_list
-        cmd_agent_vault_list(key); return
-    if args.agent_schedule_create:
-        from wire.zc_agents_sdk import cmd_agent_schedule_create
-        if not args.agent_schedule_env or not args.agent_schedule_cron:
-            print("[ERROR] --agent-schedule-create requires --agent-schedule-env "
-                  "and --agent-schedule-cron"); sys.exit(1)
-        cmd_agent_schedule_create(args.agent_schedule_create, args.agent_schedule_env,
-                                  args.agent_schedule_cron, key,
-                                  timezone=args.agent_schedule_tz,
-                                  task=args.agent_schedule_task); return
-    if args.agent_schedule_list:
-        from wire.zc_agents_sdk import cmd_agent_schedule_list
-        cmd_agent_schedule_list(key); return
-    if args.agent_schedule_cancel:
-        from wire.zc_agents_sdk import cmd_agent_schedule_cancel
-        cmd_agent_schedule_cancel(args.agent_schedule_cancel, key); return
-    if args.agent_review_multiagent:
-        from wire.zc_agents_sdk import cmd_agent_review_multiagent
-        specialists = [s.strip() for s in args.agent_review_specialists.split(",") if s.strip()]
-        cmd_agent_review_multiagent(args.agent_review_multiagent, specialists, key, model=model); return
-    if args.agent_outcome_rubric_upload:
-        from wire.zc_agents_sdk import cmd_agent_outcome_rubric_upload
-        cmd_agent_outcome_rubric_upload(args.agent_outcome_rubric_upload, key, model); return
-    if args.agent_env_self_hosted:
-        from wire.zc_agents_sdk import cmd_agent_env_self_hosted_create
-        cmd_agent_env_self_hosted_create(args.agent_env_self_hosted, key); return
-    if args.agent_env_work_stats:
-        from wire.zc_agents_sdk import cmd_agent_env_work_stats
-        cmd_agent_env_work_stats(args.agent_env_work_stats, key); return
-    if args.agent_managed_run:
-        # Real hosted zAICoder Managed Agents API (/v1/agents, /v1/environments,
-        # /v1/sessions) — distinct from --agent-session above, which runs a
-        # local agent loop over the plain Messages API. See
-        # zc_agents_sdk.ManagedAgentsClient.
-        from wire.zc_agents_sdk import cmd_managed_agent_run
-        outcome_rubric_text = None
-        if args.agent_outcome_rubric:
-            outcome_rubric_text = Path(args.agent_outcome_rubric).read_text(encoding="utf-8")
-        if args.agent_outcome and not outcome_rubric_text and not args.agent_outcome_rubric_file:
-            print("[ERROR] --agent-outcome requires --agent-outcome-rubric FILE "
-                  "or --agent-outcome-rubric-file FILE_ID"); sys.exit(1)
-        agent_overrides = None
-        if args.agent_override_json:
-            import json as _json
-            agent_overrides = _json.loads(Path(args.agent_override_json).read_text(encoding="utf-8"))
-        if args.agent_override_model or args.agent_override_system:
-            agent_overrides = agent_overrides or {}
-            if args.agent_override_model:
-                agent_overrides["model"] = args.agent_override_model
-            if args.agent_override_system:
-                agent_overrides["system"] = args.agent_override_system
-        cmd_managed_agent_run(args.agent_managed_run, key, model=model,
-                              memory_store=args.agent_memory_store or None,
-                              outcome_description=args.agent_outcome or None,
-                              outcome_rubric=outcome_rubric_text,
-                              outcome_rubric_file_id=args.agent_outcome_rubric_file or None,
-                              outcome_max_iterations=args.agent_outcome_max_iter,
-                              vault_id=args.agent_vault or None,
-                              agent_overrides=agent_overrides,
-                              stream_deltas=args.agent_stream_deltas); return
-    if args.agent_memory_store_create:
-        from wire.zc_agents_sdk import cmd_agent_memory_store_create
-        if not args.agent_memory_store:
-            print("[ERROR] --agent-memory-store-create requires --agent-memory-store NAME"); sys.exit(1)
-        cmd_agent_memory_store_create(args.agent_memory_store, key); return
-    if args.agent_memory_list:
-        from wire.zc_agents_sdk import cmd_agent_memory_list
-        depth = int(args.agent_memory_depth) if args.agent_memory_depth else None
-        cmd_agent_memory_list(args.agent_memory_list, key,
-                              path_prefix=args.agent_memory_path_prefix or None,
-                              depth=depth); return
-    if args.agent_memory_stores_list:
-        from wire.zc_agents_sdk import cmd_agent_memory_stores_list
-        cmd_agent_memory_stores_list(
-            key, include_archived=args.agent_memory_stores_include_archived); return
-    if args.agent_memory_store_archive:
-        from wire.zc_agents_sdk import cmd_agent_memory_store_archive
-        cmd_agent_memory_store_archive(args.agent_memory_store_archive, key); return
-    if args.agent_memory_store_delete:
-        from wire.zc_agents_sdk import cmd_agent_memory_store_delete
-        cmd_agent_memory_store_delete(args.agent_memory_store_delete, key,
-                                      confirm=args.agent_memory_store_delete_yes); return
-    if args.agent_memory_get:
-        from wire.zc_agents_sdk import cmd_agent_memory_get
-        if not args.agent_memory_id:
-            print("[ERROR] --agent-memory-get requires --agent-memory-id"); sys.exit(1)
-        cmd_agent_memory_get(args.agent_memory_get, args.agent_memory_id, key); return
-    if args.agent_memory_create:
-        from wire.zc_agents_sdk import cmd_agent_memory_create
-        if not args.agent_memory_path or not args.agent_memory_content:
-            print("[ERROR] --agent-memory-create requires --agent-memory-path "
-                  "and --agent-memory-content"); sys.exit(1)
-        cmd_agent_memory_create(args.agent_memory_create, args.agent_memory_path,
-                                args.agent_memory_content, key); return
-    if args.agent_memory_update:
-        from wire.zc_agents_sdk import cmd_agent_memory_update
-        if not args.agent_memory_id:
-            print("[ERROR] --agent-memory-update requires --agent-memory-id"); sys.exit(1)
-        cmd_agent_memory_update(args.agent_memory_update, args.agent_memory_id, key,
-                                content=args.agent_memory_content or None,
-                                path=args.agent_memory_path or None); return
-    if args.agent_memory_delete:
-        from wire.zc_agents_sdk import cmd_agent_memory_delete
-        if not args.agent_memory_id:
-            print("[ERROR] --agent-memory-delete requires --agent-memory-id"); sys.exit(1)
-        cmd_agent_memory_delete(args.agent_memory_delete, args.agent_memory_id, key,
-                                confirm=args.agent_memory_delete_yes); return
     if args.cowork:
         from wire.cowork import cmd_cowork
         prompt = args.cowork_prompt or args.prompt or ""
@@ -2043,33 +1834,34 @@ def main():
         from wire.zc_code import cmd_code_cost
         cmd_code_cost(key); return
 
-    if args.project_plan:
-        from wire.coder import Coder
-        from wire.projects import cmd_project_plan
-        cmd_project_plan(args.project_plan, Coder(api_key=key, model=model)); return
-    if args.project_run:
-        from wire.coder import Coder
-        from wire.projects import cmd_project_run
-        cmd_project_run(args.project_run, args.task or "all",
-                        Coder(api_key=key, model=model)); return
-    if args.artifact_create:
-        from wire.artifacts import cmd_artifact_create
-        from wire.coder import Coder
-        if not args.prompt:
-            print("[ERROR] --artifact-create requires -p"); sys.exit(1)
-        tags = [t.strip() for t in args.artifact_tags.split(",") if t.strip()]
-        cmd_artifact_create(args.artifact_create, args.prompt,
-                            artifact_type=args.artifact_type,
-                            language=args.artifact_lang, tags=tags,
-                            project_id=args.artifact_project,
-                            coder=Coder(api_key=key, model=model)); return
-    if args.artifact_iterate:
-        from wire.artifacts import cmd_artifact_iterate
-        from wire.coder import Coder
-        cmd_artifact_iterate(args.artifact_iterate, args.prompt or "",
-                             Coder(api_key=key, model=model)); return
-
     if args.prompt or args.file:
+        from wire.api_client import EnterpriseAPIClient, EnterpriseAPIError
+
+        api_client = EnterpriseAPIClient.from_env()
+        if api_client is not None:
+            payload = {
+                "prompt": args.prompt or "",
+                "model": model,
+                "temperature": args.temperature,
+                "max_tokens": args.max_tokens,
+                "file_content": _read_file(args.file) if args.file else None,
+                "personality": args.personality,
+                "agent": args.agent,
+                "skill": args.skill,
+                "service_tier": args.service_tier,
+                "inference_geo": args.inference_geo,
+                "fast_mode": args.fast_mode,
+            }
+            try:
+                result = api_client.create_response(payload)
+            except EnterpriseAPIError as exc:
+                print(f"[API ERROR] {exc}", file=sys.stderr)
+                sys.exit(1)
+            print(result)
+            if args.output:
+                Path(args.output).write_text(result, encoding="utf-8")
+            return
+
         from wire.coder import Coder
         c = Coder(api_key=key, model=model,
                   temperature=args.temperature, max_tokens=args.max_tokens,

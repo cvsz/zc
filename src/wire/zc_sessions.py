@@ -37,7 +37,7 @@ class Session:
     sid:     str = field(default_factory=lambda: str(uuid.uuid4())[:12])
     mode:    str = "interactive"
     title:   Optional[str] = None
-    model:   str = "zc-sonnet-5"
+    model:   str = "zc-xxx"
     persona: Optional[str] = None
     turns:   list[Turn] = field(default_factory=list)
     created: str = field(default_factory=lambda: datetime.now().isoformat())
@@ -56,7 +56,7 @@ class Session:
     @staticmethod
     def from_dict(d):
         s = Session(sid=d["sid"], mode=d.get("mode","interactive"),
-                    title=d.get("title"), model=d.get("model","zc-sonnet-5"),
+                    title=d.get("title"), model=d.get("model","zc-xxx"),
                     persona=d.get("persona"), created=d.get("created",""),
                     updated=d.get("updated",""))
         s.turns = [Turn.from_dict(t) for t in d.get("turns", [])]

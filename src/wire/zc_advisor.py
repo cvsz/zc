@@ -64,7 +64,7 @@ _breaker = CircuitBreaker(failure_threshold=5, reset_timeout=30)
 # ~7pp if it hasn't called the advisor in its first assistant turn.
 ADVISOR_EXECUTOR_MODELS = {
     "zc-opus-4-8", "zc-opus-4-7", "zc-opus-4-6",
-    "zc-sonnet-5", "zc-sonnet-4-6",
+    "zc-xxx", "zc-sonnet-4-6",
     "zc-haiku-4-5", "zc-haiku-4-5-20251001",
     "zc-fable-5",
 }
@@ -97,7 +97,7 @@ class AdvisorCoder:
     attached, including the pause_turn resume loop the advisor tool uses
     when it needs to hand a pending call back to you before continuing."""
 
-    def __init__(self, api_key: str, executor_model: str = "zc-sonnet-5",
+    def __init__(self, api_key: str, executor_model: str = "zc-xxx",
                  max_tokens: int = 4096):
         self.api_key        = api_key
         self.executor_model = executor_model

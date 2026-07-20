@@ -76,7 +76,16 @@ docker build -t zcoder:local .
 docker run --rm --name zcoder-local -p 8000:8000 zcoder:local
 ```
 
-The image uses the same port and health contract as local execution and removes the nondeterministic `apt-get upgrade` build step.
+The image uses the same port and health contract as local execution and removes
+the nondeterministic `apt-get upgrade` build step. Deployment dependencies are
+installed from `requirements-deploy.lock` with pip hash verification.
+
+Regenerate and verify the Python 3.11/Linux deployment lock with:
+
+```bash
+make requirements-lock
+make requirements-lock-check
+```
 
 ## Repository map
 
@@ -96,6 +105,7 @@ monitoring/             Observability assets
 
 - [Quickstart](QUICKSTART.md)
 - [Architecture](ARCHITECTURE.md)
+- [Product surface boundaries](docs/adr/ADR-001-product-surface-boundaries.md)
 - [Agents](AGENTS.md)
 - [Roadmap](ROADMAP.md)
 - [Changelog](CHANGELOG.md)
@@ -103,15 +113,19 @@ monitoring/             Observability assets
 
 Living documents must match executable repository state. Historical upgrade and phase-completion documents remain immutable evidence unless a separate correction notice is added. `.zc/skills/**/SKILL.md` files are operational agent instructions and change only with the corresponding skill behavior.
 
-## Remaining release-hardening work
+## Release hardening status
 
-The runtime and packaging defects identified by the audit are repaired. Remaining non-blocking release engineering work includes:
-
-1. Generate hash-locked deployment dependencies.
-2. Pin critical GitHub Actions to reviewed commit SHAs.
-3. Generate SBOM and provenance attestations for release images.
-4. Gradually replace broad legacy Ruff/Bandit suppressions with scoped justifications outside the supported `app/` runtime.
-5. Consolidate or formally separate `app/`, `src/wire/`, web, and agent product surfaces.
+The runtime and packaging defects identified by the audit are repaired.
+Deployment dependencies are hash-locked, and third-party GitHub Actions are
+pinned to full commit SHAs with their release tags retained as comments.
+Release images carry BuildKit SBOM and max-level provenance attestations, and
+the immutable image digest is recorded in the release job summary. Ruff no
+longer has repository-wide ignores: legacy waivers are scoped to their product
+boundaries, while the supported API keeps only its documented line-length
+debt. Bandit scans the complete supported `app/` runtime without global test
+skips. ADR-001 formally separates the supported API, compatibility CLI,
+optional web adapter, and development-only agent tooling; tests enforce the
+allowed dependency direction and package manifest.
 
 ## Security
 
@@ -120,3 +134,19 @@ Do not commit provider credentials or production secrets. Configure them through
 ## License
 
 Package metadata declares MIT. Confirm repository-level license documents and third-party assets remain consistent before distribution.
+
+## Enterprise API mode
+
+Start the API separately with `zc-api`, or run `app.main:app` directly. The
+compatibility CLI can delegate model and resource operations to the local API:
+
+```bash
+zc-api --host 127.0.0.1 --port 8000 --workers 1
+export ZC_API_URL=http://127.0.0.1:8000
+export ZC_API_TOKEN="<short-lived-gateway-token>"
+zc --prompt "Review this service boundary"
+```
+
+Provider credentials remain on the API host. Resource access is scoped by the
+authenticated JWT tenant, and vault secret values are write-only through the
+API.

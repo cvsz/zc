@@ -48,7 +48,7 @@ class AmbientBuffer:
 
 
 class LiveSession:
-    def __init__(self, api_key: str, model: str = "zc-sonnet-5",
+    def __init__(self, api_key: str, model: str = "zc-xxx",
                  temperature: float = 0.7, personality_prompt: str = ""):
         self.client      = anthropic.Anthropic(api_key=api_key)
         self.model       = model
@@ -73,7 +73,7 @@ class LiveSession:
             with self.client.messages.stream(
                 model=self.model, max_tokens=4096,
                 # Was hardcoded temperature=self.temperature, unguarded — 400s
-                # (invalid_request_error) the moment self.model is zc-sonnet-5
+                # (invalid_request_error) the moment self.model is zc-xxx
                 # (the default), which rejects any explicit sampling param. Route
                 # through sampling_kwargs() like coder.py/zc_eval.py do.
                 **sampling_kwargs(self.model, temperature=self.temperature),
@@ -124,7 +124,7 @@ def _handle_slash(cmd: str, session: LiveSession) -> bool:
     return False
 
 
-def cmd_live(api_key: str, model: str = "zc-sonnet-5",
+def cmd_live(api_key: str, model: str = "zc-xxx",
              temperature: float = 0.7, personality_prompt: str = ""):
     session = LiveSession(api_key, model, temperature, personality_prompt)
     print(f"⚡ zai-live  model={model}  /help for commands  Ctrl+C to quit\n")

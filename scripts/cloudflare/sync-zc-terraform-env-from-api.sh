@@ -1,0 +1,225 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+IFS=$'\n\t'
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+SCRIPT_DIR="${ROOT_DIR}/scripts/cloudflare"
+API_BASE="${CLOUDFLARE_API_BASE:-https://api.cloudflare.com/client/v4}"
+
+ZONE_NAME="${ZONE_NAME:-zeaz.dev}"
+TUNNEL_NAME="${CLOUDFLARE_TUNNEL_NAME:-${ZC_TUNNEL_NAME:-zc}}"
+
+ZC_DOMAIN="${ZC_DOMAIN:-zai.zeaz.dev}"
+ZC_API_DOMAIN="${ZC_API_DOMAIN:-api.zeaz.dev}"
+
+ENV_CLOUDFLARE="${ENV_CLOUDFLARE:-${ROOT_DIR}/.env.cloudflare}"
+ENV_MAIN="${ENV_MAIN:-${ROOT_DIR}/.env}"
+ENV_GENERATED="${ENV_GENERATED:-${ROOT_DIR}/.env.cloudflare.zc.generated}"
+REPORT="${ROOT_DIR}/docs/reports/generated/zc-cloudflare-env-sync.md"
+
+mkdir -p "${ROOT_DIR}/docs/reports/generated"
+
+if [[ -f "${SCRIPT_DIR}/lib/env-scope.sh" ]]; then
+  # shellcheck source=scripts/cloudflare/lib/env-scope.sh
+  source "${SCRIPT_DIR}/lib/env-scope.sh"
+  cf_load_cloudflare_env_scope || true
+fi
+
+fail() {
+  echo "ERROR: $*" >&2
+  exit 1
+}
+
+need() {
+  command -v "$1" >/dev/null 2>&1 || fail "missing command: $1"
+}
+
+need curl
+need jq
+
+CF_BEARER_VALUE="${CLOUDFLARE_API_TOKEN:-${CLOUDFLARE_BOOTSTRAP_TOKEN:-}}"
+[[ -n "$CF_BEARER_VALUE" ]] || fail "missing CLOUDFLARE_API_TOKEN or CLOUDFLARE_BOOTSTRAP_TOKEN"
+
+for forbidden in CLOUDFLARE_API_KEY CF_API_KEY GLOBAL_API_KEY X_AUTH_KEY CF_GLOBAL_KEY; do
+  [[ -z "${!forbidden:-}" ]] || fail "refusing global API key variable: ${forbidden}"
+done
+
+cf_api() {
+  local method="$1"
+  local path="$2"
+
+  curl -fsS \
+    -X "$method" \
+    -H "Authorization: Bearer ${CF_BEARER_VALUE}" \
+    -H "Content-Type: application/json" \
+    "${API_BASE}${path}"
+}
+
+validate_zone_id() {
+  [[ "$1" =~ ^[a-f0-9]{32}$ ]] || fail "invalid Cloudflare zone id: $1"
+}
+
+validate_tunnel_id() {
+  [[ "$1" =~ ^[0-9a-fA-F-]{8}-[0-9a-fA-F-]{4}-[0-9a-fA-F-]{4}-[0-9a-fA-F-]{4}-[0-9a-fA-F-]{12}$ ]] || fail "invalid Cloudflare tunnel UUID: $1"
+}
+
+env_get() {
+  local file="$1"
+  local key="$2"
+
+  [[ -f "$file" ]] || return 0
+
+  awk -F= -v k="$key" '
+    $1 == k {
+      v=$0
+      sub(/^[^=]*=/, "", v)
+      gsub(/^"|"$/, "", v)
+      print v
+    }
+  ' "$file" | tail -n 1
+}
+
+env_set() {
+  local file="$1"
+  local key="$2"
+  local value="$3"
+  local tmp
+
+  mkdir -p "$(dirname "$file")"
+  touch "$file"
+  chmod 600 "$file"
+
+  tmp="$(mktemp "${file}.XXXXXX")"
+  chmod 600 "$tmp"
+
+  awk -F= -v k="$key" '$1 != k { print }' "$file" > "$tmp"
+  printf '%s="%s"\n' "$key" "$value" >> "$tmp"
+
+  mv "$tmp" "$file"
+  chmod 600 "$file"
+}
+
+env_unset() {
+  local file="$1"
+  local key="$2"
+  local tmp
+
+  [[ -f "$file" ]] || return 0
+  tmp="$(mktemp "${file}.XXXXXX")"
+  chmod 600 "$tmp"
+  awk -F= -v k="$key" '$1 != k { print }' "$file" >"$tmp"
+  mv "$tmp" "$file"
+  chmod 600 "$file"
+}
+
+zone_id="${TF_VAR_cloudflare_zone_id:-${CLOUDFLARE_ZONE_ID:-}}"
+
+if [[ -z "$zone_id" || "$zone_id" == REPLACE_* ]]; then
+  zone_id="$(cf_api GET "/zones?name=${ZONE_NAME}" | jq -r '.result[0].id // empty')"
+fi
+
+[[ -n "$zone_id" ]] || fail "could not resolve Cloudflare zone id for ${ZONE_NAME}"
+validate_zone_id "$zone_id"
+
+zone_name_from_api="$(cf_api GET "/zones/${zone_id}" | jq -r '.result.name // empty')"
+[[ "$zone_name_from_api" == "$ZONE_NAME" ]] || fail "zone id does not match ${ZONE_NAME}; got ${zone_name_from_api:-empty}"
+
+account_id="${CLOUDFLARE_ACCOUNT_ID:-$(env_get "$ENV_CLOUDFLARE" CLOUDFLARE_ACCOUNT_ID)}"
+[[ -n "$account_id" ]] || fail "missing CLOUDFLARE_ACCOUNT_ID"
+
+tunnel_id="${TF_VAR_cloudflare_tunnel_id:-${CLOUDFLARE_TUNNEL_ID:-}}"
+
+if [[ -z "$tunnel_id" || "$tunnel_id" == REPLACE_* ]]; then
+  tunnel_json="$(cf_api GET "/accounts/${account_id}/cfd_tunnel")"
+
+  tunnel_id="$(printf '%s' "$tunnel_json" | jq -r --arg name "$TUNNEL_NAME" '
+    (.result // [])
+    | map(select((.deleted_at // null) == null))
+    | map(select((.name // "") == $name))
+    | .[0].id // empty
+  ')"
+
+  if [[ -z "$tunnel_id" ]]; then
+    echo "WARN: tunnel named '${TUNNEL_NAME}' not found. Visible tunnels:" >&2
+    printf '%s' "$tunnel_json" | jq -r '
+      (.result // [])
+      | map(select((.deleted_at // null) == null))
+      | .[]
+      | "- " + (.id // "") + " name=" + (.name // "") + " status=" + (.status // "")
+    ' >&2
+    fail "set CLOUDFLARE_TUNNEL_NAME to the real tunnel name or set CLOUDFLARE_TUNNEL_ID"
+  fi
+fi
+
+validate_tunnel_id "$tunnel_id"
+
+for file in "$ENV_CLOUDFLARE" "$ENV_MAIN"; do
+  env_set "$file" CLOUDFLARE_ZONE_ID "$zone_id"
+  env_set "$file" CLOUDFLARE_TUNNEL_ID "$tunnel_id"
+  env_set "$file" CLOUDFLARE_TUNNEL_NAME "$TUNNEL_NAME"
+
+  env_set "$file" TF_VAR_cloudflare_zone_id "$zone_id"
+  env_set "$file" TF_VAR_cloudflare_tunnel_id "$tunnel_id"
+  env_unset "$file" TF_VAR_zc_wildcard_domain
+  env_set "$file" TF_VAR_zc_domain "$ZC_DOMAIN"
+  env_set "$file" TF_VAR_zc_api_domain "$ZC_API_DOMAIN"
+
+  chmod 600 "$file"
+done
+
+cat > "$ENV_GENERATED" <<EOF_ENV
+# Generated by scripts/cloudflare/sync-zc-terraform-env-from-api.sh
+# Local-only. Do not commit.
+COST_LOCK=true
+CLOUDFLARE_PLAN_TIER=Free
+ALLOW_PAID_CLOUDFLARE_FEATURES=false
+ALLOW_LOAD_BALANCING=false
+ALLOW_ADVANCED_WAF=false
+ALLOW_LOGPUSH=false
+ALLOW_R2_WRITE=false
+ALLOW_WORKERS_DEPLOY=false
+
+CLOUDFLARE_ZONE_ID=${zone_id}
+CLOUDFLARE_TUNNEL_ID=${tunnel_id}
+CLOUDFLARE_TUNNEL_NAME=${TUNNEL_NAME}
+
+TF_VAR_cloudflare_zone_id=${zone_id}
+TF_VAR_cloudflare_tunnel_id=${tunnel_id}
+TF_VAR_zc_domain=${ZC_DOMAIN}
+TF_VAR_zc_api_domain=${ZC_API_DOMAIN}
+EOF_ENV
+
+chmod 600 "$ENV_GENERATED"
+
+# Remove local placeholder tfvars that Terraform auto-loads.
+for f in "${ROOT_DIR}"/infra/cloudflare/terraform.tfvars "${ROOT_DIR}"/infra/cloudflare/*.auto.tfvars "${ROOT_DIR}"/infra/cloudflare/*.tfvars; do
+  [[ -f "$f" ]] || continue
+  if grep -q 'REPLACE_WITH_' "$f"; then
+    echo "Removing placeholder Terraform var file: $f"
+    rm -f "$f"
+  fi
+done
+
+cat > "$REPORT" <<EOF_REPORT
+# zc Cloudflare Terraform env sync
+
+Generated: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+- zone_name: ${ZONE_NAME}
+- zone_id: ${zone_id}
+- tunnel_name: ${TUNNEL_NAME}
+- tunnel_id: ${tunnel_id}
+- zc_domain: ${ZC_DOMAIN}
+- zc_api_domain: ${ZC_API_DOMAIN}
+
+Updated local files:
+
+- .env.cloudflare
+- .env
+- .env.cloudflare.zc.generated
+
+No secrets printed.
+EOF_REPORT
+
+echo "PASS: synced zc Terraform env from Cloudflare API"
+echo "Report: ${REPORT}"

@@ -5,10 +5,10 @@ from wire.utils import format_code_block, sampling_kwargs, wrap_text
 
 
 @pytest.mark.parametrize("model", [
-    "zc-sonnet-5",
+    "zc-xxx",
     "zc-fable-5",
     "zc-mythos-5",
-    "zc-sonnet-5-20260101",
+    "zc-xxx-20260101",
 ])
 def test_sampling_kwargs_omitted_for_no_sampling_models(model):
     assert sampling_kwargs(model, temperature=0.7) == {}

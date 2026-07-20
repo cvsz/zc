@@ -12,14 +12,62 @@ from fastapi import FastAPI, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from .api.v1.routes import router as wire_router
+from .api.v1.ai_routes import router as ai_router
+from .api.v1.resource_routes import router as resource_router
 from .core.cache import get_cache, init_cache, shutdown_cache
 from .core.config import get_config
 from .core.http_client import init_http_client, shutdown_http_client
+from .middleware.rate_limiter import RateLimitMiddleware
 from .services.upload_manager import init_upload_manager
+from .services.ai_service import AIServiceError, UnknownCapabilityError
+from .services.resource_store import ResourceConflictError, ResourceNotFoundError
 
 logger = logging.getLogger(__name__)
+
+
+class ResponseHeadersMiddleware:
+    """Add timing and defensive response headers without response buffering."""
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(
+        self, scope: Scope, receive: Receive, send: Send
+    ) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        started_at = time.perf_counter()
+
+        async def send_with_headers(message: Message) -> None:
+            if message["type"] == "http.response.start":
+                duration_ms = (time.perf_counter() - started_at) * 1000
+                headers = list(message.get("headers", []))
+                headers.extend(
+                    [
+                        (b"x-process-time", f"{duration_ms:.2f}ms".encode()),
+                        (
+                            b"strict-transport-security",
+                            b"max-age=31536000; includeSubDomains",
+                        ),
+                        (b"x-content-type-options", b"nosniff"),
+                        (b"x-frame-options", b"DENY"),
+                        (b"referrer-policy", b"no-referrer"),
+                        (
+                            b"content-security-policy",
+                            b"default-src 'none'; frame-ancestors 'none'; "
+                            b"base-uri 'none'",
+                        ),
+                    ]
+                )
+                message["headers"] = headers
+            await send(message)
+
+        await self.app(scope, receive, send_with_headers)
 
 
 def _set_component_state(
@@ -32,6 +80,7 @@ def _set_component_state(
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Initialize optional integrations and expose their state to readiness."""
     config = get_config()
+    config.validate()
     app.state.components = {}
 
     logger.info(
@@ -47,7 +96,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             _set_component_state(app, "redis", False, str(exc))
     else:
         _set_component_state(app, "redis", True, "disabled")
-
     try:
         await init_http_client()
         _set_component_state(app, "http_client", True)
@@ -101,29 +149,103 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Wildcard origins and credentialed requests are mutually unsafe. Development
-# permits any origin without credentials; production enables no cross-origin
-# callers unless an explicit policy is added by the deployment layer.
+@app.exception_handler(ResourceNotFoundError)
+async def resource_not_found_handler(
+    _request: Request, _exc: ResourceNotFoundError
+) -> JSONResponse:
+    return JSONResponse(
+        status_code=404,
+        content={
+            "error": {
+                "code": "not_found",
+                "message": "The requested resource was not found.",
+            }
+        },
+    )
+
+
+@app.exception_handler(ResourceConflictError)
+async def resource_conflict_handler(
+    _request: Request, _exc: ResourceConflictError
+) -> JSONResponse:
+    return JSONResponse(
+        status_code=409,
+        content={
+            "error": {
+                "code": "resource_conflict",
+                "message": "The resource conflicts with existing state.",
+            }
+        },
+    )
+
+
+@app.exception_handler(UnknownCapabilityError)
+async def unknown_capability_handler(
+    _request: Request, exc: UnknownCapabilityError
+) -> JSONResponse:
+    return JSONResponse(
+        status_code=422,
+        content={
+            "error": {
+                "code": "unknown_capability",
+                "message": str(exc),
+            }
+        },
+    )
+
+
+@app.exception_handler(AIServiceError)
+async def ai_service_error_handler(
+    _request: Request, _exc: AIServiceError
+) -> JSONResponse:
+    return JSONResponse(
+        status_code=502,
+        content={
+            "error": {
+                "code": "provider_error",
+                "message": "The AI provider could not complete the request.",
+            }
+        },
+    )
+
+
+@app.exception_handler(ValueError)
+async def domain_validation_handler(
+    _request: Request, exc: ValueError
+) -> JSONResponse:
+    return JSONResponse(
+        status_code=422,
+        content={
+            "error": {
+                "code": "domain_validation_error",
+                "message": str(exc),
+            }
+        },
+    )
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"] if config.debug else [],
-    allow_credentials=False,
-    allow_methods=["*"] if config.debug else [],
-    allow_headers=["*"] if config.debug else [],
+    allow_origins=config.cors_origins,
+    allow_credentials=bool(config.cors_origins),
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 app.add_middleware(GZipMiddleware, minimum_size=1000)
-
-
-@app.middleware("http")
-async def add_timing_header(request: Request, call_next) -> Response:
-    start_time = time.perf_counter()
-    response = await call_next(request)
-    process_time = (time.perf_counter() - start_time) * 1000
-    response.headers["X-Process-Time"] = f"{process_time:.2f}ms"
-    return response
-
+app.add_middleware(ResponseHeadersMiddleware)
+if config.rate_limit_enabled:
+    app.add_middleware(
+        RateLimitMiddleware,
+        requests_per_minute=config.rate_limit_requests,
+        burst=config.rate_limit_requests,
+    )
 
 app.include_router(wire_router)
+app.include_router(ai_router)
+app.include_router(resource_router)
+if config.control_panel_enabled:
+    from .api.control_panel_rest import router as control_panel_router
+
+    app.include_router(control_panel_router)
 
 
 @app.get("/")

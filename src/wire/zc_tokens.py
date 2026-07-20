@@ -27,7 +27,7 @@ _breaker = CircuitBreaker(failure_threshold=5, reset_timeout=30)
 class TokenCounter:
     """Count tokens without sending to the model."""
 
-    def __init__(self, api_key: str, model: str = "zc-sonnet-5"):
+    def __init__(self, api_key: str, model: str = "zc-xxx"):
         self.api_key = api_key
         self.model   = model
 
@@ -75,7 +75,7 @@ class TokenCounter:
         # as of 2026-07-02. Re-verify before relying on this for billing.
         prices_per_mtok = {
             "zc-opus-4-8":            5.0,
-            "zc-sonnet-5":            3.0,
+            "zc-xxx":            3.0,
             "zc-haiku-4-5-20251001":  1.0,
             "zc-fable-5":            10.0,
             "zc-mythos-5":           10.0,

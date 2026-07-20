@@ -72,7 +72,7 @@ def test_fallback_chain_refusal_served_by_fallback_model_single_call(monkeypatch
 
 
 def test_fallback_chain_attached_to_call_payload():
-    client = Fable5Client(api_key="k", fallback_chain=["zc-opus-4-8", "zc-sonnet-5"])
+    client = Fable5Client(api_key="k", fallback_chain=["zc-opus-4-8", "zc-xxx"])
     captured = {}
 
     def fake_post(payload, extra_headers=None):
@@ -83,7 +83,7 @@ def test_fallback_chain_attached_to_call_payload():
     client._post = fake_post
     client.call("hi")
 
-    assert captured["payload"]["fallbacks"] == ["zc-opus-4-8", "zc-sonnet-5"]
+    assert captured["payload"]["fallbacks"] == ["zc-opus-4-8", "zc-xxx"]
     assert captured["headers"] is None  # no fallback-credit beta on the primary call
 
 
@@ -92,7 +92,7 @@ def test_fallback_chain_not_attached_on_explicit_model_override():
     captured = {}
     client._post = lambda payload, extra_headers=None: (captured.update(payload=payload) or _response())
 
-    client.call("hi", model="zc-sonnet-5")
+    client.call("hi", model="zc-xxx")
 
     assert "fallbacks" not in captured["payload"]
 
@@ -201,8 +201,8 @@ def test_primary_call_transport_error_short_circuits():
 
 
 def test_parse_fallback_chain_splits_and_strips():
-    assert parse_fallback_chain(" zc-opus-4-8 , zc-sonnet-5 ") == [
-        "zc-opus-4-8", "zc-sonnet-5"
+    assert parse_fallback_chain(" zc-opus-4-8 , zc-xxx ") == [
+        "zc-opus-4-8", "zc-xxx"
     ]
 
 

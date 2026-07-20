@@ -68,7 +68,7 @@ def _check_python_version() -> CheckResult:
     return CheckResult("python_version", ok, f"{sys.version.split()[0]} ({'ok' if ok else 'requires >= 3.9'})")
 
 
-def _check_live_api(api_key: str, model: str = "zc-sonnet-5") -> CheckResult:
+def _check_live_api(api_key: str, model: str = "zc-xxx") -> CheckResult:
     """Deep check — makes one minimal live call. Only run explicitly."""
     try:
         from wire.coder import Coder

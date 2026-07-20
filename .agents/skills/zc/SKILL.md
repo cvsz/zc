@@ -1,4 +1,9 @@
-```markdown
+---
+name: zc
+description: Repository-specific development patterns and conventions for the zc codebase.
+origin: repository
+---
+
 # zc Development Patterns
 
 > Auto-generated skill from repository analysis
@@ -82,4 +87,3 @@ This skill introduces the core development patterns and conventions used in the 
 | /add-module     | Add a new Python module following conventions |
 | /update-module  | Update an existing module                    |
 | /commit         | Write a commit message following guidelines  |
-```

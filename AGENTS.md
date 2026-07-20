@@ -1,403 +1,622 @@
-# AGENTS.md - Enterprise Agent Architecture & Integration Guide
-## Language and Coding Standards
-- **Communication**: Always talk in Thai when interacting with users.
-- **Code & Technical Assets**: All code, comments, documentation, and technical definitions must be in English.
+# AGENTS.md — Local-First, No-Cost Public Architecture
 
-Act as a Principal Software Architect and Senior Backend Engineer. 
+## 1. Purpose
 
-I need you to design and implement a highly optimized, enterprise-grade, production-ready full-stack system that handles file uploads and optimizes performance for a CLI-to-API workflow (specifically optimized for "wire"). The implementation must utilize the latest 2026 enterprise backend standards and feature a comprehensive control panel for full-stack management.
+This repository is a local-first Python CLI and optional local API/control
+panel. The canonical deployment target is a single Ubuntu 24.04 machine. Data,
+files, state, model credentials, and application processes remain on that
+machine. Public HTTPS access is provided through Cloudflare Tunnel and
+Cloudflare Access. Cloudflare configuration is managed with Terraform.
 
-Please perform a deep-dive analysis and provide the implementation based on the following specifications:
+The target is no recurring application-platform charge. "No-cost" means:
 
-### 1. Advanced File Upload & Processing
-* Implement a highly scalable, secure, and chunked/resumable file upload mechanism.
-* Support delta-updates (patching only changed parts of files) to minimize bandwidth.
-* Include asynchronous background processing (e.g., using distributed worker queues) with real-time status updates via WebSockets or SSE.
+- no Amazon S3, managed database, managed Redis, paid queue, paid Kubernetes,
+  paid observability backend, or paid application hosting;
+- use the Cloudflare free plan only where its current terms support the
+  required feature;
+- use local disk and open-source processes for application data;
+- accept that hardware, disks, electricity, Internet connectivity, domain
+  registration, backup media, and operator time are not free.
 
-### 2. wire CLI-to-API Performance Optimization
-* Optimize the communication protocol between the wire CLI and the backend API (e.g., using gRPC, HTTP/3, or highly compressed, multiplexed JSON/Protocol Buffers).
-* Implement aggressive connection pooling, pipelining, and zero-copy data transfer.
-* Design a smart caching layer (e.g., Redis/Valkey) and an optimized indexing strategy to ensure sub-millisecond API response times for CLI commands.
+Never silently introduce a metered service. Any proposal that can create a
+bill requires explicit user approval and a documented cost ceiling.
 
-### 3. Enterprise-Grade Backend Architecture (2026 Standards)
-* Architectural Patterns: Microservices or modular monolith with strict domain-driven design (DDD), event-driven architecture, and non-blocking I/O.
-* Resiliency & Security: Implement distributed tracing (OpenTelemetry), rate limiting (leaky bucket/token bucket), circuit breakers, strict IAM/RBAC, and end-to-end encryption.
-* Scalability: Auto-scaling stateless services with optimized database connection pooling and read/write splitting.
+## 2. Communication and Asset Language
 
-### 4. Full-Stack Control Panel (Enterprise Management)
-* Provide a comprehensive dashboard UI architecture (frontend and backend integration).
-* Features required: Real-time system performance monitoring, CLI activity logs, file upload queue management, API health metrics, and granular feature flags/toggle controls.
+- Always communicate with users in Thai.
+- All source code, identifiers, comments, configuration, commit messages,
+  diagrams, technical documentation, and generated assets must be in English.
+- Explain assumptions, risk, and operational tradeoffs in Thai to the user.
+- Do not claim a component is production-ready without executable evidence.
 
-[CODEX MASTER META TEMPLATE INITIATED]
-**Primary Role:** Principal System Architect & Full-Stack Automation Engineer
-**Objective:** Architect, optimize, and provide production-ready implementation for an enterprise-grade wire CLI-to-API workflow, advanced file upload system, and comprehensive full-stack control panel (2026 Standards).
+## 3. Source of Truth and Precedence
 
-### System Context & Hard Constraints
-1. **Architectural Principles:** The system must strictly adhere to trust-minimized, sovereign, and non-blocking intent-gateway models.
-2. **Infrastructure Target:** Designed for deployment on Ubuntu 24.04 utilizing k3s. 
-3. **Networking & Routing:** Assume a Cilium CNI environment where `kube-proxy` is strictly disabled to prevent double encapsulation routing issues.
-4. **Deployment Strategy:** GitOps-first structure (e.g., ArgoCD ready) with automated reconciliation.
-5. **Language Rule:** ALL code, variables, and comments within code blocks MUST be written entirely in English.
+Use this order when requirements conflict:
 
-Please perform a deep reasoning dive and execute the following phases:
+1. System and user instructions.
+2. This `AGENTS.md`.
+3. The actual source code and executable tests.
+4. `ARCHITECTURE.md`, `README.md`, and files under `docs/`.
+5. Historical implementation reports.
 
-### Phase 1: High-Performance CLI-to-API Communication (wire Optimized)
-*   **Protocol & Transport:** Design the wire CLI to backend API communication utilizing low-latency, high-throughput protocols (e.g., gRPC, HTTP/3, or multiplexed Protobufs over WebSocket).
-*   **Optimization:** Implement zero-copy serialization, aggressive connection pooling, and payload compression to guarantee sub-millisecond API reconciliation.
-*   **Stateless Gateway:** Route CLI requests through a stateless intent-gateway that validates and forwards requests without holding session state.
+Historical reports are not proof that a feature is active. Verify runtime
+wiring, tests, configuration, and deployment manifests before reporting status.
 
-### Phase 2: Enterprise-Grade File Upload System
-*   **Chunking & Resumability:** Architect a robust, concurrent chunked file upload mechanism capable of handling massive payloads securely.
-*   **Delta-Updates:** Implement binary diffing/patching so the wire CLI only transmits changed bytes, drastically reducing bandwidth overhead.
-*   **Async Processing:** Offload file validation, virus scanning, and storage (e.g., S3-compatible endpoints) to decoupled background worker queues.
+Cloudflare products, Terraform schemas, free-plan limits, and security guidance
+change frequently. Before modifying Cloudflare or Terraform code:
 
-### Phase 3: Master Observability & Full-Stack Control Panel
-*   **Telemetry:** Integrate real-time distributed tracing (OpenTelemetry) and API health metrics.
-*   **Control Panel Architecture:** Design the backend endpoints and frontend data flow for a Master Observability Node that provides visual telemetry, CLI activity logs, and granular feature flag controls.
-*   **Authentication & RBAC:** Ensure the control panel utilizes strict, token-based, trust-minimized access controls.
+1. retrieve current official Cloudflare documentation;
+2. retrieve the current Cloudflare Terraform provider schema;
+3. prefer official documentation and registry pages over memory;
+4. record a provider constraint and commit the generated lock file;
+5. run `terraform validate` and inspect `terraform plan`.
 
-### Deliverables Required:
-1.  **Architecture Blueprint:** A detailed system data flow and microservices layout (use Mermaid.js syntax).
-2.  **Core Code Implementation:** Production-ready code blocks for the hardest performance bottlenecks:
-    *   The wire CLI-to-API network handler.
-    *   The chunked file upload/delta-update logic.
-3.  **Infrastructure Config:** The Kubernetes/k3s manifest snippets specifically optimized for the Cilium routing constraints mentioned above.
+## 4. Canonical Architecture
 
-### Output Expectations:
-1. Provide a clear architectural blueprint/data flow diagram (using Markdown/Mermaid text).
-2. Write production-ready, clean, well-commented, and highly optimized code snippets for the core performance bottlenecks (CLI-API communication, file upload handler, and control panel API).
-3. Explain the performance tradeoffs and the specific 2026 technologies/libraries chosen to achieve maximum throughput.
+```mermaid
+flowchart LR
+    Browser["Browser"]
+    CLI["wire CLI"]
+    Edge["Cloudflare DNS + Access"]
+    Tunnel["cloudflared outbound tunnel"]
+    API["FastAPI HTTP API"]
+    GRPC["Local gRPC API"]
+    Files["Local filesystem"]
+    Sessions["Atomic JSON session metadata"]
+    Optional["Optional local open-source services"]
 
-*Think deeply, step-by-step, and do not skimp on production-level details. Prioritize performance, security, and scalability. Do not provide generic boilerplate; output highly optimized, edge-case resilient code.*
-
-## Overview
-This document defines the architecture, capabilities, and integration patterns for autonomous agents within the wire CLI-to-API ecosystem (2026 Enterprise Standards).
-
-## Agent Taxonomy
-
-### 1. Core System Agents
-- **Orchestrator Agent**: Manages workflow coordination across microservices
-- **Security Sentinel**: Real-time threat detection and response
-- **Performance Optimizer**: Dynamic resource allocation and caching strategies
-- **Data Integrity Guardian**: Ensures consistency across distributed systems
-
-### 2. Domain-Specific Agents
-- **File Processing Agent**: Handles chunked uploads, delta-sync, and validation
-- **CLI Interaction Agent**: Mediates between wire CLI commands and API endpoints
-- **Observability Agent**: Collects metrics, traces, and logs for the control panel
-- **Compliance Agent**: Enforces regulatory requirements and audit trails
-
-## Agent Communication Protocol
-
-### Message Format (Protobuf)
-```protobuf
-syntax = "proto3";
-
-package agents.v1;
-
-message AgentEnvelope {
-    string agent_id = 1;
-    string target_agent = 2;
-    uint64 timestamp = 3;
-    MessageType type = 4;
-    bytes payload = 5;
-    string correlation_id = 6;
-}
-
-enum MessageType {
-    COMMAND = 0;
-    RESPONSE = 1;
-    EVENT = 2;
-    HEARTBEAT = 3;
-}
-
-message Command {
-    string action = 1;
-    map<string, string> parameters = 2;
-    int32 timeout_ms = 3;
-}
-
-message Event {
-    string event_type = 1;
-    map<string, string> metadata = 2;
-    bytes data = 3;
-}
+    Browser -->|"HTTPS + Access"| Edge
+    CLI -->|"HTTPS + Access service token + app JWT"| Edge
+    Edge --> Tunnel
+    Tunnel -->|"127.0.0.1:8000"| API
+    CLI -->|"localhost only"| GRPC
+    API --> Files
+    API --> Sessions
+    API -.-> Optional
 ```
 
-### Communication Patterns
-- **Request-Response**: Synchronous command execution with timeouts
-- **Pub/Sub**: Event-driven architecture using NATS JetStream
-- **Streaming**: Real-time data flows via gRPC bidirectional streams
-- **Heartbeat**: Liveness monitoring with automatic failover
+Architectural invariants:
 
-## Agent Lifecycle Management
+- The application binds to `127.0.0.1`, never `0.0.0.0`, in the canonical
+  public-local profile.
+- The router exposes no inbound port to the Internet.
+- `cloudflared` creates outbound-only connections to Cloudflare.
+- Only the HTTP API and control panel are published by default.
+- gRPC remains localhost-only unless a separately reviewed design proves
+  transport, authentication, request limits, and Cloudflare compatibility.
+- A final tunnel ingress rule must return `http_status:404`.
+- Public hostnames must have a Cloudflare Access application before the tunnel
+  route becomes active.
+- Cloudflare Access is an outer identity-aware proxy, not a replacement for
+  application authorization.
+- Mutating API routes still require application JWT/RBAC and tenant checks.
+- Files and persistent metadata never move to Cloudflare R2, KV, D1, Queues,
+  or another billed storage product without explicit approval.
 
-### Registration
-```python
-class AgentRegistry:
-    async def register(self, agent: BaseAgent) -> None:
-        """Register agent with discovery service"""
-        await self.redis.hset(
-            "agents:registry",
-            agent.id,
-            json.dumps({
-                "status": "active",
-                "capabilities": agent.capabilities,
-                "endpoint": agent.endpoint,
-                "last_heartbeat": datetime.now(timezone.utc).isoformat()
-            })
-        )
-    
-    async def discover(self, capability: str) -> List[str]:
-        """Find agents with specific capability"""
-        all_agents = await self.redis.hgetall("agents:registry")
-        return [
-            agent_id for agent_id, info in all_agents.items()
-            if capability in json.loads(info)["capabilities"]
-        ]
+## 5. Canonical Local Runtime
+
+The dependency-free profile is the default:
+
+```text
+Storage             local filesystem
+Upload metadata     atomic JSON files
+Process cache       in-memory L1
+Shared cache        disabled
+Queue               disabled
+Tracing exporter    disabled
+Authentication      enabled for public mode
+HTTP bind           127.0.0.1:8000
+gRPC bind           127.0.0.1:8001
+Workers             1
 ```
 
-### Health Monitoring
-- Heartbeat interval: 5 seconds
-- Failure threshold: 3 missed heartbeats
-- Automatic failover to standby agents
-- Graceful degradation with circuit breakers
+Local-only development may disable authentication. Public-local mode must not.
 
-## Security Model
+Required local directories:
 
-### Authentication
-- Mutual TLS (mTLS) for agent-to-agent communication
-- JWT tokens with short-lived expiration (5 minutes)
-- Role-Based Access Control (RBAC) per agent type
-
-### Authorization Matrix
-| Agent Type | Read Permissions | Write Permissions | Admin Actions |
-|------------|------------------|-------------------|---------------|
-| Orchestrator | All resources | Workflow control | Scale operations |
-| Security Sentinel | Logs, metrics | Block threats | Isolate components |
-| File Processor | Upload sessions | Chunk storage | Quarantine files |
-| CLI Agent | Command queue | Response channel | Rate limit users |
-
-### Audit Trail
-All agent actions are logged with:
-- Agent ID and version
-- Timestamp (UTC with nanosecond precision)
-- Action performed
-- Target resource
-- Outcome (success/failure)
-- Correlation ID for tracing
-
-## Integration Points
-
-### wire CLI Integration
-```python
-class CLIAgent(BaseAgent):
-    capabilities = ["command_execution", "file_upload", "status_query"]
-    
-    async def execute_command(self, command: str, context: dict) -> Response:
-        """Execute CLI command via API gateway"""
-        envelope = AgentEnvelope(
-            agent_id=self.id,
-            target_agent="orchestrator",
-            timestamp=time_ns(),
-            type=MessageType.COMMAND,
-            payload=Command(action=command, parameters=context).SerializeToString(),
-            correlation_id=generate_correlation_id()
-        )
-        return await self.send_and_wait(envelope, timeout_ms=30000)
-    
-    async def stream_upload(self, file_path: Path) -> AsyncIterator[bytes]:
-        """Stream file chunks with delta optimization"""
-        async for chunk in self.delta_encode(file_path):
-            yield chunk
+```text
+data/
+└── uploads/
+    ├── chunks/
+    ├── files/
+    └── sessions/
 ```
 
-### Control Panel Integration
-```python
-class ObservabilityAgent(BaseAgent):
-    capabilities = ["metrics_collection", "log_aggregation", "alerting"]
-    
-    async def collect_metrics(self) -> MetricsBundle:
-        """Gather system-wide metrics"""
-        return MetricsBundle(
-            cpu_usage=await self.get_cpu_metrics(),
-            memory_usage=await self.get_memory_metrics(),
-            active_uploads=await self.get_upload_count(),
-            error_rate=await self.calculate_error_rate()
-        )
-    
-    async def push_to_dashboard(self, metrics: MetricsBundle) -> None:
-        """Real-time update to control panel via WebSocket"""
-        await self.websocket.send_json(metrics.dict())
+Required behavior:
+
+- Create directories with restrictive permissions.
+- Persist upload session metadata through atomic write-and-rename.
+- Verify every chunk with BLAKE3.
+- Validate chunk index, expected size, session ownership, total file size, and
+  configured limits.
+- Assemble into a temporary file.
+- Verify final length and whole-file BLAKE3 before atomic publication.
+- Never return a path outside the configured storage root.
+- Never treat an unscanned public upload as safe.
+- Do not load a complete large object into memory.
+
+Optional local open-source services may be enabled when the machine has enough
+resources:
+
+| Capability | Preferred component | Default |
+|---|---|---|
+| Shared cache and rate limits | Valkey | Off |
+| Durable event queue | NATS JetStream | Off |
+| Relational metadata | PostgreSQL | Off |
+| Malware scanning | ClamAV | Off; uploads remain quarantined |
+| Metrics | Prometheus | Off |
+| Dashboards | Grafana | Off |
+| Logs | Loki | Off |
+| Traces | Tempo + OpenTelemetry Collector | Off |
+
+These services must run locally and must not depend on a paid hosted control
+plane.
+
+## 6. Runtime Profiles
+
+### 6.1 Local development
+
+Use only on a trusted machine:
+
+```env
+ENVIRONMENT=development
+DEBUG=true
+AUTH_REQUIRED=false
+STORAGE_BACKEND=local
+UPLOAD_TEMP_DIR=./data/uploads
+REDIS_ENABLED=false
+NATS_ENABLED=false
+OTEL_ENABLED=false
+API_HOST=127.0.0.1
+API_PORT=8000
+API_WORKERS=1
 ```
 
-## Performance Optimization Strategies
+### 6.2 Local origin exposed through Cloudflare
 
-### Caching Layers
-- **L1 Cache**: In-memory cache within each agent (LRU, 100MB limit)
-- **L2 Cache**: Redis cluster for shared state (TTL-based invalidation)
-- **L3 Cache**: Persistent storage for historical data
+This is the canonical online profile:
 
-### Connection Pooling
-- gRPC channels: Reused across requests with keepalive
-- Database connections: PgBouncer with transaction pooling
-- HTTP clients: aiohttp with connection limits per host
-
-### Batch Processing
-- Aggregate multiple small requests into batch operations
-- Configurable batch size (default: 100 items)
-- Timeout-based flushing (max 50ms latency)
-
-## Fault Tolerance
-
-### Retry Logic
-```python
-@retry(
-    stop=stop_after_attempt(3),
-    wait=wait_exponential(multiplier=1, min=1, max=10),
-    retry=retry_if_exception_type((ConnectionError, TimeoutError))
-)
-async def resilient_call(agent: BaseAgent, request: Any) -> Any:
-    return await agent.execute(request)
+```env
+ENVIRONMENT=production
+DEBUG=false
+AUTH_REQUIRED=true
+STORAGE_BACKEND=local
+UPLOAD_TEMP_DIR=./data/uploads
+REDIS_ENABLED=false
+NATS_ENABLED=false
+OTEL_ENABLED=false
+API_HOST=127.0.0.1
+API_PORT=8000
+API_WORKERS=1
+RATE_LIMIT_ENABLED=true
+CONTROL_PANEL_ENABLED=true
+JWT_SECRET=<generated-secret>
+E2E_SECRET_KEY=<base64-encoded-32-byte-key>
+CORS_ORIGINS=https://wire.example.com
+CLOUDFLARE_ACCESS_TEAM_DOMAIN=https://team-name.cloudflareaccess.com
+CLOUDFLARE_ACCESS_AUD=<application-audience-tag>
 ```
 
-### Circuit Breaker Pattern
-- **Closed**: Normal operation
-- **Open**: Fail fast after 5 consecutive failures
-- **Half-Open**: Test with single request after 30 seconds
+Secrets must be supplied through environment variables, an ignored permission
+restricted file, SOPS-encrypted material, or a local secret manager. Never
+commit real values.
 
-### Dead Letter Queue
-Failed messages are routed to DLQ for:
-- Manual inspection
-- Automated replay with exponential backoff
-- Alert generation for critical failures
+## 7. Cloudflare Boundary
 
-## Deployment Configuration
+Use these Cloudflare capabilities only:
 
-### Kubernetes Resources
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: agent-orchestrator
-spec:
-  replicas: 3
-  template:
-    spec:
-      containers:
-      - name: orchestrator
-        image: wire-agents:latest
-        env:
-        - name: AGENT_TYPE
-          value: "orchestrator"
-        - name: REDIS_URL
-          valueFrom:
-            secretKeyRef:
-              name: redis-credentials
-              key: url
-        resources:
-          requests:
-            cpu: "250m"
-            memory: "256Mi"
-          limits:
-            cpu: "1000m"
-            memory: "1Gi"
-        livenessProbe:
-          grpc:
-            port: 9090
-            service: "health.Health"
-          initialDelaySeconds: 5
-          periodSeconds: 10
+- authoritative DNS for the selected hostname;
+- Cloudflare Tunnel for outbound-only origin connectivity;
+- Cloudflare Access for deny-by-default user and machine authentication;
+- standard proxy TLS and baseline free-plan protections;
+- Terraform API management.
+
+Do not add R2, Workers, Pages, D1, KV, Queues, Images, Stream, Argo Smart
+Routing, Load Balancing, Browser Isolation, or another potentially metered
+product without user approval.
+
+### 7.1 Tunnel requirements
+
+- Prefer a remotely managed named tunnel.
+- Store the tunnel token outside Terraform variables committed to Git.
+- Run `cloudflared` with a token file when supported, or inject
+  `TUNNEL_TOKEN` through the process environment.
+- Never put the token on a command line that is visible in process listings.
+- Route the application hostname to `http://127.0.0.1:8000`.
+- Configure `origin_request.access.required = true`.
+- Configure the Access team name and application audience tag.
+- End ingress with `http_status:404`.
+- Allow outbound TCP/UDP port 7844 as required by the selected tunnel protocol.
+- Do not open inbound ports 8000 or 8001 in the host firewall.
+- Do not use a Quick Tunnel for authenticated or persistent use.
+
+### 7.2 Access requirements
+
+- Create Access before activating the public tunnel hostname.
+- Default policy is deny.
+- Allow only explicit email addresses, identity-provider groups, or service
+  tokens.
+- Never use an `everyone` or `all valid emails` allow rule.
+- Require MFA where supported by the selected free plan and identity provider.
+- Keep browser session duration short enough for the risk profile.
+- Use a separate service-auth policy for CLI automation.
+- Return HTTP 401 for missing machine credentials where supported.
+- Validate the `Cf-Access-Jwt-Assertion` signature and audience at the origin,
+  or require cloudflared Access validation.
+- A header's presence alone is not authentication.
+- Strip or ignore spoofable client-supplied identity headers.
+
+### 7.3 Two-layer authorization
+
+For browser requests:
+
+```text
+Cloudflare Access user authentication
+→ validated Access JWT
+→ application role mapping
+→ tenant/resource authorization
 ```
 
-### Scaling Policies
-- **Horizontal Pod Autoscaler**: Based on CPU (70%) and custom metrics
-- **Vertical Pod Autoscaler**: Right-size resource requests
-- **Cluster Autoscaler**: Add nodes when pending pods detected
+For CLI requests:
 
-## Monitoring & Debugging
-
-### Distributed Tracing
-- OpenTelemetry integration with W3C Trace Context
-- Span attributes: agent_id, action, duration, status
-- Sampling rate: 10% for production, 100% for staging
-
-### Log Aggregation
-- Structured logging (JSON format)
-- Correlation IDs across service boundaries
-- Log levels: DEBUG, INFO, WARN, ERROR, FATAL
-
-### Alerting Rules
-```yaml
-groups:
-- name: agent-alerts
-  rules:
-  - alert: AgentDown
-    expr: up{job="agents"} == 0
-    for: 1m
-    labels:
-      severity: critical
-    annotations:
-      summary: "Agent {{ $labels.agent_id }} is down"
-  
-  - alert: HighErrorRate
-    expr: rate(agent_errors_total[5m]) > 0.05
-    for: 2m
-    labels:
-      severity: warning
-    annotations:
-      summary: "High error rate detected"
+```text
+Cloudflare Access service token
+→ application bearer JWT
+→ role and tenant authorization
+→ operation-specific validation
 ```
 
-## Version Compatibility
+Cloudflare identity decides who may reach the origin. Application identity
+decides what the caller may do.
 
-| Agent Version | CLI Version | API Version | Protocol Version |
-|---------------|-------------|-------------|------------------|
-| 1.0.0         | 1.32.0+     | 2026.1.0    | v1               |
-| 1.1.0         | 1.33.0+     | 2026.2.0    | v1.1             |
-| 2.0.0         | 2.0.0+      | 2027.1.0    | v2               |
+## 8. Terraform Contract
 
-## Future Roadmap
+Cloudflare Terraform code belongs under:
 
-### Q1 2026
-- AI-powered anomaly detection
-- Predictive scaling based on usage patterns
-- Multi-region agent federation
+```text
+infra/
+└── cloudflare/
+    ├── versions.tf
+    ├── providers.tf
+    ├── variables.tf
+    ├── main.tf
+    ├── outputs.tf
+    ├── terraform.tfvars.example
+    └── README.md
+```
 
-### Q2 2026
-- Quantum-resistant cryptography integration
-- Edge computing support for IoT scenarios
-- Natural language command interface
+Use Cloudflare provider v5 syntax. Pin a compatible minor range and commit
+`.terraform.lock.hcl`. Do not copy v4 examples into v5 configuration.
 
-### Q3 2026
-- Self-healing capabilities with automated remediation
-- Cross-cloud agent mobility
-- Blockchain-based audit trail immutability
+Terraform owns:
 
-## Implementation Status (Current Repo Mapping)
+- the proxied DNS record for the application hostname;
+- the remotely managed Cloudflare Tunnel;
+- tunnel ingress configuration;
+- the Cloudflare Access self-hosted application;
+- explicit user and service-auth policies;
+- optional reusable Access policies when appropriate.
 
-A deep scan of the repository confirms the following mappings between the architectural blueprint and the current implementation:
+Expected provider resources must be confirmed against the current registry,
+but the preferred v5 resource families are:
 
-### 1. High-Performance CLI-to-API Communication
-- **Implementation**: `app/grpc/wire_servicer.py` & `app/api/v1/routes.py`
-- **Status**: Implemented. The `WireService` supports binary Protobuf chunk uploads alongside traditional HTTP endpoints. Connection multiplexing and zero-copy semantics are supported via `grpc.aio.server`.
+```text
+cloudflare_zero_trust_tunnel_cloudflared
+cloudflare_zero_trust_tunnel_cloudflared_config
+cloudflare_zero_trust_access_application
+cloudflare_zero_trust_access_policy
+cloudflare_dns_record
+```
 
-### 2. Enterprise-Grade File Upload & Delta Processing
-- **Implementation**: `app/services/upload_manager.py` & `app/services/delta/sync_service.py`
-- **Status**: Implemented. Supports concurrent chunked resumable uploads and binary diffing/delta updates to minimize bandwidth overhead.
+### 8.1 Terraform authentication
 
-### 3. Master Observability & Control Panel
-- **Implementation**: `app/telemetry/otel_service.py` (Distributed Tracing), `app/api/control_panel.py`, and the `webapp/` frontend.
-- **Status**: Implemented. Real-time metrics are collected using OpenTelemetry and surfaced to the web dashboard.
+Use a scoped Cloudflare API token through:
 
-### 4. Security & Compliance
-- **Implementation**: `app/core/security.py` (JWT, RBAC), `app/middleware/rate_limiter.py`, and `zc_compliance_api.py`.
-- **Status**: Implemented. Trust-minimized authentication and rate limiting are enforced at the API gateway layer.
+```env
+CLOUDFLARE_API_TOKEN=<scoped-token>
+```
 
-*Note: The agent taxonomy pseudo-code (e.g., `CLIAgent`, `ObservabilityAgent`) outlined above represents the logical domain models. The physical implementation distributes these responsibilities across the `FastAPI` / `gRPC` microservice layers mentioned here.*
+Grant only the permissions required for:
+
+- Tunnel edit;
+- Access applications and policies edit;
+- DNS edit for the selected zone;
+- account and zone read where required by provider lookups.
+
+Do not use a Global API Key.
+
+### 8.2 Variables
+
+Non-secret variables may include:
+
+```text
+cloudflare_account_id
+cloudflare_zone_id
+zone_name
+application_hostname
+access_team_name
+allowed_emails
+session_duration
+local_origin_url
+```
+
+Mark all credential-like variables `sensitive = true`. Do not put these in a
+tracked `.tfvars` file:
+
+```text
+cloudflare_api_token
+tunnel_token
+service_token_client_secret
+application JWT secret
+encryption key
+```
+
+### 8.3 Terraform state
+
+Terraform state can contain sensitive values.
+
+- Never commit `terraform.tfstate`, backups, plans, crash logs, or `.terraform/`.
+- For a no-cost single-operator setup, use local state on encrypted disk and
+  back it up to encrypted offline media.
+- Set restrictive file permissions.
+- Do not invent a free remote backend by storing state in a public repository.
+- Migrating state to a paid or hosted backend requires explicit approval.
+
+### 8.4 Safe workflow
+
+Read-only operations are allowed without approval:
+
+```bash
+terraform fmt -check -recursive
+terraform init -backend=false
+terraform validate
+terraform plan -out=tfplan
+terraform show tfplan
+```
+
+`terraform apply`, `destroy`, import operations, state mutation, token
+creation, DNS changes, Tunnel creation, and Access policy changes are external
+actions. They require explicit user approval immediately before execution.
+
+Never auto-approve a destructive or public exposure change.
+
+## 9. Bootstrap Procedure
+
+The first setup contains unavoidable account-specific steps:
+
+1. Add an owned domain to Cloudflare.
+2. Confirm the domain is active.
+3. Create a scoped Terraform API token.
+4. Configure a Cloudflare Zero Trust organization/team domain.
+5. Select an identity provider or the supported one-time PIN flow.
+6. Prepare explicit allowed user emails or groups.
+7. Populate ignored local Terraform variables.
+8. Run format, initialize, validate, and plan.
+9. Review the plan for unexpected paid products or broad access.
+10. Obtain explicit user approval.
+11. Apply Terraform.
+12. Retrieve the tunnel token without printing or committing it.
+13. Store the token in a permission-restricted local file or environment.
+14. Start the local application on `127.0.0.1:8000`.
+15. Start `cloudflared`.
+16. Verify Access denies an unauthenticated browser and CLI.
+17. Verify allowed identities can reach only authorized routes.
+18. Verify ports 8000 and 8001 are unreachable from another LAN host.
+
+## 10. Security Requirements
+
+### 10.1 Secrets
+
+- No hardcoded credentials.
+- No default passwords.
+- No random per-process production JWT or encryption keys.
+- Fail startup when required production secrets are absent.
+- Redact tokens and authorization headers from logs.
+- Rotate a tunnel token immediately if exposed.
+- Treat Terraform plan and state files as secrets.
+
+### 10.2 HTTP
+
+- Production CORS uses exact HTTPS origins.
+- Never combine wildcard origins with credentials.
+- Enforce request body and upload limits.
+- Add HSTS, `nosniff`, frame denial, strict referrer policy, and a restrictive
+  content security policy.
+- Do not expose debug docs in production.
+- Do not trust `X-Forwarded-For` unless the request came through the expected
+  local proxy path.
+- Rate limiting must fail closed in public production mode when its
+  authoritative backend is required.
+
+### 10.3 Files
+
+- Validate opaque identifiers with allowlists.
+- Prevent path traversal and symlink escape.
+- Namespace chunks and sessions by tenant.
+- Use atomic create/rename patterns.
+- Verify both chunk and final file digests.
+- Keep quarantined files unavailable for download.
+- Do not serve arbitrary local paths.
+- Apply retention and disk-space limits.
+
+### 10.4 Process isolation
+
+- Run the application and `cloudflared` as non-root users.
+- Use separate service users where practical.
+- Restrict write access to the upload directory.
+- Restrict tunnel-token read access to the cloudflared service user.
+- Use systemd hardening when installing persistent services.
+- Do not grant Docker socket access to the application.
+
+## 11. Public API Rules
+
+- Health liveness may be reachable without application authentication only if
+  Cloudflare Access still protects the hostname.
+- Readiness must not disclose credentials, internal addresses, or stack traces.
+- Upload initialization, chunk upload, finalization, cancellation, metrics,
+  feature flags, and control-panel operations require authorization.
+- Errors exposed publicly must be stable, sanitized, and correlation-ID based.
+- Never return raw exception strings for unexpected failures.
+- Use idempotency keys for retried mutating requests.
+- Public endpoints need explicit timeout and size budgets.
+
+## 12. Performance Rules
+
+- Do not promise sub-millisecond Internet latency.
+- Define latency separately for local processing, local network, tunnel edge,
+  and end-to-end requests.
+- Stream large payloads; do not buffer complete files in RAM.
+- Reuse HTTP/gRPC connections.
+- Keep public HTTP request sizes within verified Cloudflare limits.
+- Benchmark through the tunnel, not only against localhost.
+- Record p50, p95, p99, throughput, memory, disk I/O, and error rate.
+- Cloudflare plan limits must be retrieved from official documentation before
+  setting upload defaults.
+
+## 13. Observability
+
+The no-cost default is structured local logs plus local health endpoints.
+
+- Emit JSON logs in public mode.
+- Include timestamp, request ID, subject, tenant, action, resource, outcome,
+  duration, and trace ID where available.
+- Never log bearer tokens, Access assertions, cookies, tunnel tokens, file
+  contents, or Terraform secrets.
+- Use log rotation and bounded retention.
+- Optional Prometheus/Grafana/Loki/Tempo must remain local.
+- Do not enable Cloudflare paid logging or analytics exports without approval.
+
+## 14. Testing Requirements
+
+Every security or public-network change needs tests for:
+
+- missing and invalid application bearer tokens;
+- wrong role;
+- cross-tenant session access;
+- invalid Cloudflare Access audience;
+- invalid Access JWT signature;
+- expired Access JWT;
+- missing Access assertion in public mode;
+- path traversal;
+- negative and oversized chunk indices;
+- incorrect chunk size and digest;
+- incorrect final size and digest;
+- restart-safe local upload resume;
+- atomic finalization cleanup;
+- CORS rejection;
+- sanitized errors;
+- tunnel ingress catch-all behavior;
+- Terraform variable validation.
+
+Required local verification:
+
+```bash
+pytest -q
+ruff check app tests
+python -m compileall -q app src/wire webapp/backend
+git diff --check
+terraform -chdir=infra/cloudflare fmt -check -recursive
+terraform -chdir=infra/cloudflare init -backend=false
+terraform -chdir=infra/cloudflare validate
+```
+
+When tools are installed, also run:
+
+```bash
+gitleaks detect --no-banner --redact --no-git --source app
+cloudflared tunnel ingress validate
+```
+
+Do not report a cluster, tunnel, DNS record, Access policy, or public URL as
+working unless it was verified against the real external state.
+
+## 15. External Action Boundaries
+
+Network tools are read-only by default. Search, inspect, validate, and draft
+freely within scope.
+
+Explicit approval is required before:
+
+- `terraform apply` or `terraform destroy`;
+- creating, changing, or deleting DNS records;
+- creating, rotating, or deleting API/tunnel/service tokens;
+- making a hostname publicly routable;
+- changing Cloudflare Access policies;
+- publishing images or releases;
+- opening firewall ports;
+- pushing commits or merging pull requests.
+
+If approval is absent, produce local Terraform code, validation output, and a
+reviewable plan without applying it.
+
+## 16. Repository Conventions
+
+- Python file names use `snake_case`.
+- Prefer relative imports within packages.
+- Define `__all__` for new reusable modules.
+- Preserve unrelated worktree changes.
+- Use `apply_patch` for edits.
+- Add or update tests with behavior changes.
+- Review the scoped diff before handoff.
+- Never commit `.env`, `.env.local`, `.env.cloudflare`, tunnel credentials,
+  private keys, Terraform state, plan files, or generated secret material.
+
+Expected ignore patterns:
+
+```gitignore
+.env
+.env.*
+!.env.example
+!.env.*.example
+.cloudflared/
+*.pem
+infra/cloudflare/.terraform/
+infra/cloudflare/*.tfstate
+infra/cloudflare/*.tfstate.*
+infra/cloudflare/*.tfplan
+infra/cloudflare/crash.log
+infra/cloudflare/*.auto.tfvars
+```
+
+## 17. Definition of Done
+
+A local-public Cloudflare change is complete only when:
+
+- source behavior matches this document;
+- no paid dependency was introduced;
+- the application binds only to localhost;
+- Access is deny-by-default;
+- both Cloudflare and application authorization are enforced;
+- secrets are absent from source, diff, logs, and Terraform state committed to
+  Git;
+- tests, lint, compilation, and Terraform validation pass;
+- the Terraform plan contains only expected resources;
+- public exposure was applied only after explicit approval;
+- unauthenticated access is denied in a real external smoke test;
+- rollback instructions exist;
+- documentation identifies remaining operational costs and limitations.
+
+## 18. Authoritative References
+
+Verify these before implementation because schemas and limits change:
+
+- Cloudflare Tunnel:
+  `https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/`
+- Publish a self-hosted application:
+  `https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/self-hosted-public-app/`
+- Validate Access JWTs:
+  `https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/authorization-cookie/validating-json/`
+- Tunnel firewall requirements:
+  `https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/configure-tunnels/tunnel-with-firewall/`
+- Cloudflare Terraform provider:
+  `https://registry.terraform.io/providers/cloudflare/cloudflare/latest/docs`
+- Cloudflare Terraform changelog:
+  `https://developers.cloudflare.com/changelog/product/terraform/`
 
 ---
 
-*Last Updated: 2026-01-15*
-*Document Version: 1.0.0*
-*Maintained by: Platform Architecture Team*
+Document version: 2.0.0
+
+Architecture: Local-first, Cloudflare-published, Terraform-managed
+
+Last updated: 2026-07-19

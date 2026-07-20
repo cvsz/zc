@@ -1,0 +1,12 @@
+name = "zeaz-loading"
+main = "src/index.js"
+compatibility_date = "2026-05-24"
+workers_dev = false
+
+routes = [
+  { pattern = "zeaz.dev/*", zone_name = "zeaz.dev" }
+]
+
+[vars]
+BRAND_NAME = "ZEAZDEV COMPANY LIMITED"
+APP_URL = "https://zeaz.dev"

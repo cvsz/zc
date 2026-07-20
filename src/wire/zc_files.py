@@ -52,7 +52,7 @@ def _validate_filename(name: str) -> Optional[str]:
 class FilesAPI:
     """Wrapper around the Anthropic Files API."""
 
-    def __init__(self, api_key: str, model: str = "zc-sonnet-5"):
+    def __init__(self, api_key: str, model: str = "zc-xxx"):
         self.api_key = api_key
         self.model   = model
         LOCAL_REGISTRY.parent.mkdir(parents=True, exist_ok=True)

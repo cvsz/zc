@@ -96,14 +96,14 @@ def test_cmd_cost_report_prints_rows(monkeypatch, capsys):
     monkeypatch.setattr("wire.zc_admin_api.AdminApiClient", lambda admin_api_key: client)
     monkeypatch.setattr(client, "get_cost_report",
                         lambda start, end, group_by="model": {
-                            "data": [{"model": "zc-sonnet-5", "amount": "12.50", "currency": "usd"}]
+                            "data": [{"model": "zc-xxx", "amount": "12.50", "currency": "usd"}]
                         })
 
     result = cmd_cost_report("k", start="2026-06-01", end="2026-07-01")
 
     assert result["data"][0]["amount"] == "12.50"
     out = capsys.readouterr().out
-    assert "zc-sonnet-5" in out
+    assert "zc-xxx" in out
     assert "12.50" in out
 
 

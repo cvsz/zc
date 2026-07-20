@@ -3,6 +3,7 @@ FROM python:3.11-slim-bookworm
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
+    PYTHONPATH=/app/src \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     APP_NAME=zcoder \
     APP_VERSION=1.33.0 \
@@ -22,10 +23,12 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends curl && \
     rm -rf /var/lib/apt/lists/*
 
-COPY requirements-enterprise.txt ./
-RUN python -m pip install --no-cache-dir -r requirements-enterprise.txt
+COPY requirements-deploy.lock ./
+RUN python -m pip install --no-cache-dir --require-hashes -r requirements-deploy.lock
 
 COPY app/ ./app/
+COPY src/ ./src/
+COPY webapp/ ./webapp/
 COPY AGENTS.md README.md ./
 
 RUN mkdir -p /app/data/uploads /app/logs /tmp/uploads && \

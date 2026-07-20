@@ -3,7 +3,7 @@ services:
     image: ghcr.io/berriai/litellm:main-latest
     container_name: litellm-gateway
     environment:
-      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY:-sk-litellm-master-key}
+      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY:?LITELLM_MASTER_KEY is required}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
     ports:
@@ -27,7 +27,7 @@ services:
     environment:
       # Route Anthropic API calls through the LiteLLM Proxy Gateway
       - ANTHROPIC_BASE_URL=http://litellm:4000
-      - ANTHROPIC_API_KEY=${LITELLM_MASTER_KEY:-sk-litellm-master-key}
+      - ANTHROPIC_API_KEY=${LITELLM_MASTER_KEY:?LITELLM_MASTER_KEY is required}
       - zc_LOG_FORMAT=json
       - zc_LOG_LEVEL=INFO
     volumes:

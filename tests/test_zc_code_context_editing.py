@@ -34,8 +34,8 @@ def _end_turn_response(text="ok"):
 
 
 def test_query_without_context_management_omits_payload_and_betas(monkeypatch):
-    agent = CodeAgent(api_key="k", model="zc-sonnet-5")
-    session = CodeSession(cwd=".", model="zc-sonnet-5")
+    agent = CodeAgent(api_key="k", model="zc-xxx")
+    session = CodeSession(cwd=".", model="zc-xxx")
     captured = {}
 
     def fake_post(payload, betas=None):
@@ -51,8 +51,8 @@ def test_query_without_context_management_omits_payload_and_betas(monkeypatch):
 
 
 def test_query_with_context_management_attaches_payload_and_beta(monkeypatch):
-    agent = CodeAgent(api_key="k", model="zc-sonnet-5")
-    session = CodeSession(cwd=".", model="zc-sonnet-5")
+    agent = CodeAgent(api_key="k", model="zc-xxx")
+    session = CodeSession(cwd=".", model="zc-xxx")
     cm = build_context_management(clear_tool_uses=True)
     captured = {}
 
@@ -72,8 +72,8 @@ def test_query_with_context_management_attaches_payload_and_beta(monkeypatch):
 def test_query_context_management_survives_multiple_turns(monkeypatch):
     """The context_management payload and beta header should be resent
     on every turn of the loop, not just the first."""
-    agent = CodeAgent(api_key="k", model="zc-sonnet-5")
-    session = CodeSession(cwd=".", model="zc-sonnet-5")
+    agent = CodeAgent(api_key="k", model="zc-xxx")
+    session = CodeSession(cwd=".", model="zc-xxx")
     cm = build_context_management(clear_tool_uses=True)
     calls = []
 
@@ -114,7 +114,7 @@ def test_cmd_code_agent_flag_off_passes_no_context_management(monkeypatch, tmp_p
     monkeypatch.setattr("wire.zc_code.CodeAgent", FakeAgent)
 
     cmd_code_agent(
-        prompt="do a thing", api_key="k", model="zc-sonnet-5",
+        prompt="do a thing", api_key="k", model="zc-xxx",
         cwd=str(tmp_path), headless=True,
     )
 
@@ -135,7 +135,7 @@ def test_cmd_code_agent_flag_on_builds_and_forwards_context_management(monkeypat
     monkeypatch.setattr("wire.zc_code.CodeAgent", FakeAgent)
 
     cmd_code_agent(
-        prompt="do a thing", api_key="k", model="zc-sonnet-5",
+        prompt="do a thing", api_key="k", model="zc-xxx",
         cwd=str(tmp_path), headless=True,
         agent_context_editing=True,
     )
@@ -162,7 +162,7 @@ def test_cmd_code_agent_headless_forces_text_output_mode(monkeypatch, tmp_path, 
     monkeypatch.setattr("wire.zc_code.CodeAgent", FakeAgent)
 
     cmd_code_agent(
-        prompt="do a thing", api_key="k", model="zc-sonnet-5",
+        prompt="do a thing", api_key="k", model="zc-xxx",
         cwd=str(tmp_path), headless=True, output_mode="stream",
     )
 

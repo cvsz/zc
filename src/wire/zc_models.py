@@ -49,7 +49,7 @@ _breaker = CircuitBreaker(failure_threshold=5, reset_timeout=30)
 # tier:     "mythos" (above Opus) | "current" | "legacy" (superseded, still callable)
 
 MODEL_CATALOG: dict = {
-    "claude-mythos-5": {
+    "zc-mythos-5": {
         "display_name": "zAICoder Mythos 5", "tier": "mythos",
         "context_window": 1_000_000, "max_output": 128_000,
         "price_in": 10.0, "price_out": 50.0,
@@ -57,7 +57,7 @@ MODEL_CATALOG: dict = {
         "notes": "Same underlying model as Fable 5, no safety classifiers. "
                  "Project Glasswing invitation-only access.",
     },
-    "claude-fable-5": {
+    "zc-fable-5": {
         "display_name": "zAICoder Fable 5", "tier": "mythos",
         "context_window": 1_000_000, "max_output": 128_000,
         "price_in": 10.0, "price_out": 50.0,
@@ -67,7 +67,7 @@ MODEL_CATALOG: dict = {
                  "than passing type:\"disabled\" (that returns a 400). Has "
                  "safety classifiers that can return stop_reason=\"refusal\".",
     },
-    "claude-opus-4-8": {
+    "zc-opus-4-8": {
         "display_name": "zAICoder Opus 4.8", "tier": "current",
         "context_window": 1_000_000, "max_output": 128_000,
         "price_in": 5.0, "price_out": 25.0,
@@ -75,7 +75,7 @@ MODEL_CATALOG: dict = {
         "notes": "Best for complex agentic coding and enterprise work. "
                  "Adaptive thinking only — manual budget_tokens returns 400.",
     },
-    "claude-sonnet-5": {
+    "zc-xxx": {
         "display_name": "zAICoder Sonnet 5", "tier": "current",
         "context_window": 1_000_000, "max_output": 128_000,
         "price_in": 3.0, "price_out": 15.0,
@@ -83,7 +83,7 @@ MODEL_CATALOG: dict = {
         "notes": "Best speed/intelligence balance; builds on Sonnet 4.6. "
                  "Introductory pricing $2/$10 per MTok through 2026-08-31.",
     },
-    "claude-haiku-4-5-20251001": {
+    "zc-haiku-4-5-20251001": {
         "display_name": "zAICoder Haiku 4.5", "tier": "current",
         "context_window": 200_000, "max_output": 64_000,
         "price_in": 1.0, "price_out": 5.0,
@@ -92,35 +92,35 @@ MODEL_CATALOG: dict = {
                  "thinking, not adaptive. Alias: zc-haiku-4-5.",
     },
     # Legacy — still callable, superseded by the row above in the same tier.
-    "claude-opus-4-7": {
+    "zc-opus-4-7": {
         "display_name": "zAICoder Opus 4.7", "tier": "legacy",
         "context_window": 1_000_000, "max_output": 128_000,
         "price_in": 5.0, "price_out": 25.0,
         "thinking": "adaptive", "effort_default": None,
         "notes": "Superseded by Opus 4.8 (drop-in model-ID swap).",
     },
-    "claude-opus-4-6": {
+    "zc-opus-4-6": {
         "display_name": "zAICoder Opus 4.6", "tier": "legacy",
         "context_window": 1_000_000, "max_output": 128_000,
         "price_in": 5.0, "price_out": 25.0,
         "thinking": "adaptive", "effort_default": None,
         "notes": "Superseded by Opus 4.7 / 4.8.",
     },
-    "claude-opus-4-5": {
+    "zc-opus-4-5": {
         "display_name": "zAICoder Opus 4.5", "tier": "legacy",
         "context_window": 1_000_000, "max_output": 64_000,
         "price_in": 5.0, "price_out": 25.0,
         "thinking": "adaptive", "effort_default": None,
         "notes": "Superseded by later Opus releases.",
     },
-    "claude-sonnet-4-6": {
+    "zc-sonnet-4-6": {
         "display_name": "zAICoder Sonnet 4.6", "tier": "legacy",
         "context_window": 1_000_000, "max_output": 64_000,
         "price_in": 3.0, "price_out": 15.0,
         "thinking": "adaptive", "effort_default": None,
         "notes": "Superseded by Sonnet 5.",
     },
-    "claude-sonnet-4-5": {
+    "zc-sonnet-4-5": {
         "display_name": "zAICoder Sonnet 4.5", "tier": "legacy",
         "context_window": 1_000_000, "max_output": 64_000,
         "price_in": 3.0, "price_out": 15.0,
@@ -152,7 +152,7 @@ FAST_MODE_DEPRECATED = {"zc-opus-4-7"}  # still works but removed 2026-07-24
 # an existing commitment can keep using it through their contract end date.
 # Supported on all available models EXCEPT zAICoder Sonnet 5, zAICoder Mythos
 # Preview, and zAICoder Mythos 5.
-SERVICE_TIER_UNSUPPORTED = {"claude-sonnet-5", "claude-mythos-preview", "claude-mythos-5"}
+SERVICE_TIER_UNSUPPORTED = {"zc-xxx", "zc-mythos-preview", "zc-mythos-5"}
 
 # ── Data residency / inference_geo ──────────────────────────────────────────
 # Also entirely absent. Per platform.zc.com/docs/en/manage-zc/
@@ -162,7 +162,7 @@ SERVICE_TIER_UNSUPPORTED = {"claude-sonnet-5", "claude-mythos-preview", "claude-
 # 4.6, and later models — earlier models 400 if it's set at all.
 INFERENCE_GEO_SUPPORTED = {
     "zc-opus-4-8", "zc-opus-4-7", "zc-opus-4-6",
-    "zc-sonnet-5", "zc-sonnet-4-6",
+    "zc-xxx", "zc-sonnet-4-6",
     "zc-fable-5", "zc-mythos-5", "zc-mythos-preview",
 }
 INFERENCE_GEO_PRICING_MULTIPLIER = 1.1
@@ -176,33 +176,33 @@ INFERENCE_GEO_PRICING_MULTIPLIER = 1.1
 # with. Retirement dates per platform.zc.com/docs/en/about-zc/model-deprecations,
 # checked 2026-07-02.
 RETIRED_MODELS: dict = {
-    "claude-opus-4-20250514": {
+    "zc-opus-4-20250514": {
         "display_name": "zAICoder Opus 4 (original 4.0)",
         "retired": "2026-06-15",
         "replacement": "zc-opus-4-8",
         "notes": "Dateless alias zc-opus-4-0 retired alongside it.",
     },
-    "claude-opus-4-0": {
+    "zc-opus-4-0": {
         "display_name": "zAICoder Opus 4 (original 4.0, dateless alias)",
         "retired": "2026-06-15",
         "replacement": "zc-opus-4-8",
         "notes": "Alias for zc-opus-4-20250514.",
     },
-    "claude-sonnet-4-20250514": {
+    "zc-sonnet-4-20250514": {
         "display_name": "zAICoder Sonnet 4 (original 4.0)",
         "retired": "2026-06-15",
-        "replacement": "zc-sonnet-5",
+        "replacement": "zc-xxx",
         "notes": "Dateless alias zc-sonnet-4-0 retired alongside it. Anthropic's "
-                 "own migration notes point to zc-sonnet-4-6; zc-sonnet-5 is "
+                 "own migration notes point to zc-sonnet-4-6; zc-xxx is "
                  "the current recommendation as of this catalog's last check.",
     },
-    "claude-sonnet-4-0": {
+    "zc-sonnet-4-0": {
         "display_name": "zAICoder Sonnet 4 (original 4.0, dateless alias)",
         "retired": "2026-06-15",
-        "replacement": "zc-sonnet-5",
+        "replacement": "zc-xxx",
         "notes": "Alias for zc-sonnet-4-20250514.",
     },
-    "claude-haiku-3-20240307": {
+    "zc-haiku-3-20240307": {
         "display_name": "zAICoder Haiku 3",
         "retired": "2026-02-19",
         "replacement": "zc-haiku-4-5-20251001",
@@ -224,10 +224,10 @@ def check_retired(model_id: str) -> Optional[dict]:
 # already stopped working. Checked separately so callers can warn ahead
 # of the cutover instead of only finding out when requests start failing.
 UPCOMING_RETIREMENTS: dict = {
-    "claude-mythos-preview": {
+    "zc-mythos-preview": {
         "display_name": "zAICoder Mythos Preview",
         "retires": "2026-07-21",
-        "replacement": "claude-mythos-5",
+        "replacement": "zc-mythos-5",
         "notes": "Succeeded by zAICoder Mythos 5 at general Project Glasswing "
                  "availability; same access model (invitation-only, no "
                  "self-serve). See the Mythos Preview -> Mythos 5 migration "
@@ -568,7 +568,7 @@ COMPUTER_USE_BETA = "computer-use-2025-01-24"
 class ComputerUseCoder:
     """zAICoder with computer use tools."""
 
-    def __init__(self, api_key: str, model: str = "zc-sonnet-5",
+    def __init__(self, api_key: str, model: str = "zc-xxx",
                  max_tokens: int = 4096,
                  width: int = 1024, height: int = 768):
         self.api_key    = api_key
@@ -661,7 +661,7 @@ EFFORT_BUDGETS = {"low": 2000, "medium": 8000, "high": 16000, "max": 32000}
 class AdaptiveThinkingCoder:
     """Extended thinking with adaptive / interleaved modes."""
 
-    def __init__(self, api_key: str, model: str = "zc-sonnet-5",
+    def __init__(self, api_key: str, model: str = "zc-xxx",
                  max_tokens: int = 8000):
         self.api_key    = api_key
         self.model      = model
