@@ -34,6 +34,8 @@ Slash commands inside the session:
 import re
 import sys
 
+from wire.restricted_code import RestrictedCodeError, execute_restricted_code
+
 try:
     from pptx import Presentation
     from pptx.util import Inches, Pt
@@ -159,7 +161,6 @@ class PptxSession:
         for bad in _DENYLIST:
             if bad in lowered:
                 return False, f"[blocked] generated code used a disallowed construct: {bad!r}"
-
         self._snapshot()
 
         def add_slide(title, bullets=None, layout="title_content", table=None, chart=None):
@@ -193,12 +194,26 @@ class PptxSession:
             "reorder_slides": reorder_slides,
         }
         try:
-            exec(compile(code, "<pptx-turn>", "exec"), {"__builtins__": {
-                "len": len, "range": range, "sum": sum, "min": min, "max": max,
-                "round": round, "sorted": sorted, "list": list, "dict": dict,
-                "str": str, "int": int, "float": float, "bool": bool,
-                "enumerate": enumerate, "zip": zip, "abs": abs,
-            }}, local_ns)
+            execute_restricted_code(
+                code,
+                allowed_calls={
+                    "abs", "add_slide", "bool", "delete_slide", "dict",
+                    "enumerate", "float", "int", "len", "list", "max", "min",
+                    "range", "reorder_slides", "round", "sorted", "str", "sum",
+                    "update_slide", "zip",
+                },
+                builtins={
+                    "len": len, "range": range, "sum": sum, "min": min, "max": max,
+                    "round": round, "sorted": sorted, "list": list, "dict": dict,
+                    "str": str, "int": int, "float": float, "bool": bool,
+                    "enumerate": enumerate, "zip": zip, "abs": abs,
+                },
+                local_namespace=local_ns,
+                filename="<pptx-turn>",
+            )
+        except RestrictedCodeError as exc:
+            self.undo()
+            return False, f"[blocked] {exc}"
         except Exception as e:
             self.undo()
             return False, f"[ERROR] generated code failed: {e}"

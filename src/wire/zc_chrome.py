@@ -40,12 +40,12 @@ CLI:
 import json
 import re
 import urllib.error
-import urllib.request
 from html.parser import HTMLParser
 from urllib.parse import urljoin, urlparse
 
 from wire.exceptions import APIError
 from wire.resilience import raise_for_http_error, retry
+from wire.web_fetcher import SafeWebFetcher
 
 MAX_PAGE_CHARS = 8000  # keep pages small enough to stay a cheap loop step
 
@@ -113,10 +113,11 @@ def fetch_page(url, timeout=15):
 # that are otherwise reachable.
 @retry(max_attempts=2, base_delay=1.0, max_delay=5.0)
 def _fetch_retrying(url, timeout):
-    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (wire-browse)"})
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as r:
-            return r.read().decode(r.headers.get_content_charset() or "utf-8", errors="replace")
+        return SafeWebFetcher(
+            timeout=timeout,
+            max_text_chars=MAX_PAGE_CHARS,
+        ).fetch(url)
     except (urllib.error.HTTPError, TimeoutError, ConnectionError, OSError) as e:
         # Translates to the AICoderError hierarchy so retry() above can tell
         # a transient failure from a permanent one; fetch_page()'s `except

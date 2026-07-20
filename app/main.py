@@ -5,17 +5,20 @@ import logging
 import time
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Optional
 
 import uvicorn
 from fastapi import FastAPI, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from .api.v1.routes import router as wire_router
 from .api.v1.ai_routes import router as ai_router
+from .api.v1.chat_routes import router as chat_router
 from .api.v1.resource_routes import router as resource_router
 from .core.cache import get_cache, init_cache, shutdown_cache
 from .core.config import get_config
@@ -27,6 +30,7 @@ from .services.ai_provider import close_embedded_litellm
 from .services.resource_store import ResourceConflictError, ResourceNotFoundError
 
 logger = logging.getLogger(__name__)
+FRONTEND_DIR = Path(__file__).resolve().parents[1] / "webapp" / "frontend-dist"
 
 
 class ResponseHeadersMiddleware:
@@ -48,6 +52,20 @@ class ResponseHeadersMiddleware:
             if message["type"] == "http.response.start":
                 duration_ms = (time.perf_counter() - started_at) * 1000
                 headers = list(message.get("headers", []))
+                frontend_path = str(scope.get("path", ""))
+                is_frontend = (
+                    frontend_path in {"/", "/favicon.svg"}
+                    or frontend_path.startswith("/assets/")
+                )
+                content_security_policy = (
+                    b"default-src 'self'; script-src 'self'; style-src 'self'; "
+                    b"img-src 'self' data:; connect-src 'self'; font-src 'self'; "
+                    b"object-src 'none'; frame-ancestors 'none'; base-uri 'none'; "
+                    b"form-action 'self'"
+                    if is_frontend
+                    else b"default-src 'none'; frame-ancestors 'none'; "
+                    b"base-uri 'none'"
+                )
                 headers.extend(
                     [
                         (b"x-process-time", f"{duration_ms:.2f}ms".encode()),
@@ -60,8 +78,7 @@ class ResponseHeadersMiddleware:
                         (b"referrer-policy", b"no-referrer"),
                         (
                             b"content-security-policy",
-                            b"default-src 'none'; frame-ancestors 'none'; "
-                            b"base-uri 'none'",
+                            content_security_policy,
                         ),
                     ]
                 )
@@ -252,6 +269,7 @@ if config.rate_limit_enabled:
 
 app.include_router(wire_router)
 app.include_router(ai_router)
+app.include_router(chat_router)
 app.include_router(resource_router)
 if config.control_panel_enabled:
     from .api.control_panel_rest import router as control_panel_router
@@ -259,8 +277,8 @@ if config.control_panel_enabled:
     app.include_router(control_panel_router)
 
 
-@app.get("/")
-async def root() -> dict[str, str]:
+@app.get("/v1/meta")
+async def metadata() -> dict[str, str]:
     return {
         "name": config.app_name,
         "version": config.version,
@@ -269,6 +287,31 @@ async def root() -> dict[str, str]:
         "health": "/v1/wire/health/live",
         "readiness": "/ready",
     }
+
+
+@app.get("/", include_in_schema=False)
+async def root() -> Response:
+    """Serve the bundled local-first UI from the supported API process."""
+    index = FRONTEND_DIR / "index.html"
+    if config.frontend_enabled and index.is_file():
+        return FileResponse(index)
+    return JSONResponse(
+        {
+            "name": config.app_name,
+            "version": config.version,
+            "description": "zcoder API service",
+            "frontend": "not built",
+            "readiness": "/ready",
+        }
+    )
+
+
+@app.get("/favicon.svg", include_in_schema=False)
+async def favicon() -> Response:
+    icon = FRONTEND_DIR / "favicon.svg"
+    if config.frontend_enabled and icon.is_file():
+        return FileResponse(icon, media_type="image/svg+xml")
+    return Response(status_code=404)
 
 
 @app.get("/ready")
@@ -289,6 +332,14 @@ async def readiness() -> Response:
 async def cache_health() -> dict:
     """Expose cache state without leaking connection credentials."""
     return await get_cache().health_check()
+
+
+if config.frontend_enabled and (FRONTEND_DIR / "assets").is_dir():
+    app.mount(
+        "/assets",
+        StaticFiles(directory=FRONTEND_DIR / "assets"),
+        name="frontend-assets",
+    )
 
 
 def run_server(

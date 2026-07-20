@@ -54,6 +54,9 @@ class Config:
     upload_chunk_size: int = 4 * 1024 * 1024
     upload_max_size: int = 50 * 1024 * 1024 * 1024
     upload_temp_dir: Path = field(default_factory=lambda: Path("./data/uploads"))
+    chat_session_dir: Path = field(
+        default_factory=lambda: Path("./data/chat/sessions")
+    )
     storage_backend: str = "local"
     storage_s3_bucket: str = "wire-uploads"
     storage_s3_endpoint: Optional[str] = None
@@ -86,6 +89,7 @@ class Config:
     prometheus_port: int = 9090
 
     control_panel_enabled: bool = True
+    frontend_enabled: bool = True
     control_panel_admin_users: list[str] = field(default_factory=list)
     feature_flags: dict[str, bool] = field(default_factory=dict)
 
@@ -128,6 +132,9 @@ class Config:
             upload_chunk_size=int(os.getenv("UPLOAD_CHUNK_SIZE", "4194304")),
             upload_max_size=int(os.getenv("UPLOAD_MAX_SIZE", "53687091200")),
             upload_temp_dir=Path(os.getenv("UPLOAD_TEMP_DIR", "./data/uploads")),
+            chat_session_dir=Path(
+                os.getenv("CHAT_SESSION_DIR", "./data/chat/sessions")
+            ),
             storage_backend=os.getenv("STORAGE_BACKEND", "local"),
             storage_s3_bucket=os.getenv("STORAGE_S3_BUCKET", "wire-uploads"),
             storage_s3_endpoint=os.getenv("STORAGE_S3_ENDPOINT"),
@@ -171,6 +178,7 @@ class Config:
             ),
             prometheus_port=int(os.getenv("PROMETHEUS_PORT", "9090")),
             control_panel_enabled=_env_bool("CONTROL_PANEL_ENABLED", True),
+            frontend_enabled=_env_bool("FRONTEND_ENABLED", True),
             control_panel_admin_users=(
                 os.getenv("CONTROL_PANEL_ADMIN_USERS", "").split(",")
                 if os.getenv("CONTROL_PANEL_ADMIN_USERS")
@@ -194,6 +202,8 @@ class Config:
 
     def ensure_dirs(self) -> None:
         self.upload_temp_dir.mkdir(parents=True, exist_ok=True)
+        self.chat_session_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+        os.chmod(self.chat_session_dir, 0o700)
 
     def validate(self) -> None:
         """Fail closed when production security invariants are not configured."""

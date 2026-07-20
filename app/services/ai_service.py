@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import inspect
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Callable
 from datetime import datetime, timezone
 from functools import partial
 from uuid import uuid4
@@ -170,6 +170,81 @@ class AIService:
             output_text=output_text,
             usage=usage,
         )
+
+    async def stream_response(
+        self, request: AIResponseRequest
+    ) -> AsyncIterator[dict[str, object]]:
+        """Yield normalized lifecycle events for one provider response."""
+        system = self._system_prompt(request)
+        coder = self._create_coder(request)
+        stream = getattr(coder, "stream", None)
+        response_id = f"air_{uuid4().hex}"
+        created_at = datetime.now(timezone.utc)
+        yield {
+            "type": "response.started",
+            "response": {
+                "id": response_id,
+                "object": "ai.response",
+                "created_at": created_at.isoformat(),
+            },
+        }
+
+        if not callable(stream):
+            response = await self.create_response(request)
+            yield {
+                "type": "response.output_text.delta",
+                "delta": response.output_text,
+            }
+            yield {
+                "type": "response.completed",
+                "response": response.model_dump(mode="json"),
+            }
+            return
+
+        output_parts: list[str] = []
+        model = str(getattr(coder, "model", request.model or "unknown"))
+        input_tokens: int | None = None
+        output_tokens: int | None = None
+        try:
+            chunks = stream(
+                request.prompt,
+                system=system,
+                file_content=request.file_content,
+                history=[message.model_dump() for message in request.history],
+            )
+            async for chunk in chunks:
+                if chunk.model:
+                    model = chunk.model
+                if chunk.input_tokens is not None:
+                    input_tokens = chunk.input_tokens
+                if chunk.output_tokens is not None:
+                    output_tokens = chunk.output_tokens
+                if chunk.text:
+                    output_parts.append(chunk.text)
+                    yield {
+                        "type": "response.output_text.delta",
+                        "delta": chunk.text,
+                    }
+        except Exception as exc:
+            raise AIServiceError("AI provider stream failed") from exc
+
+        output_text = "".join(output_parts)
+        if not output_text:
+            raise AIServiceError("AI provider returned no text")
+        response = AIResponse(
+            id=response_id,
+            created_at=created_at,
+            model=model,
+            output_text=output_text,
+            usage=AIUsage(
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+            ),
+        )
+        yield {
+            "type": "response.completed",
+            "response": response.model_dump(mode="json"),
+        }
 
     async def list_models(self) -> list[AIModel]:
         """List model aliases visible through the configured provider."""

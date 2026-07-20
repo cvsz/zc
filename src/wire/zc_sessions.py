@@ -6,12 +6,14 @@ AI Model Coder CLI v1.10.0
 """
 
 import json
-import subprocess
+import subprocess  # nosec B404
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
+
+from wire.error_reporting import log_ignored_error
 
 SESSIONS_DIR    = Path.home() / ".ai-coder" / "sessions"
 CHECKPOINTS_DIR = Path.home() / ".ai-coder" / "checkpoints"
@@ -118,7 +120,8 @@ def latest_session(mode: Optional[str] = None) -> Optional[Session]:
         try:
             s = Session.from_dict(json.loads(p.read_text()))
             if mode is None or s.mode == mode: sessions.append(s)
-        except Exception: pass
+        except Exception:
+            log_ignored_error(__name__, "Unable to read session record")
     return max(sessions, key=lambda s: s.updated) if sessions else None
 
 def list_sessions(mode: Optional[str] = None) -> list[Session]:
@@ -128,7 +131,8 @@ def list_sessions(mode: Optional[str] = None) -> list[Session]:
         try:
             s = Session.from_dict(json.loads(p.read_text()))
             if mode is None or s.mode == mode: out.append(s)
-        except Exception: pass
+        except Exception:
+            log_ignored_error(__name__, "Unable to read session summary")
     return sorted(out, key=lambda s: s.updated, reverse=True)
 
 def capture_checkpoint(s: Session, label: str) -> Checkpoint:
@@ -153,7 +157,8 @@ def list_checkpoints(sid: str) -> list[Checkpoint]:
         try:
             cp = Checkpoint.from_dict(json.loads(p.read_text()))
             if cp.sid == sid: out.append(cp)
-        except Exception: pass
+        except Exception:
+            log_ignored_error(__name__, "Unable to read checkpoint")
     return sorted(out, key=lambda c: c.ts)
 
 
@@ -166,10 +171,11 @@ def away_summary(cwd: str, since_iso: str) -> str:
     # git commits since
     commits: list[str] = []
     try:
-        r = subprocess.run(['git', 'log', f'--since={since_iso}', '--oneline'],
+        r = subprocess.run(['git', 'log', f'--since={since_iso}', '--oneline'],  # nosec B603 B607
                           shell=False, cwd=cwd, capture_output=True, text=True, timeout=5)
         commits = [l for l in r.stdout.splitlines() if l.strip()]
-    except Exception: pass
+    except Exception:
+        log_ignored_error(__name__, "Unable to read Git activity")
 
     # files modified since
     modified: list[str] = []

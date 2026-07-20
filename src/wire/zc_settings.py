@@ -28,7 +28,7 @@ CLI flags:
 
 import json
 import os
-import subprocess
+import subprocess  # nosec B404
 from pathlib import Path
 from typing import Optional
 
@@ -128,7 +128,7 @@ def render_status_line(session_state: dict) -> str:
         try:
             import shlex
             cmd_args = shlex.split(sl["command"]) if isinstance(sl["command"], str) else sl["command"]
-            r = subprocess.run(
+            r = subprocess.run(  # nosec B603
                 cmd_args, shell=False,
                 input=json.dumps(session_state),
                 capture_output=True, text=True, timeout=5,

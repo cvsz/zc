@@ -109,6 +109,10 @@ Thumbs.db
 venv2/
 .web.pid
 *.save
+node_modules/
+*.tsbuildinfo
+webapp/frontend-src/vite.config.js
+webapp/frontend-src/vite.config.d.ts
 infra/cloudflare/.terraform/
 infra/cloudflare/*.tfstate
 infra/cloudflare/*.tfstate.*

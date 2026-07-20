@@ -32,6 +32,8 @@ Slash commands inside the session:
 import re
 import sys
 
+from wire.restricted_code import RestrictedCodeError, execute_restricted_code
+
 try:
     import pandas as pd
 except ImportError:
@@ -144,7 +146,6 @@ class ExcelSession:
         for bad in _DENYLIST:
             if bad in lowered:
                 return False, f"[blocked] generated code used a disallowed construct: {bad!r}"
-
         self._snapshot()
         local_ns = {
             "sheets": self.sheets,
@@ -152,12 +153,32 @@ class ExcelSession:
             "add_chart": self._add_chart,
         }
         try:
-            exec(compile(code, "<excel-turn>", "exec"), {"__builtins__": {
-                "len": len, "range": range, "sum": sum, "min": min, "max": max,
-                "round": round, "sorted": sorted, "list": list, "dict": dict,
-                "str": str, "int": int, "float": float, "bool": bool,
-                "enumerate": enumerate, "zip": zip, "abs": abs,
-            }}, local_ns)
+            execute_restricted_code(
+                code,
+                allowed_calls={
+                    "abs", "add_chart", "bool", "dict", "enumerate", "float",
+                    "int", "len", "list", "max", "min", "range", "round",
+                    "sorted", "str", "sum", "zip",
+                },
+                allowed_methods={
+                    "abs", "astype", "clip", "copy", "drop", "drop_duplicates",
+                    "dropna", "fillna", "groupby", "head", "isin", "map",
+                    "mean", "merge", "pivot", "pivot_table", "rename", "replace",
+                    "reset_index", "round", "sort_index", "sort_values", "sum",
+                    "tail", "to_datetime", "to_numeric",
+                },
+                builtins={
+                    "len": len, "range": range, "sum": sum, "min": min, "max": max,
+                    "round": round, "sorted": sorted, "list": list, "dict": dict,
+                    "str": str, "int": int, "float": float, "bool": bool,
+                    "enumerate": enumerate, "zip": zip, "abs": abs,
+                },
+                local_namespace=local_ns,
+                filename="<excel-turn>",
+            )
+        except RestrictedCodeError as exc:
+            self.undo()
+            return False, f"[blocked] {exc}"
         except Exception as e:
             self.undo()
             return False, f"[ERROR] generated code failed: {e}"

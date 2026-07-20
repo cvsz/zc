@@ -20,8 +20,29 @@ class FakeRouter:
 
     request: dict[str, Any] = {}
 
-    async def acompletion(self, **kwargs: Any) -> SimpleNamespace:
+    async def acompletion(self, **kwargs: Any) -> Any:
         type(self).request = kwargs
+        if kwargs.get("stream"):
+            async def chunks():
+                yield SimpleNamespace(
+                    choices=[
+                        SimpleNamespace(delta=SimpleNamespace(content="routed "))
+                    ],
+                    model="resolved-deployment",
+                    usage=None,
+                )
+                yield SimpleNamespace(
+                    choices=[
+                        SimpleNamespace(delta=SimpleNamespace(content="inside zc"))
+                    ],
+                    model="resolved-deployment",
+                    usage=SimpleNamespace(
+                        prompt_tokens=11,
+                        completion_tokens=7,
+                    ),
+                )
+
+            return chunks()
         return SimpleNamespace(
             choices=[
                 SimpleNamespace(
@@ -64,6 +85,25 @@ async def test_embedded_adapter_calls_router_without_http(tmp_path: Path) -> Non
         {"role": "user", "content": "fix the test"},
     ]
     assert FakeRouter.request["timeout"] == 120
+
+
+@pytest.mark.asyncio
+async def test_embedded_adapter_streams_without_proxy_process(
+    tmp_path: Path,
+) -> None:
+    adapter = EmbeddedLiteLLMAdapter(
+        config_path=tmp_path / "litellm-config.yaml",
+        model="zc-default",
+        router=FakeRouter(),
+    )
+
+    chunks = [chunk async for chunk in adapter.stream("stream this")]
+
+    assert "".join(chunk.text for chunk in chunks) == "routed inside zc"
+    assert chunks[-1].model == "resolved-deployment"
+    assert chunks[-1].input_tokens == 11
+    assert chunks[-1].output_tokens == 7
+    assert FakeRouter.request["stream"] is True
 
 
 @pytest.mark.asyncio
@@ -154,8 +194,14 @@ def test_compose_starts_only_zc_with_embedded_router() -> None:
     assert set(compose["services"]) == {"zc"}
     service = compose["services"]["zc"]
     assert "depends_on" not in service
-    assert "AI_PROVIDER=litellm" in service["environment"]
-    assert "LITELLM_CONFIG_PATH=/app/litellm-config.yaml" in service["environment"]
+    assert service["environment"]["AI_PROVIDER"] == "${AI_PROVIDER:-litellm}"
+    assert (
+        service["environment"]["LITELLM_CONFIG_PATH"]
+        == "/app/litellm-config.yaml"
+    )
+    assert service["environment"]["FRONTEND_ENABLED"] == "true"
+    assert service["environment"]["REDIS_ENABLED"] == "false"
+    assert service["network_mode"] == "host"
     assert "ports" not in service
 
 

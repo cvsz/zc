@@ -18,6 +18,7 @@ import urllib.request
 from pathlib import Path
 from typing import Optional
 
+from wire.error_reporting import log_ignored_error
 from wire.exceptions import AICoderError
 from wire.resilience import CircuitBreaker, retry, urlopen_json
 
@@ -166,6 +167,7 @@ class CitationsCoder:
             try:
                 docs.append({"title": p.name, "content": p.read_text()[:8000]})
             except Exception:
+                log_ignored_error(__name__, "Unable to read citation document")
                 pass
         if not docs:
             return {"answer": f"No documents found in {directory}", "citations": []}

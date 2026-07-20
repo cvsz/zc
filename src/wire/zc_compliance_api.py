@@ -230,7 +230,7 @@ class ComplianceApiClient:
         while True:
             req = urllib.request.Request(url, headers=self._headers(), method=method)
             try:
-                with urllib.request.urlopen(req, timeout=self.timeout) as r:
+                with urlopen_http(req, timeout=self.timeout) as r:
                     body = r.read()
                     headers = dict(r.headers)
                     if raw:
@@ -777,3 +777,4 @@ def cmd_compliance_group_members(api_key: str, group_id: str):
         print(f"  {m.get('user_id')}  {m.get('email', '?')}")
     print()
     return data
+from wire.resilience import urlopen_http

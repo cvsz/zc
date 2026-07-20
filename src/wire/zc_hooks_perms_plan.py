@@ -12,11 +12,13 @@ AI Model Coder CLI v1.10.0
 import fnmatch
 import json
 import os
-import subprocess
+import subprocess  # nosec B404
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from typing import Any, Callable, Optional
+
+from wire.error_reporting import log_ignored_error
 
 HOOKS_FILE = Path.home() / ".ai-coder" / "hooks.json"
 PERMS_FILE = Path.home() / ".ai-coder" / "permissions.json"
@@ -60,7 +62,8 @@ class HookManager:
     def _load(self):
         if HOOKS_FILE.exists():
             try: self.hooks = [Hook.from_dict(d) for d in json.loads(HOOKS_FILE.read_text())]
-            except Exception: pass
+            except Exception:
+                log_ignored_error(__name__, "Unable to read hook configuration")
 
     def save(self):
         HOOKS_FILE.parent.mkdir(parents=True, exist_ok=True)
@@ -87,7 +90,7 @@ class HookManager:
             try:
                 import shlex
                 cmd_args = shlex.split(h.command) if isinstance(h.command, str) else h.command
-                p = subprocess.run(cmd_args, shell=False, capture_output=True,
+                p = subprocess.run(cmd_args, shell=False, capture_output=True,  # nosec B603
                                    text=True, timeout=30, env=env)
                 blocked = (event == HookEvent.PRE_TOOL_USE and p.returncode != 0)
                 results.append(HookResult(hook=h, returncode=p.returncode,

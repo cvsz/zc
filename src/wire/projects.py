@@ -12,6 +12,7 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
+from wire.error_reporting import log_ignored_error
 from wire.security import safe_resolve
 from typing import Optional
 
@@ -145,6 +146,7 @@ class ProjectManager:
                         "updated_at":  m.get("updated_at", ""),
                     })
                 except Exception:
+                    log_ignored_error(__name__, "Unable to read project metadata")
                     pass
         return projects
 

@@ -138,8 +138,9 @@ import uuid
 from pathlib import Path
 from typing import Optional
 
+from wire.error_reporting import log_ignored_error
 from wire.exceptions import AICoderError
-from wire.resilience import CircuitBreaker, raise_for_http_error, retry, urlopen_json
+from wire.resilience import CircuitBreaker, raise_for_http_error, retry, urlopen_http, urlopen_json
 
 SESSIONS_DIR = Path(os.path.expanduser("~/.ai-coder/agent_sessions"))
 ENDPOINT     = "https://api.anthropic.com/v1/messages"
@@ -308,7 +309,7 @@ class McpTunnel:
     @retry(max_attempts=4, base_delay=1.0, max_delay=15.0, breaker=_breaker)
     def _call_delete(self, req: "urllib.request.Request") -> dict:
         try:
-            with urllib.request.urlopen(req, timeout=30) as r:
+            with urlopen_http(req, timeout=30) as r:
                 return {"status": r.status}
         except (urllib.error.HTTPError, TimeoutError, ConnectionError, OSError) as e:
             raise_for_http_error(e)
@@ -953,7 +954,7 @@ class ManagedAgentsClient:
     def add_credential(self, vault_id: str, credential_type: str,
                        mcp_server_url: Optional[str] = None,
                        secret_name: Optional[str] = None,
-                       secret_value: str = "",
+                       secret_value: Optional[str] = None,
                        allowed_domains: Optional[list] = None,
                        injection_location: Optional[str] = None) -> dict:
         """Add a credential to a vault. credential_type is one of
@@ -1474,7 +1475,7 @@ def cmd_agent_vault_create(display_name: str, api_key: str,
 def cmd_agent_vault_add_credential(vault_id: str, credential_type: str, api_key: str,
                                    mcp_server_url: Optional[str] = None,
                                    secret_name: Optional[str] = None,
-                                   secret_value: str = "",
+                                   secret_value: Optional[str] = None,
                                    allowed_domains: Optional[list] = None,
                                    injection_location: Optional[str] = None) -> dict:
     """Add a credential to an existing vault. Never prints secret_value —
@@ -1731,7 +1732,8 @@ def cmd_agent_list_sessions():
             turns = len(d.get("history", [])) // 2
             print(f"{d['id']:<16}{d.get('name','')[:24]:<25}{turns:<8}{d.get('updated_at','')[:10]}")
         except Exception:
-            pass
+            log_ignored_error(__name__, "Skipping unreadable agent session")
+            continue
 
 
 def cmd_list_tool_presets():

@@ -31,9 +31,10 @@ from __future__ import annotations
 import functools
 import json
 import logging
-import random
+import secrets
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from dataclasses import dataclass, field
 from typing import Callable, NoReturn, TypeVar
@@ -50,6 +51,19 @@ from wire.exceptions import (
 logger = logging.getLogger("wire.resilience")
 
 T = TypeVar("T")
+
+
+def urlopen_http(req: urllib.request.Request, timeout: float):
+    """Open a validated HTTP(S) request.
+
+    This is the single audited boundary for urllib calls. Callers that accept
+    arbitrary public URLs must additionally use ``SafeWebFetcher`` for SSRF
+    protection.
+    """
+    parsed = urllib.parse.urlsplit(req.full_url)
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        raise ValueError("Only absolute HTTP(S) URLs are supported")
+    return urllib.request.urlopen(req, timeout=timeout)  # nosec B310
 
 
 def _is_retryable(exc: BaseException) -> bool:
@@ -106,7 +120,7 @@ def urlopen_json(req: urllib.request.Request, timeout: float) -> dict:
     failures via `raise_for_http_error`. Call this from inside a function
     decorated with `@retry(...)` — it does not retry by itself."""
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as r:
+        with urlopen_http(req, timeout=timeout) as r:
             return json.loads(r.read().decode())
     except (urllib.error.HTTPError, TimeoutError, ConnectionError, OSError) as e:
         raise_for_http_error(e)
@@ -116,7 +130,7 @@ def urlopen_text(req: urllib.request.Request, timeout: float) -> str:
     """Like `urlopen_json` but returns the raw decoded body (for endpoints
     that don't return JSON, e.g. fetching a diff or a web page)."""
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as r:
+        with urlopen_http(req, timeout=timeout) as r:
             return r.read().decode(errors="replace")
     except (urllib.error.HTTPError, TimeoutError, ConnectionError, OSError) as e:
         raise_for_http_error(e)
@@ -170,7 +184,7 @@ class CircuitBreaker:
 def _backoff_delay(attempt: int, base_delay: float, max_delay: float) -> float:
     """Full-jitter exponential backoff: uniform(0, min(cap, base * 2**attempt))."""
     cap = min(max_delay, base_delay * (2 ** attempt))
-    return random.uniform(0, cap)
+    return secrets.SystemRandom().uniform(0, cap)
 
 
 def retry(
@@ -217,7 +231,8 @@ def retry(
             # Unreachable in practice (loop always returns or raises), but
             # keeps type checkers happy and guards against a future edit
             # accidentally falling through.
-            assert last_exc is not None
+            if last_exc is None:
+                raise RuntimeError("retry loop ended without a result or exception")
             raise last_exc
         return wrapper
     return decorator

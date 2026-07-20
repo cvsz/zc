@@ -42,24 +42,50 @@ CLI flags:
 import json
 import os
 import shutil
+import stat
 import sys
 import tempfile
 import urllib.error
-import urllib.request
 import zipfile
 from pathlib import Path
 from typing import Optional
 
+from wire.error_reporting import log_ignored_error
 from wire.exceptions import AICoderError, TransientAPIError
 from wire.resilience import retry
+from wire.web_fetcher import SafeWebFetcher
 
 PLUGINS_ROOT     = Path(os.path.expanduser("~/.zc/plugins"))
 MARKETPLACES_DIR = PLUGINS_ROOT / "marketplaces"
 INSTALLED_DIR    = PLUGINS_ROOT / "installed"
 REGISTRY_FILE    = PLUGINS_ROOT / "registry.json"
+MAX_ARCHIVE_FILES = 10_000
+MAX_ARCHIVE_BYTES = 100_000_000
 
 for d in (MARKETPLACES_DIR, INSTALLED_DIR):
     d.mkdir(parents=True, exist_ok=True)
+
+
+def _safe_extract_zip(archive: zipfile.ZipFile, destination: Path) -> None:
+    """Extract a bounded archive without traversal or symlink entries."""
+    members = archive.infolist()
+    if len(members) > MAX_ARCHIVE_FILES:
+        raise ValueError("plugin archive contains too many entries")
+    if sum(member.file_size for member in members) > MAX_ARCHIVE_BYTES:
+        raise ValueError("plugin archive is too large after extraction")
+
+    destination = destination.resolve()
+    destination.mkdir(parents=True, exist_ok=True)
+    for member in members:
+        mode = (member.external_attr >> 16) & 0xFFFF
+        if stat.S_ISLNK(mode):
+            raise ValueError(f"plugin archive contains a symlink: {member.filename}")
+        target = (destination / member.filename).resolve()
+        if target != destination and destination not in target.parents:
+            raise ValueError(
+                f"plugin archive path escapes destination: {member.filename}"
+            )
+    archive.extractall(destination)
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -71,6 +97,7 @@ def _load_registry() -> dict:
         try:
             return json.loads(REGISTRY_FILE.read_text())
         except Exception:
+            log_ignored_error(__name__, "Unable to read plugin registry")
             pass
     return {"marketplaces": {}, "installed": {}}
 
@@ -174,8 +201,15 @@ def _is_url(s: str) -> bool:
 @retry(max_attempts=2, base_delay=1.0, max_delay=5.0)
 def _fetch_marketplace_source(url: str) -> bytes:
     try:
-        with urllib.request.urlopen(url, timeout=30) as resp:
-            return resp.read()
+        return SafeWebFetcher(max_bytes=10_000_000).fetch_bytes(
+            url,
+            allowed_content_types=(
+                "application/json",
+                "application/zip",
+                "application/octet-stream",
+                "text/",
+            ),
+        )
     except urllib.error.URLError as e:
         raise TransientAPIError(f"could not fetch {url}: {e}") from e
 
@@ -203,7 +237,7 @@ def marketplace_add(source: str, name: Optional[str] = None) -> dict:
                     raise RuntimeError(str(e.message)) from e
                 tmp_path = tmp.name
             with zipfile.ZipFile(tmp_path) as zf:
-                zf.extractall(dest)
+                _safe_extract_zip(zf, dest)
             os.unlink(tmp_path)
         else:
             try:
@@ -219,7 +253,7 @@ def marketplace_add(source: str, name: Optional[str] = None) -> dict:
         if src_path.suffix == ".zip":
             dest.mkdir(parents=True, exist_ok=True)
             with zipfile.ZipFile(src_path) as zf:
-                zf.extractall(dest)
+                _safe_extract_zip(zf, dest)
         else:
             shutil.copytree(src_path, dest)
 
@@ -254,6 +288,7 @@ def _discover_plugins_in_marketplace(mp_dir: Path) -> list:
                 if cand.exists():
                     found.append(cand)
         except Exception:
+            log_ignored_error(__name__, "Unable to read marketplace index")
             pass
     if found:
         return found
@@ -352,7 +387,7 @@ def plugin_install_from_dir(path: str) -> dict:
     if src_path.suffix == ".zip":
         tmp_extract = Path(tempfile.mkdtemp())
         with zipfile.ZipFile(src_path) as zf:
-            zf.extractall(tmp_extract)
+            _safe_extract_zip(zf, tmp_extract)
         contents = list(tmp_extract.iterdir())
         plug_dir = contents[0] if len(contents) == 1 and contents[0].is_dir() else tmp_extract
     else:
@@ -488,6 +523,7 @@ def load_plugin_hooks() -> dict:
         try:
             data = json.loads(hooks_file.read_text())
         except Exception:
+            log_ignored_error(__name__, "Skipping invalid plugin hook")
             continue
         for event, handlers in data.items():
             merged.setdefault(event, [])
@@ -507,6 +543,7 @@ def load_plugin_mcp_servers() -> dict:
         try:
             data = json.loads(mcp_file.read_text())
         except Exception:
+            log_ignored_error(__name__, "Skipping invalid plugin MCP configuration")
             continue
         for name, cfg in data.get("mcpServers", {}).items():
             merged[f"{plug_dir.name}:{name}"] = cfg

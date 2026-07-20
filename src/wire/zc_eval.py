@@ -14,6 +14,7 @@ from typing import Optional
 
 import anthropic
 
+from wire.error_reporting import log_ignored_error
 from wire.utils import sampling_kwargs
 
 EVALS_DIR = Path.home() / ".ai-coder" / "evals"
@@ -186,7 +187,8 @@ def cmd_eval_list():
             d = json.loads(p.read_text())
             print(f"  [{d['run_id']}] {d['ts'][:16]}  model={d['model']}  "
                   f"{d['passed']}/{d['cases']}  avg={d['avg_score']:.2f}")
-        except Exception: pass
+        except Exception:
+            log_ignored_error(__name__, "Unable to read evaluation run")
 
 
 def cmd_eval_scaffold(output: str):

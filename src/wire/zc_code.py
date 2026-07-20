@@ -67,7 +67,7 @@ CLI flags: see main.py --code-agent-*
 
 import json
 import os
-import subprocess
+import subprocess  # nosec B404
 import time
 import uuid
 from pathlib import Path
@@ -281,6 +281,7 @@ class HooksEngine:
                 data = json.loads(settings_path.read_text())
                 return cls(data.get("hooks", {}))
             except Exception:
+                log_ignored_error(__name__, "Unable to read hook settings")
                 pass
         return cls()
 
@@ -324,7 +325,7 @@ class HooksEngine:
             try:
                 import shlex
                 cmd_args = shlex.split(cmd) if isinstance(cmd, str) else cmd
-                result = subprocess.run(
+                result = subprocess.run(  # nosec B603
                     cmd_args, shell=False, input=stdin_data,
                     capture_output=True, text=True, timeout=30, env=env,
                 )
@@ -592,6 +593,7 @@ class TodoManager:
             try:
                 self._todos = json.loads(TODO_FILE.read_text())
             except Exception:
+                log_ignored_error(__name__, "Unable to read TODO data")
                 pass
 
     def _save(self):
@@ -667,8 +669,10 @@ class MemoryManager:
 import urllib.error
 import urllib.request
 
+from wire.error_reporting import log_ignored_error
 from wire.exceptions import AICoderError
 from wire.resilience import CircuitBreaker, raise_for_http_error, retry, urlopen_json
+from wire.web_fetcher import SafeWebFetcher
 
 MESSAGES_ENDPOINT = "https://api.anthropic.com/v1/messages"
 _breaker = CircuitBreaker(failure_threshold=5, reset_timeout=30)
@@ -714,10 +718,8 @@ class CodeAgent:
     # time (agent-chosen), not one fixed downstream dependency.
     @retry(max_attempts=2, base_delay=1.0, max_delay=5.0)
     def _webfetch_retrying(self, url: str) -> str:
-        req = urllib.request.Request(url, headers={"User-Agent": "ai-coder-agent/1.8"})
         try:
-            with urllib.request.urlopen(req, timeout=15) as r:
-                return r.read().decode("utf-8", errors="replace")[:4000]
+            return SafeWebFetcher().fetch(url)
         except (urllib.error.HTTPError, TimeoutError, ConnectionError, OSError) as e:
             raise_for_http_error(e)
             raise e
@@ -835,7 +837,7 @@ class CodeAgent:
                         return f"[SANDBOX BLOCKED] {e}"
                     except ImportError:
                         pass
-                r = subprocess.run(["/bin/bash", "-c", cmd], shell=False, cwd=cwd,
+                r = subprocess.run(["/bin/bash", "-c", cmd], shell=False, cwd=cwd,  # nosec B603
                                    capture_output=True, text=True, timeout=timeout)
                 out = r.stdout.strip()
                 err = r.stderr.strip()
@@ -863,6 +865,7 @@ class CodeAgent:
                             if re.search(pattern, line):
                                 results.append(f"{f.relative_to(cwd)}:{i}: {line.strip()}")
                     except Exception:
+                        log_ignored_error(__name__, "Unable to inspect search candidate")
                         pass
                 return "\n".join(results[:200]) or "(no matches)"
 
@@ -1424,6 +1427,7 @@ def cmd_code_cost(api_key: str):
             total_in += i; total_out += o; total_cost += c
             print(f"{d['id'][:16]:<18}{t:<8}{i:,<12}{o:,<12}${c:.4f}")
         except Exception:
+            log_ignored_error(__name__, "Unable to record cost data")
             pass
     print("─" * 60)
     print(f"{'TOTAL':<18}{'':8}{total_in:,<12}{total_out:,<12}${total_cost:.4f}")
@@ -1442,6 +1446,7 @@ def cmd_code_list_sessions():
             t = len(d.get("turns", [])) // 2
             print(f"{d['id'][:16]:<18}{t:<8}{d.get('model','')[:24]:<25}{d.get('updated_at','')[:10]}")
         except Exception:
+            log_ignored_error(__name__, "Unable to record session data")
             pass
 
 

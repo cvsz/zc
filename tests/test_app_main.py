@@ -38,7 +38,7 @@ def test_config_rejects_multi_worker_in_memory_rate_limiting() -> None:
 
 
 @pytest.mark.asyncio
-async def test_root_exposes_canonical_identity() -> None:
+async def test_root_serves_standalone_frontend() -> None:
     transport = httpx.ASGITransport(app=main.app)
     async with httpx.AsyncClient(
         transport=transport, base_url="http://testserver"
@@ -46,10 +46,44 @@ async def test_root_exposes_canonical_identity() -> None:
         response = await client.get("/")
 
     assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/html")
+    assert '<div id="root"></div>' in response.text
+    assert "script-src 'self'" in response.headers["content-security-policy"]
+
+
+@pytest.mark.asyncio
+async def test_frontend_assets_are_served_with_restrictive_headers() -> None:
+    transport = httpx.ASGITransport(app=main.app)
+    index = (main.FRONTEND_DIR / "index.html").read_text(encoding="utf-8")
+    asset_path = index.split('src="', 1)[1].split('"', 1)[0]
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://testserver"
+    ) as client:
+        asset = await client.get(asset_path)
+        icon = await client.get("/favicon.svg")
+
+    assert asset.status_code == 200
+    assert asset.headers["x-content-type-options"] == "nosniff"
+    assert "connect-src 'self'" in asset.headers["content-security-policy"]
+    assert icon.status_code == 200
+    assert icon.headers["content-type"].startswith("image/svg+xml")
+
+
+@pytest.mark.asyncio
+async def test_metadata_exposes_canonical_identity() -> None:
+    transport = httpx.ASGITransport(app=main.app)
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://testserver"
+    ) as client:
+        response = await client.get("/v1/meta")
+
     body = response.json()
     assert body["name"] == "zcoder"
     assert body["version"] == "1.33.0"
     assert body["readiness"] == "/ready"
+    assert response.headers["content-security-policy"] == (
+        "default-src 'none'; frame-ancestors 'none'; base-uri 'none'"
+    )
 
 
 @pytest.mark.asyncio

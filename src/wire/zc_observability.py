@@ -15,6 +15,8 @@ from typing import Any, Callable, Optional
 
 import anthropic
 
+from wire.error_reporting import log_ignored_error
+
 OBS_DIR  = Path.home() / ".ai-coder" / "observability"
 LOG_FILE = OBS_DIR / "requests.jsonl"
 
@@ -36,7 +38,8 @@ def _read_logs(hours: int = 24) -> list[dict]:
             try:
                 r = json.loads(line)
                 if r.get("ts", "") >= cutoff: records.append(r)
-            except Exception: pass
+            except Exception:
+                log_ignored_error(__name__, "Skipping malformed observability record")
     return records
 
 

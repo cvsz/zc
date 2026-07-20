@@ -10,7 +10,7 @@ import urllib.request
 from wire.config import Config
 from wire.exceptions import APIError, AuthenticationError, RateLimitError, TransientAPIError
 from wire.logging_config import get_logger
-from wire.resilience import CircuitBreaker, retry
+from wire.resilience import CircuitBreaker, retry, urlopen_http
 from wire.utils import sampling_kwargs
 
 logger = get_logger("coder")
@@ -72,7 +72,7 @@ class Coder:
                 elif addition:
                     system = addition
             except Exception:
-                pass
+                logger.warning("personality_prompt_unavailable", exc_info=True)
 
         messages.append({"role": "user", "content": user_content})
 
@@ -109,7 +109,7 @@ class Coder:
                 method="POST",
             )
             try:
-                with urllib.request.urlopen(req, timeout=120) as resp:
+                with urlopen_http(req, timeout=120) as resp:
                     return json.loads(resp.read().decode())
             except urllib.error.HTTPError as e:
                 body = e.read().decode()

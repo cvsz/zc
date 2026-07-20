@@ -2,6 +2,8 @@
 import json
 import os
 
+from wire.error_reporting import log_ignored_error
+
 CONFIG_PATH = os.path.expanduser("~/.ai-coder-config.json")
 
 class Config:
@@ -12,6 +14,7 @@ class Config:
                 with open(CONFIG_PATH) as f:
                     self._data = json.load(f)
             except Exception:
+                log_ignored_error(__name__, "Unable to load configuration file")
                 pass
 
     def get(self, key, default=None):

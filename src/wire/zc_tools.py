@@ -806,9 +806,9 @@ def build_code_tools_registry() -> ToolRegistry:
     reg = ToolRegistry()
 
     def run_python(code: str) -> str:
-        import subprocess
+        import subprocess  # nosec B404
         import sys
-        result = subprocess.run(
+        result = subprocess.run(  # nosec B603
             [sys.executable, "-c", code],
             capture_output=True, text=True, timeout=30
         )

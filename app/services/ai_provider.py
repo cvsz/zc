@@ -6,6 +6,7 @@ import json
 import os
 from dataclasses import dataclass
 from pathlib import Path
+from collections.abc import AsyncIterator
 from typing import Any
 
 import aiohttp
@@ -20,6 +21,16 @@ class ProviderGeneration:
 
     text: str
     model: str
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+
+
+@dataclass(frozen=True)
+class ProviderStreamChunk:
+    """One normalized text or usage update from a streaming provider."""
+
+    text: str = ""
+    model: str | None = None
     input_tokens: int | None = None
     output_tokens: int | None = None
 
@@ -116,6 +127,87 @@ class AnthropicCoderAdapter:
             output_tokens=_optional_non_negative_int(usage.get("output_tokens")),
         )
 
+    async def stream(
+        self,
+        prompt: str,
+        *,
+        system: str | None = None,
+        file_content: str | None = None,
+        history: list[dict[str, str]] | None = None,
+    ) -> AsyncIterator[ProviderStreamChunk]:
+        """Stream normalized Anthropic SSE text deltas."""
+        if not self.api_key:
+            raise RuntimeError("AI provider credential is not configured")
+
+        user_content = prompt
+        if file_content:
+            user_content = f"File content:\n```\n{file_content}\n```\n\n{prompt}"
+        messages: list[dict[str, Any]] = list(history or [])
+        messages.append({"role": "user", "content": user_content})
+        payload: dict[str, Any] = {
+            "model": self.model,
+            "max_tokens": self.max_tokens,
+            "messages": messages,
+            "stream": True,
+        }
+        if system:
+            payload["system"] = system
+        if self.temperature is not None:
+            payload["temperature"] = self.temperature
+        if self.service_tier:
+            payload["service_tier"] = self.service_tier
+        if self.inference_geo:
+            payload["inference_geo"] = self.inference_geo
+        if self.fast_mode:
+            payload["speed"] = "fast"
+
+        timeout = aiohttp.ClientTimeout(total=120)
+        try:
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.post(
+                    ANTHROPIC_MESSAGES_URL,
+                    json=payload,
+                    headers={
+                        "anthropic-version": "2023-06-01",
+                        "content-type": "application/json",
+                        "x-api-key": self.api_key,
+                    },
+                ) as response:
+                    if response.status >= 400:
+                        raise RuntimeError("AI provider request failed")
+                    async for raw_line in response.content:
+                        line = raw_line.decode("utf-8", errors="replace").strip()
+                        if not line.startswith("data:"):
+                            continue
+                        raw_data = line[5:].strip()
+                        if not raw_data or raw_data == "[DONE]":
+                            continue
+                        event = json.loads(raw_data)
+                        event_type = event.get("type")
+                        if event_type == "message_start":
+                            message = event.get("message") or {}
+                            usage = message.get("usage") or {}
+                            yield ProviderStreamChunk(
+                                model=str(message.get("model") or self.model),
+                                input_tokens=_optional_non_negative_int(
+                                    usage.get("input_tokens")
+                                ),
+                            )
+                        elif event_type == "content_block_delta":
+                            delta = event.get("delta") or {}
+                            text = delta.get("text")
+                            if isinstance(text, str) and text:
+                                yield ProviderStreamChunk(text=text)
+                        elif event_type == "message_delta":
+                            usage = event.get("usage") or {}
+                            yield ProviderStreamChunk(
+                                output_tokens=_optional_non_negative_int(
+                                    usage.get("output_tokens")
+                                )
+                            )
+        except (aiohttp.ClientError, TimeoutError, ValueError) as exc:
+            raise RuntimeError("AI provider request failed") from exc
+
 
 _router_cache: dict[Path, Any] = {}
 
@@ -208,6 +300,53 @@ class EmbeddedLiteLLMAdapter:
             ),
         )
 
+    async def stream(
+        self,
+        prompt: str,
+        *,
+        system: str | None = None,
+        file_content: str | None = None,
+        history: list[dict[str, str]] | None = None,
+    ) -> AsyncIterator[ProviderStreamChunk]:
+        """Stream normalized deltas from the embedded LiteLLM Router."""
+        messages: list[dict[str, str]] = []
+        if system:
+            messages.append({"role": "system", "content": system})
+        messages.extend(history or [])
+        user_content = prompt
+        if file_content:
+            user_content = f"File content:\n```\n{file_content}\n```\n\n{prompt}"
+        messages.append({"role": "user", "content": user_content})
+
+        options: dict[str, Any] = {"max_tokens": self.max_tokens}
+        if self.temperature is not None:
+            options["temperature"] = self.temperature
+        try:
+            response = await self._get_router().acompletion(
+                model=self.model,
+                messages=messages,
+                timeout=self.timeout_seconds,
+                stream=True,
+                **options,
+            )
+            async for chunk in response:
+                choices = getattr(chunk, "choices", None) or []
+                delta = getattr(choices[0], "delta", None) if choices else None
+                content = getattr(delta, "content", None)
+                usage = getattr(chunk, "usage", None)
+                yield ProviderStreamChunk(
+                    text=content if isinstance(content, str) else "",
+                    model=str(getattr(chunk, "model", None) or self.model),
+                    input_tokens=_optional_non_negative_int(
+                        getattr(usage, "prompt_tokens", None)
+                    ),
+                    output_tokens=_optional_non_negative_int(
+                        getattr(usage, "completion_tokens", None)
+                    ),
+                )
+        except Exception as exc:
+            raise RuntimeError("AI provider request failed") from exc
+
     async def list_models(self) -> list[str]:
         """Return configured model aliases without a network round trip."""
         return sorted(set(self._get_router().get_model_names()))
@@ -269,5 +408,6 @@ __all__ = [
     "AnthropicCoderAdapter",
     "EmbeddedLiteLLMAdapter",
     "ProviderGeneration",
+    "ProviderStreamChunk",
     "close_embedded_litellm",
 ]

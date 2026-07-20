@@ -18,6 +18,7 @@ from typing import Optional
 
 import anthropic
 
+from wire.error_reporting import log_ignored_error
 from wire.utils import sampling_kwargs
 
 INDEX_DIR = Path.home() / ".ai-coder" / "rag_indexes"
@@ -80,7 +81,9 @@ def build_index(name: str, folder: str, chunk_size: int = 600,
         if path.suffix.lower() not in SUPPORTED_EXTS: continue
         try:
             text = path.read_text(errors="replace")
-        except Exception: continue
+        except Exception:
+            log_ignored_error(__name__, "Skipping unreadable RAG source")
+            continue
         for chunk in _chunk_text(str(path), text, chunk_size, overlap):
             idx.chunks.append(chunk)
             total += 1
@@ -156,4 +159,5 @@ def cmd_rag_list():
         try:
             d = json.loads(p.read_text())
             print(f"  {d['name']:<24} {len(d.get('chunks',[]))} chunks")
-        except Exception: pass
+        except Exception:
+            log_ignored_error(__name__, "Unable to read RAG index")

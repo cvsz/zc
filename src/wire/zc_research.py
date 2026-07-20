@@ -7,7 +7,6 @@ AI Model Coder CLI v1.10.0
 
 import json
 import urllib.error
-import urllib.request
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional
@@ -16,6 +15,7 @@ import anthropic
 
 from wire.resilience import raise_for_http_error, retry
 from wire.utils import sampling_kwargs
+from wire.web_fetcher import SafeWebFetcher
 
 SYS_PLAN  = "You are a research planning assistant. Output only valid JSON."
 SYS_ANAL  = "You are a careful research analyst. Be precise. Flag uncertainty."
@@ -53,6 +53,7 @@ class DeepResearchAgent:
     def __init__(self, api_key: str, model: str = "zc-xxx"):
         self.client = anthropic.Anthropic(api_key=api_key)
         self.model  = model
+        self.web_fetcher = SafeWebFetcher()
 
     def _call(self, system: str, user: str, max_tokens: int = 2048) -> str:
         r = self.client.messages.create(
@@ -73,11 +74,15 @@ class DeepResearchAgent:
     # links and start short-circuiting fetches to sites that are fine.
     @retry(max_attempts=2, base_delay=1.0, max_delay=5.0)
     def _fetch_retrying(self, url: str) -> str:
-        req = urllib.request.Request(url, headers={"User-Agent": "ai-coder-research/1.0"})
         try:
-            with urllib.request.urlopen(req, timeout=15) as resp:
-                return resp.read().decode("utf-8", errors="replace")[:4000]
-        except (urllib.error.HTTPError, TimeoutError, ConnectionError, OSError) as e:
+            return self.web_fetcher.fetch(url)
+        except (
+            urllib.error.HTTPError,
+            urllib.error.URLError,
+            TimeoutError,
+            ConnectionError,
+            OSError,
+        ) as e:
             raise_for_http_error(e)
 
     def plan(self, topic: str, depth: int = 4) -> list[SubQ]:

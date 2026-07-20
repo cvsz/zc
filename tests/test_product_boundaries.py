@@ -47,6 +47,7 @@ def test_console_commands_expose_cli_and_api_boundaries() -> None:
     config.read(ROOT / "setup.cfg")
     entry_points = config["options.entry_points"]["console_scripts"]
 
-    assert "zc = wire.main:main" in entry_points
-    assert "zcoder = wire.main:main" in entry_points
+    assert "zc = app.main:cli" in entry_points
+    assert "zcoder = app.main:cli" in entry_points
     assert "zc-api = app.main:run_server" in entry_points
+    assert "zc-legacy = wire.main:main" in entry_points

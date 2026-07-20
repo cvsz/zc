@@ -10,6 +10,8 @@ import urllib.error
 import urllib.request
 from dataclasses import dataclass
 
+from wire.resilience import urlopen_http
+
 
 class EnterpriseAPIError(RuntimeError):
     """The enterprise API rejected or failed a CLI request."""
@@ -102,7 +104,7 @@ class EnterpriseAPIClient:
             method="GET",
         )
         try:
-            with urllib.request.urlopen(request, timeout=self.timeout_seconds) as response:
+            with urlopen_http(request, timeout=self.timeout_seconds) as response:
                 data = response.read()
             Path(output_path).write_bytes(data)
             return output_path
@@ -114,7 +116,7 @@ class EnterpriseAPIClient:
 
     def _send(self, request: urllib.request.Request) -> dict:
         try:
-            with urllib.request.urlopen(request, timeout=self.timeout_seconds) as response:
+            with urlopen_http(request, timeout=self.timeout_seconds) as response:
                 raw = response.read()
                 if not raw:
                     return {}

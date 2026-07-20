@@ -32,6 +32,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
+from wire.error_reporting import log_ignored_error
 from wire.exceptions import AICoderError
 from wire.resilience import CircuitBreaker, retry, urlopen_json
 from typing import Optional
@@ -394,6 +395,7 @@ class CoworkAgent:
             try:
                 file_content += f"\n\n--- {fp} ---\n{Path(fp).read_text()[:6000]}"
             except Exception:
+                log_ignored_error(__name__, "Unable to read cowork attachment")
                 pass
 
         first = initial_prompt

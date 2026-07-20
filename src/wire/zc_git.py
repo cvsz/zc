@@ -4,7 +4,7 @@ descriptions, changelogs, diff review, and blame explanations.
 AI Model Coder CLI v1.10.0
 """
 
-import subprocess
+import subprocess  # nosec B404
 from typing import Optional
 
 import anthropic
@@ -18,7 +18,7 @@ SYS = ("You are a senior software engineer writing git artifacts. "
 def _git(cmd: str, cwd: str = ".") -> str:
     import shlex
     cmd_args = shlex.split(cmd) if isinstance(cmd, str) else cmd
-    r = subprocess.run(cmd_args, shell=False, cwd=cwd, capture_output=True, text=True, timeout=30)
+    r = subprocess.run(cmd_args, shell=False, cwd=cwd, capture_output=True, text=True, timeout=30)  # nosec B603
     return r.stdout.strip() or r.stderr.strip()
 
 
@@ -93,7 +93,7 @@ def cmd_git_commit(api_key: str, model: str, style: str = "conventional",
     msg  = commit_message(diff, api_key, model, style)
     print(msg)
     if write:
-        result = subprocess.run(["git", "commit", "-m", msg], cwd=cwd, capture_output=True, text=True)
+        result = subprocess.run(["git", "commit", "-m", msg], cwd=cwd, capture_output=True, text=True)  # nosec B603 B607
         if result.returncode == 0: print("\n✓ Committed.")
         else: print(f"\n✗ Commit failed:\n{result.stderr}")
 

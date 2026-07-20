@@ -11,6 +11,7 @@ LOCAL_DEFAULTS = {
     "AUTH_REQUIRED": "false",
     "STORAGE_BACKEND": "local",
     "UPLOAD_TEMP_DIR": "./data/uploads",
+    "CHAT_SESSION_DIR": "./data/chat/sessions",
     "REDIS_ENABLED": "false",
     "NATS_ENABLED": "false",
     "OTEL_ENABLED": "false",

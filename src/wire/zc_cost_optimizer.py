@@ -30,6 +30,7 @@ from typing import Optional
 
 import anthropic
 
+from wire.error_reporting import log_ignored_error
 from wire.utils import sampling_kwargs
 
 SPEND_LOG = Path.home() / ".ai-coder" / "cost_log.json"
@@ -131,7 +132,8 @@ def _log_spend(model: str, in_tok: int, out_tok: int, cost: float, prompt_previe
     entries = []
     if SPEND_LOG.exists():
         try: entries = json.loads(SPEND_LOG.read_text())
-        except Exception: pass
+        except Exception:
+            log_ignored_error(__name__, "Unable to read spend log")
     entries.append({"ts": datetime.now().isoformat(), "model": model,
                    "in_tok": in_tok, "out_tok": out_tok, "cost_usd": round(cost, 6),
                    "prompt": prompt_preview[:80]})

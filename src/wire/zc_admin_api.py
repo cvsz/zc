@@ -107,7 +107,7 @@ class AdminApiClient:
             )
         req = urllib.request.Request(url, headers=self._headers(), method="GET")
         try:
-            with urllib.request.urlopen(req, timeout=60) as r:
+            with urlopen_http(req, timeout=60) as r:
                 return json.loads(r.read().decode())
         except urllib.error.HTTPError as e:
             return {"error": e.read().decode(), "status": e.code}
@@ -120,7 +120,7 @@ class AdminApiClient:
             headers=self._headers(), method="POST",
         )
         try:
-            with urllib.request.urlopen(req, timeout=60) as r:
+            with urlopen_http(req, timeout=60) as r:
                 return json.loads(r.read().decode())
         except urllib.error.HTTPError as e:
             return {"error": e.read().decode(), "status": e.code}
@@ -130,7 +130,7 @@ class AdminApiClient:
     def _delete(self, path: str) -> dict:
         req = urllib.request.Request(f"{ADMIN_BASE}{path}", headers=self._headers(), method="DELETE")
         try:
-            with urllib.request.urlopen(req, timeout=60) as r:
+            with urlopen_http(req, timeout=60) as r:
                 body = r.read().decode()
                 return json.loads(body) if body else {"deleted": True}
         except urllib.error.HTTPError as e:
@@ -642,3 +642,4 @@ def cmd_rate_limits_workspace(workspace_id: str, admin_api_key: str):
                  f"value={limiter.get('value', '?'):<12} org_limit={limiter.get('org_limit', '?')}")
     print()
     return data
+from wire.resilience import urlopen_http

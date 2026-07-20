@@ -35,6 +35,11 @@ curl -fsS http://127.0.0.1:8000/ready
 curl -fsS http://127.0.0.1:8000/v1/wire/health/live
 ```
 
+Open `http://127.0.0.1:8000/` for the bundled local-first web workspace.
+The UI, API, embedded LiteLLM Router, and durable local chat sessions run in
+the same `zc` process. Sessions use tenant-namespaced atomic JSON files under
+`data/chat/sessions/`; provider credentials never enter the browser.
+
 The `zcoder` command is an alias of `zc`. Direct execution remains available:
 
 ```bash
@@ -73,7 +78,7 @@ pytest tests/test_webapp_server.py -v
 
 ```bash
 docker build -t zcoder:local .
-docker run --rm --name zcoder-local -p 8000:8000 zcoder:local
+docker run --rm --name zcoder-local --network host zcoder:local
 ```
 
 The image uses the same port and health contract as local execution and removes
@@ -137,8 +142,8 @@ Package metadata declares MIT. Confirm repository-level license documents and th
 
 ## Enterprise API mode
 
-Start the API separately with `zc-api`, or run `app.main:app` directly. The
-The AI response API can route through an embedded LiteLLM Router without
+Start the standalone API and frontend together with `zc`, `zc-api`, or
+`app.main:app`. The AI response API can route through an embedded LiteLLM Router without
 embedding provider credentials in clients:
 
 ```env
@@ -148,7 +153,7 @@ LITELLM_MODEL=zc-default
 ```
 
 The supported integration embeds LiteLLM's Python `Router` inside the `zc`
-process. Start only `zc-api`; no LiteLLM proxy process, port, or master key is
+process. Start only `zc`; no LiteLLM proxy process, port, or master key is
 required. Provider credentials remain server-side environment variables.
 
 Authenticated callers can discover sanitized model aliases at

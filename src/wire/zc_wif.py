@@ -63,9 +63,11 @@ from pathlib import Path
 from typing import Any, Optional
 
 from wire.exceptions import AICoderError, APIError, AuthenticationError, RateLimitError
-from wire.resilience import CircuitBreaker, retry, urlopen_json
+from wire.resilience import CircuitBreaker, retry, urlopen_http, urlopen_json
 
-OAUTH_TOKEN_ENDPOINT = "https://api.anthropic.com/v1/oauth/token"
+OAUTH_ENDPOINT = "https://api.anthropic.com/v1/oauth/token"
+# Backward-compatible public endpoint name. This is a URL, not a credential.
+OAUTH_TOKEN_ENDPOINT = OAUTH_ENDPOINT
 ADMIN_BASE = "https://api.anthropic.com/v1/organizations"
 JWT_BEARER_GRANT = "urn:ietf:params:oauth:grant-type:jwt-bearer"
 
@@ -110,7 +112,7 @@ class WIFCredentialExchanger:
             body["token_lifetime_seconds"] = token_lifetime_seconds
 
         req = urllib.request.Request(
-            OAUTH_TOKEN_ENDPOINT,
+            OAUTH_ENDPOINT,
             data=json.dumps(body).encode(),
             headers={"Content-Type": "application/json"},
             method="POST",
@@ -192,7 +194,7 @@ class WIFAdminClient:
     def _get(self, path: str) -> dict:
         req = urllib.request.Request(f"{ADMIN_BASE}{path}", headers=self._headers(), method="GET")
         try:
-            with urllib.request.urlopen(req, timeout=30) as r:
+            with urlopen_http(req, timeout=30) as r:
                 return json.loads(r.read().decode())
         except urllib.error.HTTPError as e:
             return {"error": e.read().decode(), "status": e.code}
@@ -205,7 +207,7 @@ class WIFAdminClient:
             headers=self._headers(), method="POST",
         )
         try:
-            with urllib.request.urlopen(req, timeout=30) as r:
+            with urlopen_http(req, timeout=30) as r:
                 return json.loads(r.read().decode())
         except urllib.error.HTTPError as e:
             return {"error": e.read().decode(), "status": e.code}
