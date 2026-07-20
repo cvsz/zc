@@ -22,7 +22,9 @@ from .services.upload_manager import init_upload_manager
 logger = logging.getLogger(__name__)
 
 
-def _set_component_state(app: FastAPI, name: str, ready: bool, error: str | None = None) -> None:
+def _set_component_state(
+    app: FastAPI, name: str, ready: bool, error: str | None = None
+) -> None:
     app.state.components[name] = {"ready": ready, "error": error}
 
 
