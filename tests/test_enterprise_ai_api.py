@@ -147,6 +147,18 @@ async def test_capabilities_are_discoverable(ai_app: FastAPI) -> None:
 
 
 @pytest.mark.asyncio
+async def test_model_discovery_is_authorized_and_sanitized(ai_app: FastAPI) -> None:
+    transport = httpx.ASGITransport(app=ai_app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        unauthorized = await client.get("/v1/ai/models")
+        response = await client.get("/v1/ai/models", headers=auth_header())
+
+    assert unauthorized.status_code == 401
+    assert response.status_code == 200
+    assert response.json() == {"data": []}
+
+
+@pytest.mark.asyncio
 async def test_request_schema_rejects_unknown_fields(ai_app: FastAPI) -> None:
     transport = httpx.ASGITransport(app=ai_app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:

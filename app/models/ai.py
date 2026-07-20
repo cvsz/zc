@@ -52,6 +52,13 @@ class AIUsage(BaseModel):
     output_tokens: int | None = None
 
 
+class AIModel(BaseModel):
+    """A model alias currently available through the inference gateway."""
+
+    id: str
+    object: Literal["model"] = "model"
+
+
 class AIResponse(BaseModel):
     """Stable response resource returned by the enterprise API."""
 
@@ -73,6 +80,7 @@ class AICapabilities(BaseModel):
 
 __all__ = [
     "AICapabilities",
+    "AIModel",
     "AIResponse",
     "AIResponseRequest",
     "AIUsage",

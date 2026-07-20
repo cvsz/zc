@@ -32,6 +32,13 @@ class Config:
     api_timeout: int = 30
     strict_readiness: bool = False
 
+    ai_provider: str = "anthropic"
+    litellm_config_path: Path = field(
+        default_factory=lambda: Path("./litellm-config.yaml")
+    )
+    litellm_model: str = "zc-default"
+    litellm_timeout_seconds: int = 120
+
     protobuf_enabled: bool = True
     max_message_size: int = 100 * 1024 * 1024
 
@@ -103,6 +110,12 @@ class Config:
             api_workers=int(os.getenv("API_WORKERS", "1")),
             api_timeout=int(os.getenv("API_TIMEOUT", "30")),
             strict_readiness=_env_bool("STRICT_READINESS", False),
+            ai_provider=os.getenv("AI_PROVIDER", "anthropic").strip().lower(),
+            litellm_config_path=Path(
+                os.getenv("LITELLM_CONFIG_PATH", "./litellm-config.yaml")
+            ),
+            litellm_model=os.getenv("LITELLM_MODEL", "zc-default"),
+            litellm_timeout_seconds=int(os.getenv("LITELLM_TIMEOUT_SECONDS", "120")),
             protobuf_enabled=_env_bool("PROTOBUF_ENABLED", True),
             max_message_size=int(os.getenv("MAX_MESSAGE_SIZE", "104857600")),
             redis_url=os.getenv("REDIS_URL", "redis://localhost:6379"),
@@ -186,6 +199,17 @@ class Config:
         """Fail closed when production security invariants are not configured."""
         if self.environment == "production" and self.auth_required and not self.jwt_secret:
             raise RuntimeError("JWT_SECRET is required when production authentication is enabled")
+        if self.ai_provider not in {"anthropic", "litellm"}:
+            raise RuntimeError("AI_PROVIDER must be 'anthropic' or 'litellm'")
+        if self.litellm_timeout_seconds <= 0:
+            raise RuntimeError("LITELLM_TIMEOUT_SECONDS must be positive")
+        if self.ai_provider == "litellm":
+            if not self.litellm_model:
+                raise RuntimeError("LITELLM_MODEL must not be empty")
+            if not self.litellm_config_path.is_file():
+                raise RuntimeError(
+                    f"LiteLLM config not found: {self.litellm_config_path}"
+                )
         if self.upload_chunk_size <= 0 or self.upload_chunk_size > self.max_message_size:
             raise RuntimeError("UPLOAD_CHUNK_SIZE must be within MAX_MESSAGE_SIZE")
         if self.upload_max_size < self.upload_chunk_size:

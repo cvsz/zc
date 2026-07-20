@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 
 from ...core.auth import Principal, require_roles
-from ...models.ai import AICapabilities, AIResponse, AIResponseRequest
+from ...models.ai import AICapabilities, AIModel, AIResponse, AIResponseRequest
 from ...services.ai_service import (
     AIService,
     AIServiceError,
@@ -57,6 +57,15 @@ async def create_response(
             },
         )
     return {"data": response}
+
+
+@router.get("/models", response_model=dict[str, list[AIModel]])
+async def list_models(
+    _principal: Principal = Depends(_ai_roles),
+    service: AIService = Depends(get_ai_service),
+) -> dict[str, list[AIModel]]:
+    """List sanitized model aliases visible through the inference gateway."""
+    return {"data": await service.list_models()}
 
 
 __all__ = ["router"]

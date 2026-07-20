@@ -138,6 +138,27 @@ Package metadata declares MIT. Confirm repository-level license documents and th
 ## Enterprise API mode
 
 Start the API separately with `zc-api`, or run `app.main:app` directly. The
+The AI response API can route through an embedded LiteLLM Router without
+embedding provider credentials in clients:
+
+```env
+AI_PROVIDER=litellm
+LITELLM_CONFIG_PATH=./litellm-config.yaml
+LITELLM_MODEL=zc-default
+```
+
+The supported integration embeds LiteLLM's Python `Router` inside the `zc`
+process. Start only `zc-api`; no LiteLLM proxy process, port, or master key is
+required. Provider credentials remain server-side environment variables.
+
+Authenticated callers can discover sanitized model aliases at
+`GET /v1/ai/models`. AI responses preserve LiteLLM prompt/completion token
+usage, and `/ready` reports embedded-router initialization as the `ai_provider`
+component. See the
+[LiteLLM integration contract](docs/reports/litellm-integration.md).
+
+The runtime dependency is pinned to the version audited from the local source
+checkout at `/home/zeazdev/litellm`.
 compatibility CLI can delegate model and resource operations to the local API:
 
 ```bash

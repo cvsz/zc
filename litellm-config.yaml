@@ -1,22 +1,28 @@
 model_list:
+  - model_name: zc-default
+    litellm_params:
+      model: anthropic/claude-sonnet-5
+      api_key: os.environ/ANTHROPIC_API_KEY
+
   - model_name: claude-3-5-sonnet-20240620
     litellm_params:
       model: anthropic/claude-3-5-sonnet-20240620
-      api_key: "os.environ/ANTHROPIC_API_KEY"
+      api_key: os.environ/ANTHROPIC_API_KEY
 
   - model_name: claude-3-haiku-20240307
     litellm_params:
       model: anthropic/claude-3-haiku-20240307
-      api_key: "os.environ/ANTHROPIC_API_KEY"
+      api_key: os.environ/ANTHROPIC_API_KEY
 
   - model_name: gpt-4o
     litellm_params:
       model: openai/gpt-4o
-      api_key: "os.environ/OPENAI_API_KEY"
+      api_key: os.environ/OPENAI_API_KEY
 
 litellm_settings:
   drop_params: true
   set_verbose: false
 
-general_settings:
-  master_key: "sk-litellm-master-key"
+router_settings:
+  num_retries: 2
+  routing_strategy: simple-shuffle

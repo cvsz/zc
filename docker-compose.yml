@@ -1,33 +1,14 @@
 services:
-  litellm:
-    image: ghcr.io/berriai/litellm:main-latest
-    container_name: litellm-gateway
-    environment:
-      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY:?LITELLM_MASTER_KEY is required}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
-    ports:
-      - "4000:4000"
-    command: [ "--config", "/app/config.yaml", "--detailed_debug" ]
-    volumes:
-      - ./litellm-config.yaml:/app/config.yaml
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
   zc:
     build: .
     image: zaicoder:latest
     container_name: zc
-    depends_on:
-      litellm:
-        condition: service_healthy
     environment:
-      # Route Anthropic API calls through the LiteLLM Proxy Gateway
-      - ANTHROPIC_BASE_URL=http://litellm:4000
-      - ANTHROPIC_API_KEY=${LITELLM_MASTER_KEY:?LITELLM_MASTER_KEY is required}
+      - AI_PROVIDER=litellm
+      - LITELLM_CONFIG_PATH=/app/litellm-config.yaml
+      - LITELLM_MODEL=${LITELLM_MODEL:-zc-default}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - zc_LOG_FORMAT=json
       - zc_LOG_LEVEL=INFO
     volumes:

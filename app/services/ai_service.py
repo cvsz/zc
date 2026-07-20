@@ -2,16 +2,20 @@
 
 from __future__ import annotations
 
-import asyncio
 import inspect
 from collections.abc import Callable
 from datetime import datetime, timezone
 from functools import partial
 from uuid import uuid4
 
-from app.models.ai import AICapabilities, AIResponse, AIResponseRequest
+from app.models.ai import AICapabilities, AIModel, AIResponse, AIResponseRequest, AIUsage
 
-from .ai_provider import AnthropicCoderAdapter
+from ..core.config import Config, get_config
+from .ai_provider import (
+    AnthropicCoderAdapter,
+    EmbeddedLiteLLMAdapter,
+    ProviderGeneration,
+)
 from .capabilities import PERSONALITIES, SKILLS
 
 
@@ -51,8 +55,14 @@ class UnknownCapabilityError(ValueError):
 class AIService:
     """Own AI use-case orchestration independently of HTTP and argparse."""
 
-    def __init__(self, coder_factory: Callable[..., object] | None = None) -> None:
+    def __init__(
+        self,
+        coder_factory: Callable[..., object] | None = None,
+        *,
+        config: Config | None = None,
+    ) -> None:
         self._coder_factory = coder_factory
+        self._config = config or get_config()
 
     @staticmethod
     def capabilities() -> AICapabilities:
@@ -92,19 +102,31 @@ class AIService:
         return "\n\n".join(parts) or None
 
     def _create_coder(self, request: AIResponseRequest) -> object:
-        if self._coder_factory is None:
-            factory: Callable[..., object] = AnthropicCoderAdapter
-        else:
+        options: dict[str, object] = {
+            "model": request.model,
+            "temperature": request.temperature,
+            "max_tokens": request.max_tokens,
+            "personality_style": request.personality,
+            "service_tier": request.service_tier,
+            "inference_geo": request.inference_geo,
+            "fast_mode": request.fast_mode,
+        }
+        if self._coder_factory is not None:
             factory = self._coder_factory
+        elif self._config.ai_provider == "litellm":
+            factory = EmbeddedLiteLLMAdapter
+            options.update(
+                {
+                    "config_path": self._config.litellm_config_path,
+                    "model": request.model or self._config.litellm_model,
+                    "timeout_seconds": self._config.litellm_timeout_seconds,
+                }
+            )
+        else:
+            factory = AnthropicCoderAdapter
 
         return factory(
-            model=request.model,
-            temperature=request.temperature,
-            max_tokens=request.max_tokens,
-            personality_style=request.personality,
-            service_tier=request.service_tier,
-            inference_geo=request.inference_geo,
-            fast_mode=request.fast_mode,
+            **options,
         )
 
     async def create_response(self, request: AIResponseRequest) -> AIResponse:
@@ -125,18 +147,51 @@ class AIService:
         output = call()
         if inspect.isawaitable(output):
             output = await output
-        if not isinstance(output, str):
+        usage = AIUsage()
+        if isinstance(output, ProviderGeneration):
+            output_text = output.text
+            model = output.model
+            usage = AIUsage(
+                input_tokens=output.input_tokens,
+                output_tokens=output.output_tokens,
+            )
+        elif isinstance(output, str):
+            output_text = output
+            model = str(getattr(coder, "model", request.model or "unknown"))
+        else:
             raise AIServiceError("AI provider returned an invalid response")
-        if output.startswith("[ERROR]") or output.startswith("[API ERROR"):
+        if output_text.startswith("[ERROR]") or output_text.startswith("[API ERROR"):
             raise AIServiceError("AI provider request failed")
 
-        model = str(getattr(coder, "model", request.model or "unknown"))
         return AIResponse(
             id=f"air_{uuid4().hex}",
             created_at=datetime.now(timezone.utc),
             model=model,
-            output_text=output,
+            output_text=output_text,
+            usage=usage,
         )
+
+    async def list_models(self) -> list[AIModel]:
+        """List model aliases visible through the configured provider."""
+        if self._config.ai_provider != "litellm":
+            return []
+        adapter = EmbeddedLiteLLMAdapter(
+            config_path=self._config.litellm_config_path,
+            model=self._config.litellm_model,
+            timeout_seconds=self._config.litellm_timeout_seconds,
+        )
+        return [AIModel(id=model_id) for model_id in await adapter.list_models()]
+
+    async def provider_ready(self) -> bool:
+        """Return whether the configured inference provider is reachable."""
+        if self._config.ai_provider != "litellm":
+            return True
+        adapter = EmbeddedLiteLLMAdapter(
+            config_path=self._config.litellm_config_path,
+            model=self._config.litellm_model,
+            timeout_seconds=self._config.litellm_timeout_seconds,
+        )
+        return await adapter.is_live()
 
 
 _service: AIService | None = None

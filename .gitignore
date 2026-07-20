@@ -109,7 +109,6 @@ Thumbs.db
 venv2/
 .web.pid
 *.save
-/scripts/setup-production-secrets.sh
 infra/cloudflare/.terraform/
 infra/cloudflare/*.tfstate
 infra/cloudflare/*.tfstate.*

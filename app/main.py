@@ -22,7 +22,8 @@ from .core.config import get_config
 from .core.http_client import init_http_client, shutdown_http_client
 from .middleware.rate_limiter import RateLimitMiddleware
 from .services.upload_manager import init_upload_manager
-from .services.ai_service import AIServiceError, UnknownCapabilityError
+from .services.ai_service import AIService, AIServiceError, UnknownCapabilityError
+from .services.ai_provider import close_embedded_litellm
 from .services.resource_store import ResourceConflictError, ResourceNotFoundError
 
 logger = logging.getLogger(__name__)
@@ -110,6 +111,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         logger.exception("Upload manager initialization failed")
         _set_component_state(app, "upload_manager", False, str(exc))
 
+    if config.ai_provider == "litellm":
+        if await AIService(config=config).provider_ready():
+            _set_component_state(app, "ai_provider", True)
+        else:
+            _set_component_state(app, "ai_provider", False, "unavailable")
+    else:
+        _set_component_state(app, "ai_provider", True, "direct")
+
     if config.protobuf_enabled:
         try:
             from .grpc.wire_servicer import create_grpc_server
@@ -134,6 +143,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     if hasattr(app.state, "grpc_server"):
         await app.state.grpc_server.stop(grace=5.0)
+    if config.ai_provider == "litellm":
+        await close_embedded_litellm()
     await shutdown_http_client()
     await shutdown_cache()
 
