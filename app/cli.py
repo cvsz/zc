@@ -17,6 +17,7 @@ def build_parser() -> argparse.ArgumentParser:
 def cli(argv: Sequence[str] | None = None) -> None:
     args = build_parser().parse_args(argv)
     from .main import run_server
+
     run_server(host=args.host, port=args.port, workers=args.workers)
 
 
