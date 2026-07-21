@@ -18,6 +18,16 @@ resource "cloudflare_zero_trust_access_policy" "users" {
   ]
 }
 
+resource "cloudflare_zero_trust_access_policy" "cli_services" {
+  account_id = var.cloudflare_account_id
+  name       = "zc explicit cli service auth"
+  decision   = "non_identity"
+  include = [
+    {
+      service_token = [var.service_token_id]
+    }
+  ]
+}
 
 
 resource "cloudflare_zero_trust_access_application" "zc" {
