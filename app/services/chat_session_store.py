@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 import asyncio
+import builtins
 import hashlib
 import json
 import logging
 import os
 import re
 import tempfile
-from datetime import datetime, timezone
+import threading
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -23,6 +25,14 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _next_timestamp(previous: str) -> str:
+    now = datetime.now(timezone.utc)
+    previous_time = datetime.fromisoformat(previous)
+    if now <= previous_time:
+        now = previous_time + timedelta(microseconds=1)
+    return now.isoformat()
+
+
 class AtomicChatSessionStore:
     """Store each session as one atomically replaced local JSON document."""
 
@@ -30,6 +40,7 @@ class AtomicChatSessionStore:
         self.root = root.resolve()
         self.root.mkdir(parents=True, exist_ok=True, mode=0o700)
         os.chmod(self.root, 0o700)
+        self._mutation_lock = threading.RLock()
 
     @staticmethod
     def _tenant_namespace(tenant_id: str) -> str:
@@ -59,9 +70,7 @@ class AtomicChatSessionStore:
         data: dict[str, Any],
     ) -> dict[str, Any]:
         del domain
-        return await asyncio.to_thread(
-            self._create_sync, tenant_id, resource_id, data
-        )
+        return await asyncio.to_thread(self._create_sync, tenant_id, resource_id, data)
 
     def _create_sync(
         self,
@@ -69,18 +78,19 @@ class AtomicChatSessionStore:
         resource_id: str,
         data: dict[str, Any],
     ) -> dict[str, Any]:
-        path = self._path(tenant_id, resource_id)
-        if path.exists():
-            raise ResourceConflictError("chat session already exists")
-        now = _now()
-        document = {
-            **data,
-            "id": resource_id,
-            "created_at": now,
-            "updated_at": now,
-        }
-        self._write_atomic(path, document, replace=False)
-        return document
+        with self._mutation_lock:
+            path = self._path(tenant_id, resource_id)
+            if path.exists():
+                raise ResourceConflictError("chat session already exists")
+            now = _now()
+            document = {
+                **data,
+                "id": resource_id,
+                "created_at": now,
+                "updated_at": now,
+            }
+            self._write_atomic(path, document, replace=False)
+            return document
 
     async def get(
         self, tenant_id: str, domain: str, resource_id: str
@@ -108,16 +118,14 @@ class AtomicChatSessionStore:
         *,
         limit: int = 50,
         offset: int = 0,
-    ) -> tuple[list[dict[str, Any]], int]:
+    ) -> tuple[builtins.list[dict[str, Any]], int]:
         del domain
-        return await asyncio.to_thread(
-            self._list_sync, tenant_id, limit, offset
-        )
+        return await asyncio.to_thread(self._list_sync, tenant_id, limit, offset)
 
     def _list_sync(
         self, tenant_id: str, limit: int, offset: int
-    ) -> tuple[list[dict[str, Any]], int]:
-        items: list[dict[str, Any]] = []
+    ) -> tuple[builtins.list[dict[str, Any]], int]:
+        items: builtins.list[dict[str, Any]] = []
         for path in self._tenant_dir(tenant_id).glob("chat_*.json"):
             try:
                 payload = self._read_json(path)
@@ -150,9 +158,7 @@ class AtomicChatSessionStore:
         data: dict[str, Any],
     ) -> dict[str, Any]:
         del domain
-        return await asyncio.to_thread(
-            self._replace_sync, tenant_id, resource_id, data
-        )
+        return await asyncio.to_thread(self._replace_sync, tenant_id, resource_id, data)
 
     def _replace_sync(
         self,
@@ -160,34 +166,43 @@ class AtomicChatSessionStore:
         resource_id: str,
         data: dict[str, Any],
     ) -> dict[str, Any]:
-        path = self._path(tenant_id, resource_id)
-        existing = self._get_sync(tenant_id, resource_id)
-        document = {
-            **data,
-            "id": resource_id,
-            "created_at": existing["created_at"],
-            "updated_at": _now(),
-        }
-        self._write_atomic(path, document, replace=True)
-        return document
+        with self._mutation_lock:
+            path = self._path(tenant_id, resource_id)
+            existing = self._get_sync(tenant_id, resource_id)
+            expected_updated_at = data.get("updated_at")
+            if (
+                expected_updated_at is not None
+                and expected_updated_at != existing["updated_at"]
+            ):
+                raise ResourceConflictError("chat session was modified")
+            document = {
+                **data,
+                "id": resource_id,
+                "created_at": existing["created_at"],
+                "updated_at": _next_timestamp(existing["updated_at"]),
+            }
+            self._write_atomic(path, document, replace=True)
+            return document
 
-    async def delete(
-        self, tenant_id: str, domain: str, resource_id: str
-    ) -> None:
+    async def delete(self, tenant_id: str, domain: str, resource_id: str) -> None:
         del domain
         await asyncio.to_thread(self._delete_sync, tenant_id, resource_id)
 
     def _delete_sync(self, tenant_id: str, resource_id: str) -> None:
-        path = self._path(tenant_id, resource_id)
-        try:
-            path.unlink()
-        except FileNotFoundError as exc:
-            raise ResourceNotFoundError("chat session not found") from exc
+        with self._mutation_lock:
+            path = self._path(tenant_id, resource_id)
+            try:
+                path.unlink()
+                directory_fd = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
+                try:
+                    os.fsync(directory_fd)
+                finally:
+                    os.close(directory_fd)
+            except FileNotFoundError as exc:
+                raise ResourceNotFoundError("chat session not found") from exc
 
     @staticmethod
-    def _write_atomic(
-        path: Path, document: dict[str, Any], *, replace: bool
-    ) -> None:
+    def _write_atomic(path: Path, document: dict[str, Any], *, replace: bool) -> None:
         if not replace and path.exists():
             raise ResourceConflictError("chat session already exists")
         encoded = json.dumps(
@@ -213,9 +228,7 @@ class AtomicChatSessionStore:
                 try:
                     os.link(temporary, path)
                 except FileExistsError as exc:
-                    raise ResourceConflictError(
-                        "chat session already exists"
-                    ) from exc
+                    raise ResourceConflictError("chat session already exists") from exc
             os.chmod(path, 0o600)
             directory_fd = os.open(path.parent, os.O_RDONLY)
             try:

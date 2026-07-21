@@ -62,8 +62,7 @@ def test_query_with_context_management_attaches_payload_and_beta(monkeypatch):
         return _end_turn_response()
 
     monkeypatch.setattr(agent, "_post", fake_post)
-    agent.query("hi", session, tools="none", output_mode="text",
-                context_management=cm)
+    agent.query("hi", session, tools="none", output_mode="text", context_management=cm)
 
     assert captured["payload"]["context_management"] == cm
     assert captured["betas"] == [CONTEXT_MANAGEMENT_BETA]
@@ -81,15 +80,16 @@ def test_query_context_management_survives_multiple_turns(monkeypatch):
         calls.append((payload, betas))
         if len(calls) == 1:
             return {
-                "content": [{"type": "tool_use", "id": "t1", "name": "LS", "input": {}}],
+                "content": [
+                    {"type": "tool_use", "id": "t1", "name": "LS", "input": {}}
+                ],
                 "stop_reason": "tool_use",
                 "usage": {},
             }
         return _end_turn_response("done")
 
     monkeypatch.setattr(agent, "_post", fake_post)
-    agent.query("hi", session, tools="all", output_mode="text",
-                context_management=cm)
+    agent.query("hi", session, tools="all", output_mode="text", context_management=cm)
 
     assert len(calls) == 2
     for payload, betas in calls:
@@ -114,14 +114,19 @@ def test_cmd_code_agent_flag_off_passes_no_context_management(monkeypatch, tmp_p
     monkeypatch.setattr("wire.zc_code.CodeAgent", FakeAgent)
 
     cmd_code_agent(
-        prompt="do a thing", api_key="k", model="zc-xxx",
-        cwd=str(tmp_path), headless=True,
+        prompt="do a thing",
+        api_key="k",
+        model="zc-xxx",
+        cwd=str(tmp_path),
+        headless=True,
     )
 
     assert captured["context_management"] is None
 
 
-def test_cmd_code_agent_flag_on_builds_and_forwards_context_management(monkeypatch, tmp_path):
+def test_cmd_code_agent_flag_on_builds_and_forwards_context_management(
+    monkeypatch, tmp_path
+):
     captured = {}
 
     class FakeAgent:
@@ -135,8 +140,11 @@ def test_cmd_code_agent_flag_on_builds_and_forwards_context_management(monkeypat
     monkeypatch.setattr("wire.zc_code.CodeAgent", FakeAgent)
 
     cmd_code_agent(
-        prompt="do a thing", api_key="k", model="zc-xxx",
-        cwd=str(tmp_path), headless=True,
+        prompt="do a thing",
+        api_key="k",
+        model="zc-xxx",
+        cwd=str(tmp_path),
+        headless=True,
         agent_context_editing=True,
     )
 
@@ -162,8 +170,12 @@ def test_cmd_code_agent_headless_forces_text_output_mode(monkeypatch, tmp_path, 
     monkeypatch.setattr("wire.zc_code.CodeAgent", FakeAgent)
 
     cmd_code_agent(
-        prompt="do a thing", api_key="k", model="zc-xxx",
-        cwd=str(tmp_path), headless=True, output_mode="stream",
+        prompt="do a thing",
+        api_key="k",
+        model="zc-xxx",
+        cwd=str(tmp_path),
+        headless=True,
+        output_mode="stream",
     )
 
     # headless always forces "text", regardless of the requested output_mode

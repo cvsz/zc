@@ -1,11 +1,14 @@
 """Regression tests for the supported zcoder API runtime contract."""
 
+import base64
 import sys
+from pathlib import Path
 
 import httpx
 import pytest
 
 from app import main
+import app.core.config as config_module
 from app.core.config import APP_NAME, APP_VERSION, DEFAULT_API_PORT, Config
 
 
@@ -19,8 +22,6 @@ def test_config_defaults_are_canonical() -> None:
     assert config.storage_backend == "local"
     assert config.upload_temp_dir.as_posix() == "data/uploads"
     assert config.redis_enabled is False
-    assert config.nats_enabled is False
-    assert config.otel_enabled is False
     assert config.rate_limit_enabled is False
 
 
@@ -29,12 +30,44 @@ def test_config_rejects_multi_worker_in_memory_rate_limiting() -> None:
         environment="production",
         auth_required=False,
         rate_limit_enabled=True,
+        strict_readiness=True,
         redis_enabled=False,
         api_workers=2,
     )
 
     with pytest.raises(RuntimeError, match="API_WORKERS"):
         config.validate()
+
+
+def test_config_rejects_nonlocal_storage_backend() -> None:
+    config = Config(environment="test", storage_backend="s3")
+
+    with pytest.raises(RuntimeError, match="STORAGE_BACKEND"):
+        config.validate()
+
+
+@pytest.mark.parametrize(
+    ("field", "directory_name"),
+    [
+        ("upload_temp_dir", "uploads"),
+        ("idempotency_dir", "idempotency"),
+        ("chat_session_dir", "chat"),
+    ],
+)
+def test_config_rejects_symlinked_state_directories(
+    tmp_path: Path,
+    field: str,
+    directory_name: str,
+) -> None:
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    link = tmp_path / directory_name
+    link.symlink_to(outside, target_is_directory=True)
+    config = Config(environment="test")
+    setattr(config, field, link)
+
+    with pytest.raises(RuntimeError, match="must not be a symlink"):
+        config.ensure_dirs()
 
 
 @pytest.mark.asyncio
@@ -70,7 +103,14 @@ async def test_frontend_assets_are_served_with_restrictive_headers() -> None:
 
 
 @pytest.mark.asyncio
-async def test_metadata_exposes_canonical_identity() -> None:
+async def test_metadata_exposes_canonical_identity(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        config_module,
+        "_config",
+        Config(environment="test", auth_required=False),
+    )
     transport = httpx.ASGITransport(app=main.app)
     async with httpx.AsyncClient(
         transport=transport, base_url="http://testserver"
@@ -118,3 +158,35 @@ def test_cli_forwards_parsed_runtime_options(monkeypatch) -> None:
     main.cli()
 
     assert captured == {"host": "127.0.0.1", "port": 9000, "workers": 2}
+
+
+@pytest.mark.parametrize(
+    ("host", "workers", "message"),
+    [
+        ("0.0.0.0", 1, "127.0.0.1"),
+        ("127.0.0.1", 2, "one worker"),
+    ],
+)
+def test_run_server_cannot_override_production_bind_invariants(
+    monkeypatch: pytest.MonkeyPatch,
+    host: str,
+    workers: int,
+    message: str,
+) -> None:
+    config = Config(
+        environment="production",
+        auth_required=True,
+        jwt_secret="a-production-secret-with-32-characters",
+        cloudflare_access_required=True,
+        cloudflare_access_team_domain="https://zc-team.cloudflareaccess.com",
+        cloudflare_access_aud="a" * 64,
+        rate_limit_enabled=True,
+        strict_readiness=True,
+        cors_origins=["https://zeaz.dev"],
+        encryption_key=base64.b64encode(b"k" * 32).decode(),
+        anthropic_api_key="test-provider-key",
+    )
+    monkeypatch.setattr(config_module, "_config", config)
+
+    with pytest.raises(RuntimeError, match=message):
+        main.run_server(host=host, workers=workers)

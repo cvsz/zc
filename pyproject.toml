@@ -17,12 +17,9 @@ exclude = [".web-venv", ".venv", "build", "dist"]
 "app/core/auth.py" = ["E402", "W291"]
 "app/core/cache.py" = ["W293"]
 "app/core/http_client.py" = ["W293"]
-"app/core/monitoring.py" = ["W291"]
-"app/core/resiliency.py" = ["W293"]
 "app/grpc/wire_servicer.py" = ["W293"]
 "app/services/delta/sync_service.py" = ["W293"]
 "app/services/upload_manager.py" = ["W293"]
-"app/telemetry/otel_service.py" = ["W293"]
 
 # Legacy product surfaces are tracked separately while their architecture is
 # consolidated. New supported API code above does not inherit these waivers.
@@ -34,10 +31,24 @@ exclude = [".web-venv", ".venv", "build", "dist"]
 "*.py" = ["E501", "E701", "E702", "E402", "E731", "F401", "F841", "B007", "W293", "W291", "E741"]
 
 [tool.bandit]
-exclude_dirs = ["tests", ".web-venv", ".venv", "app/proto", "zai-configen", "argocd", "k8s"]
+exclude_dirs = ["tests", ".web-venv", ".venv", "app/proto", "zai-configen"]
 
 [tool.mypy]
 exclude = [
     "google",
     "app/proto",
 ]
+
+[[tool.mypy.overrides]]
+module = [
+    "bsdiff4",
+    "grpc",
+    "grpc.*",
+    "litellm",
+    "litellm.*",
+]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["app.proto.*"]
+ignore_errors = true

@@ -3,6 +3,12 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
+  "engines": {
+    "node": "^20.19.0 || ^22.13.0 || >=24.0.0"
+  },
+  "allowScripts": {
+    "esbuild@0.25.12": true
+  },
   "scripts": {
     "build": "tsc -b && vite build",
     "dev": "vite --host 127.0.0.1",
@@ -22,7 +28,7 @@
     "@testing-library/react": "^16.3.0",
     "@types/react": "^19.1.2",
     "@types/react-dom": "^19.1.2",
-    "jsdom": "^26.1.0",
+    "jsdom": "^29.1.1",
     "typescript": "^5.8.3",
     "vitest": "^3.1.3"
   }

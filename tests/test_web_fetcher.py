@@ -100,9 +100,7 @@ def test_rejects_unsupported_url_shapes(url: str) -> None:
 
 
 def test_revalidates_redirect_targets() -> None:
-    opener = _Opener(
-        [_redirect("https://example.com/start", "http://127.0.0.1/admin")]
-    )
+    opener = _Opener([_redirect("https://example.com/start", "http://127.0.0.1/admin")])
 
     def resolver(host: str, port: int, *, type: int):
         address = "127.0.0.1" if host == "127.0.0.1" else "93.184.216.34"
@@ -133,9 +131,7 @@ def test_enforces_payload_limit_without_unbounded_read() -> None:
 def test_rejects_binary_content() -> None:
     fetcher = SafeWebFetcher(
         resolver=_resolver_for("93.184.216.34"),
-        opener=_Opener(
-            [_Response(b"binary", content_type="application/octet-stream")]
-        ),
+        opener=_Opener([_Response(b"binary", content_type="application/octet-stream")]),
     )
 
     with pytest.raises(UnsafeWebFetchError, match="content type"):

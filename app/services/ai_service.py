@@ -8,7 +8,13 @@ from datetime import datetime, timezone
 from functools import partial
 from uuid import uuid4
 
-from app.models.ai import AICapabilities, AIModel, AIResponse, AIResponseRequest, AIUsage
+from app.models.ai import (
+    AICapabilities,
+    AIModel,
+    AIResponse,
+    AIResponseRequest,
+    AIUsage,
+)
 
 from ..core.config import Config, get_config
 from .ai_provider import (
@@ -26,9 +32,7 @@ AGENT_SYSTEM_PROMPTS: dict[str, str] = {
     "code_reviewer": (
         "You are a code review agent. Focus on correctness, readability, and maintainability."
     ),
-    "testing_agent": (
-        "You are a testing agent. Cover edge cases and failure modes."
-    ),
+    "testing_agent": ("You are a testing agent. Cover edge cases and failure modes."),
     "documentation_agent": (
         "You are a documentation agent. Write clear documentation for new readers."
     ),
@@ -95,9 +99,7 @@ class AIService:
             skill_description = SKILLS.get(request.skill)
             if skill_description is None:
                 raise UnknownCapabilityError(f"Unknown skill: {request.skill}")
-            parts.append(
-                f"Skill focus — {request.skill}: {skill_description}"
-            )
+            parts.append(f"Skill focus — {request.skill}: {skill_description}")
 
         return "\n\n".join(parts) or None
 

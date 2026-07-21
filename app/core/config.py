@@ -1,9 +1,12 @@
 """Centralized runtime configuration for the zcoder API service."""
 
+import base64
+import binascii
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
+from urllib.parse import urlparse
 
 APP_NAME = "zcoder"
 APP_VERSION = "1.33.0"
@@ -32,48 +35,46 @@ class Config:
     api_timeout: int = 30
     strict_readiness: bool = False
 
-    ai_provider: str = "anthropic"
+    ai_provider: str = "litellm"
     litellm_config_path: Path = field(
         default_factory=lambda: Path("./litellm-config.yaml")
     )
     litellm_model: str = "zc-default"
     litellm_timeout_seconds: int = 120
+    anthropic_api_key: Optional[str] = None
 
     protobuf_enabled: bool = True
-    max_message_size: int = 100 * 1024 * 1024
+    max_message_size: int = 90 * 1024 * 1024
 
     redis_url: str = "redis://localhost:6379"
     redis_pool_size: int = 10
     redis_ttl_default: int = 3600
     redis_enabled: bool = False
 
-    database_url: Optional[str] = None
-    db_pool_size: int = 20
-    db_max_overflow: int = 10
+    http_pool_size: int = 20
 
     upload_chunk_size: int = 4 * 1024 * 1024
     upload_max_size: int = 50 * 1024 * 1024 * 1024
+    upload_retention_seconds: int = 86400
+    upload_min_free_bytes: int = 1024 * 1024 * 1024
     upload_temp_dir: Path = field(default_factory=lambda: Path("./data/uploads"))
-    chat_session_dir: Path = field(
-        default_factory=lambda: Path("./data/chat/sessions")
-    )
+    idempotency_dir: Path = field(default_factory=lambda: Path("./data/idempotency"))
+    idempotency_ttl_seconds: int = 86400
+    idempotency_max_response_bytes: int = 1024 * 1024
+    idempotency_max_entries: int = 1000
+    chat_session_dir: Path = field(default_factory=lambda: Path("./data/chat/sessions"))
     storage_backend: str = "local"
-    storage_s3_bucket: str = "wire-uploads"
-    storage_s3_endpoint: Optional[str] = None
-    storage_s3_access_key: Optional[str] = None
-    storage_s3_secret_key: Optional[str] = None
-    storage_s3_region: str = "us-east-1"
-
-    nats_url: str = "nats://localhost:4222"
-    nats_cluster: list[str] = field(default_factory=list)
-    nats_enabled: bool = False
 
     jwt_secret: Optional[str] = None
     jwt_algorithm: str = "HS256"
+    jwt_issuer: str = "zc"
+    jwt_audience: str = "zc-api"
     jwt_expiry_seconds: int = 3600
     auth_required: bool = True
-    mtls_enabled: bool = False
-    mtls_ca_cert: Optional[Path] = None
+    cloudflare_access_required: bool = False
+    cloudflare_access_team_domain: Optional[str] = None
+    cloudflare_access_aud: Optional[str] = None
+    cloudflare_access_jwks_cache_seconds: int = 300
     encryption_key: Optional[str] = None
     cors_origins: list[str] = field(default_factory=list)
 
@@ -81,82 +82,66 @@ class Config:
     rate_limit_requests: int = 1000
     rate_limit_window: int = 60
 
-    otel_enabled: bool = False
-    otel_exporter_endpoint: str = "http://otel-collector:4317"
-    otel_service_name: str = "zcoder-api"
-    otel_tracing_sample_rate: float = 0.1
-    prometheus_metrics_enabled: bool = False
-    prometheus_port: int = 9090
-
     control_panel_enabled: bool = True
     frontend_enabled: bool = True
-    control_panel_admin_users: list[str] = field(default_factory=list)
-    feature_flags: dict[str, bool] = field(default_factory=dict)
-
-    http3_enabled: bool = False
-    http3_port: int = 8443
-    quic_certificate: Optional[Path] = None
-    quic_private_key: Optional[Path] = None
-
-    kubernetes_enabled: bool = False
-    cilium_ebpf_enabled: bool = False
 
     @classmethod
     def from_env(cls) -> "Config":
         """Load configuration from environment variables."""
         return cls(
-            app_name=os.getenv("APP_NAME", APP_NAME),
-            version=os.getenv("APP_VERSION", APP_VERSION),
+            app_name=APP_NAME,
+            version=APP_VERSION,
             debug=_env_bool("DEBUG", False),
-            environment=os.getenv("ENVIRONMENT", "production"),
+            environment=os.getenv("ENVIRONMENT", "production").strip().lower(),
             api_host=os.getenv("API_HOST", "127.0.0.1"),
             api_port=int(os.getenv("API_PORT", str(DEFAULT_API_PORT))),
             api_workers=int(os.getenv("API_WORKERS", "1")),
             api_timeout=int(os.getenv("API_TIMEOUT", "30")),
             strict_readiness=_env_bool("STRICT_READINESS", False),
-            ai_provider=os.getenv("AI_PROVIDER", "anthropic").strip().lower(),
+            ai_provider=os.getenv("AI_PROVIDER", "litellm").strip().lower(),
             litellm_config_path=Path(
                 os.getenv("LITELLM_CONFIG_PATH", "./litellm-config.yaml")
             ),
             litellm_model=os.getenv("LITELLM_MODEL", "zc-default"),
             litellm_timeout_seconds=int(os.getenv("LITELLM_TIMEOUT_SECONDS", "120")),
+            anthropic_api_key=os.getenv("ANTHROPIC_API_KEY"),
             protobuf_enabled=_env_bool("PROTOBUF_ENABLED", True),
-            max_message_size=int(os.getenv("MAX_MESSAGE_SIZE", "104857600")),
+            max_message_size=int(os.getenv("MAX_MESSAGE_SIZE", "94371840")),
             redis_url=os.getenv("REDIS_URL", "redis://localhost:6379"),
             redis_pool_size=int(os.getenv("REDIS_POOL_SIZE", "10")),
             redis_ttl_default=int(os.getenv("REDIS_TTL_DEFAULT", "3600")),
             redis_enabled=_env_bool("REDIS_ENABLED", False),
-            database_url=os.getenv("DATABASE_URL"),
-            db_pool_size=int(os.getenv("DB_POOL_SIZE", "20")),
-            db_max_overflow=int(os.getenv("DB_MAX_OVERFLOW", "10")),
+            http_pool_size=int(os.getenv("HTTP_POOL_SIZE", "20")),
             upload_chunk_size=int(os.getenv("UPLOAD_CHUNK_SIZE", "4194304")),
             upload_max_size=int(os.getenv("UPLOAD_MAX_SIZE", "53687091200")),
+            upload_retention_seconds=int(
+                os.getenv("UPLOAD_RETENTION_SECONDS", "86400")
+            ),
+            upload_min_free_bytes=int(os.getenv("UPLOAD_MIN_FREE_BYTES", "1073741824")),
             upload_temp_dir=Path(os.getenv("UPLOAD_TEMP_DIR", "./data/uploads")),
+            idempotency_dir=Path(os.getenv("IDEMPOTENCY_DIR", "./data/idempotency")),
+            idempotency_ttl_seconds=int(os.getenv("IDEMPOTENCY_TTL_SECONDS", "86400")),
+            idempotency_max_response_bytes=int(
+                os.getenv("IDEMPOTENCY_MAX_RESPONSE_BYTES", "1048576")
+            ),
+            idempotency_max_entries=int(os.getenv("IDEMPOTENCY_MAX_ENTRIES", "1000")),
             chat_session_dir=Path(
                 os.getenv("CHAT_SESSION_DIR", "./data/chat/sessions")
             ),
             storage_backend=os.getenv("STORAGE_BACKEND", "local"),
-            storage_s3_bucket=os.getenv("STORAGE_S3_BUCKET", "wire-uploads"),
-            storage_s3_endpoint=os.getenv("STORAGE_S3_ENDPOINT"),
-            storage_s3_access_key=os.getenv("STORAGE_S3_ACCESS_KEY"),
-            storage_s3_secret_key=os.getenv("STORAGE_S3_SECRET_KEY"),
-            storage_s3_region=os.getenv("STORAGE_S3_REGION", "us-east-1"),
-            nats_url=os.getenv("NATS_URL", "nats://localhost:4222"),
-            nats_cluster=(
-                os.getenv("NATS_CLUSTER", "").split(",")
-                if os.getenv("NATS_CLUSTER")
-                else []
-            ),
-            nats_enabled=_env_bool("NATS_ENABLED", False),
             jwt_secret=os.getenv("JWT_SECRET"),
             jwt_algorithm=os.getenv("JWT_ALGORITHM", "HS256"),
+            jwt_issuer=os.getenv("JWT_ISSUER", "zc"),
+            jwt_audience=os.getenv("JWT_AUDIENCE", "zc-api"),
             jwt_expiry_seconds=int(os.getenv("JWT_EXPIRY_SECONDS", "3600")),
             auth_required=_env_bool("AUTH_REQUIRED", True),
-            mtls_enabled=_env_bool("MTLS_ENABLED", False),
-            mtls_ca_cert=(
-                Path(os.environ["MTLS_CA_CERT"]) if os.getenv("MTLS_CA_CERT") else None
+            cloudflare_access_required=_env_bool("CLOUDFLARE_ACCESS_REQUIRED", False),
+            cloudflare_access_team_domain=os.getenv("CLOUDFLARE_ACCESS_TEAM_DOMAIN"),
+            cloudflare_access_aud=os.getenv("CLOUDFLARE_ACCESS_AUD"),
+            cloudflare_access_jwks_cache_seconds=int(
+                os.getenv("CLOUDFLARE_ACCESS_JWKS_CACHE_SECONDS", "300")
             ),
-            encryption_key=os.getenv("ENCRYPTION_KEY"),
+            encryption_key=os.getenv("E2E_SECRET_KEY"),
             cors_origins=[
                 origin.strip()
                 for origin in os.getenv("CORS_ORIGINS", "").split(",")
@@ -165,52 +150,132 @@ class Config:
             rate_limit_enabled=_env_bool("RATE_LIMIT_ENABLED", False),
             rate_limit_requests=int(os.getenv("RATE_LIMIT_REQUESTS", "1000")),
             rate_limit_window=int(os.getenv("RATE_LIMIT_WINDOW", "60")),
-            otel_enabled=_env_bool("OTEL_ENABLED", False),
-            otel_exporter_endpoint=os.getenv(
-                "OTEL_EXPORTER_ENDPOINT", "http://otel-collector:4317"
-            ),
-            otel_service_name=os.getenv("OTEL_SERVICE_NAME", "zcoder-api"),
-            otel_tracing_sample_rate=float(
-                os.getenv("OTEL_TRACING_SAMPLE_RATE", "0.1")
-            ),
-            prometheus_metrics_enabled=_env_bool(
-                "PROMETHEUS_METRICS_ENABLED", False
-            ),
-            prometheus_port=int(os.getenv("PROMETHEUS_PORT", "9090")),
             control_panel_enabled=_env_bool("CONTROL_PANEL_ENABLED", True),
             frontend_enabled=_env_bool("FRONTEND_ENABLED", True),
-            control_panel_admin_users=(
-                os.getenv("CONTROL_PANEL_ADMIN_USERS", "").split(",")
-                if os.getenv("CONTROL_PANEL_ADMIN_USERS")
-                else []
-            ),
-            http3_enabled=_env_bool("HTTP3_ENABLED", False),
-            http3_port=int(os.getenv("HTTP3_PORT", "8443")),
-            quic_certificate=(
-                Path(os.environ["QUIC_CERTIFICATE"])
-                if os.getenv("QUIC_CERTIFICATE")
-                else None
-            ),
-            quic_private_key=(
-                Path(os.environ["QUIC_PRIVATE_KEY"])
-                if os.getenv("QUIC_PRIVATE_KEY")
-                else None
-            ),
-            kubernetes_enabled=_env_bool("KUBERNETES_ENABLED", False),
-            cilium_ebpf_enabled=_env_bool("CILIUM_EBPF_ENABLED", False),
         )
 
     def ensure_dirs(self) -> None:
-        self.upload_temp_dir.mkdir(parents=True, exist_ok=True)
-        self.chat_session_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
-        os.chmod(self.chat_session_dir, 0o700)
+        for name, directory in (
+            ("UPLOAD_TEMP_DIR", self.upload_temp_dir),
+            ("IDEMPOTENCY_DIR", self.idempotency_dir),
+            ("CHAT_SESSION_DIR", self.chat_session_dir),
+        ):
+            if directory.is_symlink():
+                raise RuntimeError(f"{name} must not be a symlink")
+            directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+            if not directory.is_dir():
+                raise RuntimeError(f"{name} must be a directory")
+            os.chmod(directory, 0o700)
 
     def validate(self) -> None:
         """Fail closed when production security invariants are not configured."""
-        if self.environment == "production" and self.auth_required and not self.jwt_secret:
-            raise RuntimeError("JWT_SECRET is required when production authentication is enabled")
+        if self.environment not in {"development", "test", "production"}:
+            raise RuntimeError(
+                "ENVIRONMENT must be 'development', 'test', or 'production'"
+            )
+        if (
+            self.environment == "production"
+            and self.auth_required
+            and not self.jwt_secret
+        ):
+            raise RuntimeError(
+                "JWT_SECRET is required when production authentication is enabled"
+            )
+        if (
+            self.environment == "production"
+            and self.auth_required
+            and self.jwt_secret
+            and len(self.jwt_secret) < 32
+        ):
+            raise RuntimeError("JWT_SECRET must contain at least 32 characters")
+        if self.jwt_algorithm != "HS256":
+            raise RuntimeError("JWT_ALGORITHM must be HS256")
+        if not self.jwt_issuer or not self.jwt_audience:
+            raise RuntimeError("JWT_ISSUER and JWT_AUDIENCE must not be empty")
+        if self.jwt_expiry_seconds < 60 or self.jwt_expiry_seconds > 86400:
+            raise RuntimeError("JWT_EXPIRY_SECONDS must be between 60 and 86400")
+        if self.api_port < 1 or self.api_port > 65535:
+            raise RuntimeError("API_PORT must be between 1 and 65535")
+        if self.api_workers < 1:
+            raise RuntimeError("API_WORKERS must be positive")
+        if self.api_timeout <= 0:
+            raise RuntimeError("API_TIMEOUT must be positive")
+        if self.protobuf_enabled and self.api_host != "127.0.0.1":
+            raise RuntimeError("gRPC requires API_HOST to be 127.0.0.1")
+        if self.protobuf_enabled and self.api_port >= 65535:
+            raise RuntimeError("API_PORT must leave the next port available for gRPC")
+        if self.environment == "production":
+            if self.api_host != "127.0.0.1":
+                raise RuntimeError("API_HOST must be 127.0.0.1 in production")
+            if self.api_workers != 1:
+                raise RuntimeError("API_WORKERS must be 1 in production")
+            if self.debug:
+                raise RuntimeError("DEBUG must be disabled in production")
+            if not self.auth_required:
+                raise RuntimeError("AUTH_REQUIRED must be enabled in production")
+            if self.max_message_size > 90 * 1024 * 1024:
+                raise RuntimeError(
+                    "MAX_MESSAGE_SIZE must not exceed 90 MiB in production"
+                )
+            if self.cors_origins and any(
+                origin == "*" or not origin.startswith("https://") or "*" in origin
+                for origin in self.cors_origins
+            ):
+                raise RuntimeError(
+                    "Production CORS_ORIGINS must contain exact HTTPS origins"
+                )
+            if not self.cloudflare_access_required:
+                raise RuntimeError(
+                    "CLOUDFLARE_ACCESS_REQUIRED must be enabled in production"
+                )
+        if self.cloudflare_access_required:
+            if not self.auth_required:
+                raise RuntimeError(
+                    "AUTH_REQUIRED must be enabled when Cloudflare Access is required"
+                )
+            if not self.cloudflare_access_team_domain:
+                raise RuntimeError(
+                    "CLOUDFLARE_ACCESS_TEAM_DOMAIN is required when Cloudflare Access is enabled"
+                )
+            if not self.cloudflare_access_aud:
+                raise RuntimeError(
+                    "CLOUDFLARE_ACCESS_AUD is required when Cloudflare Access is enabled"
+                )
+            if self.cloudflare_access_jwks_cache_seconds <= 0:
+                raise RuntimeError(
+                    "CLOUDFLARE_ACCESS_JWKS_CACHE_SECONDS must be positive"
+                )
+            from .cloudflare_access import CloudflareAccessVerifier
+
+            CloudflareAccessVerifier(
+                team_domain=self.cloudflare_access_team_domain,
+                audience=self.cloudflare_access_aud,
+                cache_seconds=self.cloudflare_access_jwks_cache_seconds,
+            )
+        if self.environment == "production":
+            if not self.rate_limit_enabled:
+                raise RuntimeError("RATE_LIMIT_ENABLED must be enabled in production")
+            if not self.strict_readiness:
+                raise RuntimeError("STRICT_READINESS must be enabled in production")
+            if self.cors_origins != ["https://zeaz.dev"]:
+                raise RuntimeError(
+                    "Production CORS_ORIGINS must be exactly https://zeaz.dev"
+                )
+            if not self.encryption_key:
+                raise RuntimeError("E2E_SECRET_KEY is required in production")
+            try:
+                encryption_key = base64.b64decode(
+                    self.encryption_key,
+                    validate=True,
+                )
+            except (binascii.Error, ValueError) as exc:
+                raise RuntimeError("E2E_SECRET_KEY must be valid base64") from exc
+            if len(encryption_key) != 32:
+                raise RuntimeError("E2E_SECRET_KEY must encode exactly 32 bytes")
         if self.ai_provider not in {"anthropic", "litellm"}:
             raise RuntimeError("AI_PROVIDER must be 'anthropic' or 'litellm'")
+        if self.environment == "production" and self.ai_provider != "litellm":
+            raise RuntimeError("AI_PROVIDER must be 'litellm' in production")
         if self.litellm_timeout_seconds <= 0:
             raise RuntimeError("LITELLM_TIMEOUT_SECONDS must be positive")
         if self.ai_provider == "litellm":
@@ -220,14 +285,52 @@ class Config:
                 raise RuntimeError(
                     f"LiteLLM config not found: {self.litellm_config_path}"
                 )
-        if self.upload_chunk_size <= 0 or self.upload_chunk_size > self.max_message_size:
+        if self.environment == "production" and not self.anthropic_api_key:
+            raise RuntimeError("ANTHROPIC_API_KEY is required in production")
+        if (
+            self.upload_chunk_size <= 0
+            or self.upload_chunk_size > self.max_message_size
+        ):
             raise RuntimeError("UPLOAD_CHUNK_SIZE must be within MAX_MESSAGE_SIZE")
         if self.upload_max_size < self.upload_chunk_size:
             raise RuntimeError("UPLOAD_MAX_SIZE must be at least UPLOAD_CHUNK_SIZE")
+        if self.upload_retention_seconds < 3600:
+            raise RuntimeError("UPLOAD_RETENTION_SECONDS must be at least 3600")
+        if self.upload_min_free_bytes < 0:
+            raise RuntimeError("UPLOAD_MIN_FREE_BYTES must not be negative")
+        if self.storage_backend != "local":
+            raise RuntimeError("STORAGE_BACKEND must be 'local'")
+        if self.idempotency_ttl_seconds <= 0:
+            raise RuntimeError("IDEMPOTENCY_TTL_SECONDS must be positive")
+        if self.idempotency_max_response_bytes <= 0:
+            raise RuntimeError("IDEMPOTENCY_MAX_RESPONSE_BYTES must be positive")
+        if self.idempotency_max_entries <= 0:
+            raise RuntimeError("IDEMPOTENCY_MAX_ENTRIES must be positive")
         if self.rate_limit_enabled and not self.redis_enabled and self.api_workers != 1:
             raise RuntimeError(
                 "API_WORKERS must be 1 when rate limiting uses in-memory state"
             )
+        if self.rate_limit_requests <= 0 or self.rate_limit_window <= 0:
+            raise RuntimeError(
+                "RATE_LIMIT_REQUESTS and RATE_LIMIT_WINDOW must be positive"
+            )
+        if self.http_pool_size <= 0:
+            raise RuntimeError("HTTP_POOL_SIZE must be positive")
+        if self.redis_pool_size <= 0 or self.redis_ttl_default <= 0:
+            raise RuntimeError("REDIS_POOL_SIZE and REDIS_TTL_DEFAULT must be positive")
+        if self.redis_enabled:
+            parsed_redis = urlparse(self.redis_url)
+            if (
+                parsed_redis.scheme not in {"redis", "rediss"}
+                or parsed_redis.hostname is None
+            ):
+                raise RuntimeError("REDIS_URL must be a valid Redis URL")
+            if self.environment == "production" and parsed_redis.hostname not in {
+                "127.0.0.1",
+                "::1",
+                "localhost",
+            }:
+                raise RuntimeError("Production REDIS_URL must use a loopback host")
 
 
 _config: Optional[Config] = None

@@ -1,9 +1,10 @@
 name: Security Scan
 
-# ci.yml's `security` job runs bandit (static analysis of *our* code) on
-# every PR. This workflow covers the other three angles: known CVEs in
-# *dependencies*, secrets accidentally committed to the *repo*, and known
-# CVEs in the *built container image*'s OS packages. These are slower and
+# ci.yml's `security` job runs Bandit across every executable Python surface
+# and its secret-scan job runs Gitleaks on every PR. This workflow repeats the
+# repository secret scan against main history and covers two slower angles:
+# known CVEs in *dependencies* and in the *built container image*'s OS
+# packages. These are slower and
 # noisier (dependency advisories change daily independent of code changes),
 # so they run on push to main, weekly, and on demand rather than blocking
 # every PR.
@@ -30,7 +31,13 @@ jobs:
       # (which only looks at *our* code, not what our dependencies pull in).
       - uses: pypa/gh-action-pip-audit@1220774d901786e6f652ae159f7b6bc8fea6d266 # v1.1.0
         with:
-          inputs: requirements.txt requirements-dev.txt webapp/requirements-web.txt
+          inputs: requirements-deploy.lock requirements-dev.txt webapp/requirements-web.txt
+      - uses: actions/setup-node@1e60f620b9541d4d100c1fa0b82bf8b88abfb4ae # v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: webapp/frontend-src/package-lock.json
+      - run: npm --prefix webapp/frontend-src audit --audit-level=moderate
 
   secret-scan:
     runs-on: ubuntu-latest
@@ -38,6 +45,7 @@ jobs:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 0  # full history, so this also catches secrets in old commits, not just HEAD
+      - run: git config diff.renameLimit 20000
       - uses: gitleaks/gitleaks-action@dcedce43c6f43de0b836d1fe38946645c9c638dc # v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -50,10 +58,10 @@ jobs:
       security-events: write  # required by github/codeql-action/upload-sarif below
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-      - run: docker build -t wire:security-scan .
+      - run: docker build -t zcoder:security-scan .
       - uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
         with:
-          image-ref: wire:security-scan
+          image-ref: zcoder:security-scan
           format: sarif
           output: trivy-results.sarif
           severity: CRITICAL,HIGH

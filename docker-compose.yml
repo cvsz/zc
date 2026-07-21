@@ -15,12 +15,9 @@ services:
       LITELLM_CONFIG_PATH: /app/litellm-config.yaml
       LITELLM_MODEL: ${LITELLM_MODEL:-zc-default}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       REDIS_ENABLED: "false"
       CHAT_SESSION_DIR: /app/data/chat/sessions
-      NATS_ENABLED: "false"
       PROTOBUF_ENABLED: "false"
-      OTEL_ENABLED: "false"
       FRONTEND_ENABLED: "true"
     volumes:
       - zc-data:/app/data

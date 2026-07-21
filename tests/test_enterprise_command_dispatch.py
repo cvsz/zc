@@ -76,11 +76,7 @@ def test_unrelated_command_is_not_claimed(monkeypatch) -> None:
 def test_no_generic_command_execution_route_exists() -> None:
     from app.main import app
 
-    paths = {
-        route.path
-        for route in app.routes
-        if hasattr(route, "path")
-    }
+    paths = {route.path for route in app.routes if hasattr(route, "path")}
     forbidden = {
         "/v1/commands",
         "/v1/execute",

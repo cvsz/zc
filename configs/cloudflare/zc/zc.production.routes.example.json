@@ -2,16 +2,11 @@
   "version": 1,
   "routes": [
     {
-      "hostname": "zai.zeaz.dev",
-      "service": "http://localhost:8080",
-      "originHost": "zai.zeaz.dev",
-      "purpose": "zc web application"
-    },
-    {
-      "hostname": "api.zeaz.dev",
-      "service": "http://localhost:8080",
-      "originHost": "api.zeaz.dev",
-      "purpose": "zc Enterprise API"
+      "hostname": "zeaz.dev",
+      "service": "http://127.0.0.1:8000",
+      "originHost": "zeaz.dev",
+      "purpose": "zc web workspace and /v1 API",
+      "accessRequired": true
     }
   ],
   "fallback": "http_status:404"

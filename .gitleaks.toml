@@ -1,0 +1,18 @@
+title = "zc repository secret scanning"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Synthetic credential fixtures used by redaction and transport tests"
+paths = [
+  '''(?:^|/)\.zc/agents/.*\.test\.ts$''',
+  '''(?:^|/)(?:\.web-venv|\.venv|venv|venv2)/''',
+]
+
+[[rules]]
+id = "generic-api-key"
+
+[rules.allowlist]
+description = "The noVNC value is an environment variable name, not a credential"
+regexes = ['''OPENCLAW_BROWSER_NOVNC_PASSWORD''']

@@ -1,4 +1,4 @@
-"""Zero-cost, single-machine runtime profile for the enterprise API."""
+"""Dependency-free single-machine development launcher."""
 
 from __future__ import annotations
 
@@ -11,13 +11,14 @@ LOCAL_DEFAULTS = {
     "AUTH_REQUIRED": "false",
     "STORAGE_BACKEND": "local",
     "UPLOAD_TEMP_DIR": "./data/uploads",
+    "IDEMPOTENCY_DIR": "./data/idempotency",
     "CHAT_SESSION_DIR": "./data/chat/sessions",
     "REDIS_ENABLED": "false",
-    "NATS_ENABLED": "false",
-    "OTEL_ENABLED": "false",
-    "RATE_LIMIT_ENABLED": "true",
+    "RATE_LIMIT_ENABLED": "false",
     "CONTROL_PANEL_ENABLED": "true",
-    "PROTOBUF_ENABLED": "true",
+    "FRONTEND_ENABLED": "true",
+    "PROTOBUF_ENABLED": "false",
+    "STRICT_READINESS": "false",
     "API_HOST": "127.0.0.1",
     "API_PORT": "8000",
     "API_WORKERS": "1",
@@ -35,7 +36,7 @@ def apply_local_defaults() -> None:
 
 
 def main() -> None:
-    """Start HTTP and gRPC services using only local machine resources."""
+    """Start the dependency-free local HTTP service."""
     apply_local_defaults()
     from .main import run_server
 

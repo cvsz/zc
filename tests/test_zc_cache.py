@@ -10,6 +10,7 @@ Covers zc_cache.py's three features:
 
 Previously this module (zc_cache.py) had zero test coverage at all.
 """
+
 import pytest
 
 from wire.zc_cache import (
@@ -25,9 +26,13 @@ def _response(text="ok", usage=None, diagnostics=None, message_id="msg_1"):
     data = {
         "id": message_id,
         "content": [{"type": "text", "text": text}],
-        "usage": usage or {"input_tokens": 10, "output_tokens": 5,
-                            "cache_creation_input_tokens": 0,
-                            "cache_read_input_tokens": 0},
+        "usage": usage
+        or {
+            "input_tokens": 10,
+            "output_tokens": 5,
+            "cache_creation_input_tokens": 0,
+            "cache_read_input_tokens": 0,
+        },
     }
     if diagnostics is not None:
         data["diagnostics"] = diagnostics
@@ -85,7 +90,9 @@ def test_diagnose_sends_previous_message_id_none_on_first_call(monkeypatch):
     assert captured["payload"]["diagnostics"] == {"previous_message_id": None}
 
 
-def test_diagnose_second_call_references_prior_message_id_and_surfaces_miss_reason(monkeypatch):
+def test_diagnose_second_call_references_prior_message_id_and_surfaces_miss_reason(
+    monkeypatch,
+):
     calls = []
 
     def fake_post(payload, diagnose=False):
@@ -93,7 +100,8 @@ def test_diagnose_second_call_references_prior_message_id_and_surfaces_miss_reas
         if len(calls) == 1:
             return _response("first", message_id="msg_1")
         return _response(
-            "second", message_id="msg_2",
+            "second",
+            message_id="msg_2",
             diagnostics={"cache_miss_reason": {"type": "system_changed"}},
         )
 
@@ -128,7 +136,10 @@ def test_diagnose_adds_beta_header(monkeypatch):
 
 def test_build_mid_system_message_shape():
     msg = build_mid_system_message("new instruction")
-    assert msg == {"role": "system", "content": [{"type": "text", "text": "new instruction"}]}
+    assert msg == {
+        "role": "system",
+        "content": [{"type": "text", "text": "new instruction"}],
+    }
 
 
 def test_validate_placement_rejects_system_as_first_message():
@@ -199,8 +210,9 @@ def test_generate_cached_mid_system_rejects_unsupported_model(monkeypatch):
     monkeypatch.setattr(cc, "_post", lambda payload, diagnose=False: _response("ok"))
 
     with pytest.raises(ValueError, match="zc-opus-4-8"):
-        cc.generate_cached("hi", history=[{"role": "user", "content": "prior"}],
-                           mid_system="update")
+        cc.generate_cached(
+            "hi", history=[{"role": "user", "content": "prior"}], mid_system="update"
+        )
 
 
 def test_generate_cached_mid_system_appends_message_on_supported_model(monkeypatch):
@@ -213,8 +225,11 @@ def test_generate_cached_mid_system_appends_message_on_supported_model(monkeypat
     cc = CachingCoder(api_key="k", model="zc-opus-4-8")
     monkeypatch.setattr(cc, "_post", fake_post)
 
-    cc.generate_cached("hi", history=[{"role": "user", "content": "prior"}],
-                       mid_system="update instructions")
+    cc.generate_cached(
+        "hi",
+        history=[{"role": "user", "content": "prior"}],
+        mid_system="update instructions",
+    )
 
     messages = captured["payload"]["messages"]
     assert messages[1] == build_mid_system_message("update instructions")

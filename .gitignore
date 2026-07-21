@@ -1,44 +1,37 @@
-```
 # Python
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
+*.py[cod]
+*.so
 .Python
+.venv/
+.venv*/
+.web-venv/
 env/
 venv/
-.venv/
-.venv3/
-.venv312/
-.venv311/
-.venv310/
-.venv39/
-.venv38/
-.venv37/
-.venv36/
-.venv35/
-.venv34/
+venv2/
+
+# Secrets and local environment
 .env
-.env.local
 .env.*
-.env.cloudflare
+!.env.example
+!.env.*.example
+.cloudflared/
+*.pem
 
-# Logs
-*.log
-
-# Testing
+# Tests and analysis
 .coverage
 coverage/
 htmlcov/
 .pytest_cache/
 .hypothesis/
+.mypy_cache/
+mypy_errors*.txt
 
-# Distribution / packaging
-.Python
+# Packaging and generated artifacts
 build/
-develop-eggs/
 dist/
 downloads/
+develop-eggs/
 eggs/
 .eggs/
 lib/
@@ -47,75 +40,37 @@ parts/
 sdist/
 var/
 wheels/
-*.egg-info/
-.installed.cfg
 *.egg
-
-# IDEs
-.vscode/
-.idea/
-*.swp
-*.swo
-*.tmp
-# Python
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-*.pyc
-.Python
-*.so
 *.egg-info/
-
-# Dependencies
-venv/
-.venv/
-.env
-.env.local
-.env.*
-
-# Build artifacts
-build/
-dist/
-*.egg
 *.whl
+.installed.cfg
 
-# gRPC/Protobuf
-*_pb2.py
-*_pb2_grpc.py
-
-# Logs
-*.log
-
-# Coverage
-.coverage
-htmlcov/
-coverage/
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*.tmp
-
-# OS generated files
-.DS_Store
-Thumbs.db
-
-# Testing
-.pytest_cache/
-.mypy_cache/
-venv2/
-.web.pid
-*.save
+# Frontend dependencies and generated TypeScript
 node_modules/
 *.tsbuildinfo
 webapp/frontend-src/vite.config.js
 webapp/frontend-src/vite.config.d.ts
+
+# Terraform local state and plans
 infra/cloudflare/.terraform/
 infra/cloudflare/*.tfstate
 infra/cloudflare/*.tfstate.*
 infra/cloudflare/*.tfplan
 infra/cloudflare/crash.log
 infra/cloudflare/*.auto.tfvars
+
+# Runtime and logs
+data/
+*.log
+*.tmp
+*.save
+.web.pid
+.zc.pid
+
+# Editors and operating systems
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db

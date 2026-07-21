@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import AsyncIterator
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, cast
 from uuid import uuid4
 
 from app.models.ai import AIResponseRequest, ConversationMessage
@@ -44,9 +44,7 @@ class ChatSessionService:
         async with self._locks_guard:
             return self._locks.setdefault(key, asyncio.Lock())
 
-    async def create(
-        self, tenant_id: str, request: ChatSessionCreate
-    ) -> ChatSession:
+    async def create(self, tenant_id: str, request: ChatSessionCreate) -> ChatSession:
         item = await self.store.create(
             tenant_id,
             _DOMAIN,
@@ -81,9 +79,7 @@ class ChatSessionService:
         async with lock:
             item = await self.store.get(tenant_id, _DOMAIN, session_id)
             item["title"] = request.title
-            updated = await self.store.replace(
-                tenant_id, _DOMAIN, session_id, item
-            )
+            updated = await self.store.replace(tenant_id, _DOMAIN, session_id, item)
         return ChatSession.model_validate(updated)
 
     async def delete(self, tenant_id: str, session_id: str) -> None:
@@ -107,7 +103,7 @@ class ChatSessionService:
                 ConversationMessage(role=message["role"], content=message["content"])
                 for message in item["messages"]
             ]
-            user_message = {
+            user_message: dict[str, Any] = {
                 "id": _id("msg"),
                 "role": "user",
                 "content": request.prompt,
@@ -124,7 +120,7 @@ class ChatSessionService:
             completed: dict[str, Any] | None = None
             async for event in self.ai_service.stream_response(effective_request):
                 if event["type"] == "response.completed":
-                    completed = event["response"]
+                    completed = cast(dict[str, Any], event["response"])
                 yield event
 
             if completed is None:

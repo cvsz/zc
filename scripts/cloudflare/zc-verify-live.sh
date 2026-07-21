@@ -7,8 +7,8 @@ REPORT="${ROOT_DIR}/docs/reports/generated/zc-live-verification.md"
 mkdir -p "${ROOT_DIR}/docs/reports/generated"
 
 urls=(
-  "https://${ZC_PUBLIC_HOST:-zai.zeaz.dev}"
-  "https://${ZC_API_PUBLIC_HOST:-api.zeaz.dev}/v1/wire/health/live"
+  "https://${ZC_PUBLIC_HOST:-zeaz.dev}"
+  "https://${ZC_PUBLIC_HOST:-zeaz.dev}/v1/wire/health/live"
 )
 
 {

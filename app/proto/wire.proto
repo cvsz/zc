@@ -7,7 +7,7 @@ message CliEnvelope {
     string request_id = 1;          // Unique request correlation ID
     uint64 timestamp_ns = 2;        // Nanosecond precision timestamp
     string client_version = 3;      // Wire CLI version
-    string auth_token = 4;          // JWT/mTLS token
+    string auth_token = 4;          // Application JWT
     
     oneof payload {
         // File Upload Operations
@@ -71,7 +71,7 @@ message UploadInitResponse {
     repeated int32 missing_chunk_indices = 2;  // Chunks to upload
     uint64 chunk_size = 3;
     uint64 estimated_transfer_bytes = 4;
-    string storage_endpoint = 5;    // Direct S3 presigned URL (optional)
+    string storage_endpoint = 5;    // Reserved for a reviewed local endpoint
 }
 
 message ChunkUploadRequest {
@@ -147,9 +147,9 @@ message HealthCheckResponse {
     string status = 1;                // "healthy", "degraded", "unhealthy"
     string version = 2;
     uint64 uptime_seconds = 3;
-    float latency_p50_ms = 4;
-    float latency_p99_ms = 5;
-    int64 active_connections = 6;
+    float latency_p50_ms = 4;        // 0 when no latency histogram is configured
+    float latency_p99_ms = 5;        // 0 when no latency histogram is configured
+    int64 active_connections = 6;    // Compatibility field: active upload sessions
     int64 pending_uploads = 7;
 }
 

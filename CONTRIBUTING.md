@@ -20,7 +20,7 @@ pytest --cov
 ```
 
 CI (`.github/workflows/ci.yml`) runs all of the above across Python
-3.9–3.12 plus a Docker build smoke test. A PR won't merge if any of these
+3.11–3.12 plus a Docker build smoke test. A PR won't merge if any of these
 fail.
 
 ## Conventions

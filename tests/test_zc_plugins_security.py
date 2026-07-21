@@ -8,7 +8,9 @@ import pytest
 from wire.zc_plugins import _safe_extract_zip
 
 
-def _archive(entries: dict[str, bytes], *, symlink: str | None = None) -> zipfile.ZipFile:
+def _archive(
+    entries: dict[str, bytes], *, symlink: str | None = None
+) -> zipfile.ZipFile:
     stream = io.BytesIO()
     with zipfile.ZipFile(stream, "w") as archive:
         for name, content in entries.items():

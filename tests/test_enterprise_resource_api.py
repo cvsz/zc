@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import asyncio
+import stat
 from datetime import datetime, timezone
+from io import BytesIO
+from uuid import uuid4
 
 import httpx
 import pytest
@@ -51,7 +54,6 @@ def resource_service(tmp_path, monkeypatch) -> DomainResourceService:
     config = Config(
         environment="test",
         redis_enabled=False,
-        nats_enabled=False,
         protobuf_enabled=False,
         upload_temp_dir=tmp_path,
         storage_backend="local",
@@ -67,6 +69,7 @@ def resource_service(tmp_path, monkeypatch) -> DomainResourceService:
         blob_root=tmp_path / "blobs",
         encryptor=FakeEncryptor(),
     )
+
     async def fake_resource_service() -> DomainResourceService:
         return service
 
@@ -77,7 +80,10 @@ def resource_service(tmp_path, monkeypatch) -> DomainResourceService:
 
 def headers(tenant: str, role: str = "developer") -> dict[str, str]:
     token = create_short_lived_token(tenant, role)
-    return {"Authorization": f"Bearer {token}"}
+    return {
+        "Authorization": f"Bearer {token}",
+        "Idempotency-Key": str(uuid4()),
+    }
 
 
 @pytest.mark.asyncio
@@ -179,7 +185,7 @@ async def test_artifact_versions_and_research_resources(
 
 
 @pytest.mark.asyncio
-async def test_file_lifecycle_question_and_private_storage_path(
+async def test_file_lifecycle_quarantine_and_private_storage_path(
     resource_service: DomainResourceService,
 ) -> None:
     transport = httpx.ASGITransport(app=app)
@@ -192,12 +198,45 @@ async def test_file_lifecycle_question_and_private_storage_path(
         assert uploaded.status_code == 201
         metadata = uploaded.json()["data"]
         assert "blob_path" not in metadata
+        stored_blob = next(resource_service.blob_root.rglob(metadata["id"]))
+        assert stat.S_IMODE(stored_blob.stat().st_mode) == 0o600
+        assert stat.S_IMODE(stored_blob.parent.stat().st_mode) == 0o700
+        assert metadata["status"] == "quarantined"
 
         forbidden = await client.get(
             f"/v1/files/{metadata['id']}/content",
             headers=headers("tenant-b"),
         )
         assert forbidden.status_code == 404
+
+        downloaded = await client.get(
+            f"/v1/files/{metadata['id']}/content",
+            headers=headers("tenant-a"),
+        )
+        assert downloaded.status_code == 404
+
+        answer = await client.post(
+            f"/v1/files/{metadata['id']}/questions",
+            json={"prompt": "Summarize"},
+            headers=headers("tenant-a"),
+        )
+        assert answer.status_code == 404
+
+        # There is intentionally no public promotion route. This direct store
+        # update models a trusted local malware scanner for the availability
+        # and streaming contract only.
+        stored_metadata = await resource_service.store.get(
+            "tenant-a",
+            "files",
+            metadata["id"],
+        )
+        stored_metadata["status"] = "available"
+        await resource_service.store.replace(
+            "tenant-a",
+            "files",
+            metadata["id"],
+            stored_metadata,
+        )
 
         downloaded = await client.get(
             f"/v1/files/{metadata['id']}/content",
@@ -234,6 +273,22 @@ async def test_file_rejects_unsafe_filename(
 
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "domain_validation_error"
+
+
+@pytest.mark.asyncio
+async def test_streamed_file_limit_removes_partial_blob(
+    resource_service: DomainResourceService,
+) -> None:
+    with pytest.raises(ValueError, match="upload limit"):
+        await resource_service.create_file(
+            "tenant-a",
+            "oversized.bin",
+            "application/octet-stream",
+            BytesIO(b"12345"),
+            maximum_size=4,
+        )
+
+    assert list(resource_service.blob_root.rglob("fil_*")) == []
 
 
 @pytest.mark.asyncio
@@ -287,6 +342,12 @@ async def test_managed_agent_runs_and_memory_lifecycle(
             headers=headers("tenant-a"),
         )
         assert archived.json()["data"]["status"] == "archived"
+        archived_run = await client.post(
+            "/v1/managed-agent-runs",
+            json={"task": "Use archived memory", "memory_store_id": store["id"]},
+            headers=headers("tenant-a"),
+        )
+        assert archived_run.status_code == 422
 
 
 @pytest.mark.asyncio
@@ -343,37 +404,46 @@ async def test_extended_managed_agent_resources_hide_vault_secrets(
             json={"name": "local-worker"},
             headers=headers("tenant-a", "admin"),
         )
-        environment_id = environment.json()["data"]["id"]
+        assert environment.status_code == 501
+        assert (
+            environment.json()["error"]["code"] == "standalone_capability_unavailable"
+        )
         schedule = await client.post(
             "/v1/agent-schedules",
             json={
                 "agent_id": "agent-a",
-                "environment_id": environment_id,
+                "environment_id": "env-local",
                 "cron_expression": "0 * * * *",
                 "timezone": "UTC",
                 "task": "Review queued work",
             },
             headers=headers("tenant-a", "admin"),
         )
-        assert schedule.status_code == 201
-        cancelled = await client.post(
-            f"/v1/agent-schedules/{schedule.json()['data']['id']}/cancel",
-            headers=headers("tenant-a", "admin"),
-        )
-        assert cancelled.json()["data"]["status"] == "cancelled"
+        assert schedule.status_code == 501
 
         webhook = await client.post(
             "/v1/agent-webhooks",
-            json={"url": "https://example.com/events", "event_types": ["run.completed"]},
+            json={
+                "url": "https://example.com/events",
+                "event_types": ["run.completed"],
+            },
             headers=headers("tenant-a", "admin"),
         )
-        assert webhook.status_code == 201
+        assert webhook.status_code == 501
         insecure = await client.post(
             "/v1/agent-webhooks",
             json={"url": "http://example.com/events"},
             headers=headers("tenant-a", "admin"),
         )
         assert insecure.status_code == 422
+
+        vault_run = await client.post(
+            "/v1/managed-agent-runs",
+            json={"task": "Use the credential", "vault_id": vault["id"]},
+            headers=headers("tenant-a"),
+        )
+        assert vault_run.status_code == 501
+        assert vault_run.json()["error"]["code"] == "standalone_capability_unavailable"
 
 
 @pytest.mark.asyncio
@@ -402,6 +472,18 @@ async def test_dream_and_multiagent_review_are_resource_backed(
         assert dream.status_code == 201
         assert dream.json()["data"]["status"] == "completed"
         assert dream.json()["data"]["output_store_id"].startswith("mems_")
+        unsupported_sessions = await client.post(
+            "/v1/agent-dreams",
+            json={"memory_store_id": store["id"], "session_ids": ["chat_123"]},
+            headers=headers("tenant-a"),
+        )
+        assert unsupported_sessions.status_code == 501
+        unsupported_iterations = await client.post(
+            "/v1/managed-agent-runs",
+            json={"task": "Iterate", "outcome_max_iterations": 2},
+            headers=headers("tenant-a"),
+        )
+        assert unsupported_iterations.status_code == 501
 
         uploaded = (
             await client.post(
@@ -410,6 +492,18 @@ async def test_dream_and_multiagent_review_are_resource_backed(
                 headers=headers("tenant-a"),
             )
         ).json()["data"]
+        scanned_metadata = await resource_service.store.get(
+            "tenant-a",
+            "files",
+            uploaded["id"],
+        )
+        scanned_metadata["status"] = "available"
+        await resource_service.store.replace(
+            "tenant-a",
+            "files",
+            uploaded["id"],
+            scanned_metadata,
+        )
         review = await client.post(
             "/v1/multi-agent-reviews",
             json={

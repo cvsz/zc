@@ -40,13 +40,13 @@ def ai_app(tmp_path, monkeypatch) -> FastAPI:
     config = Config(
         environment="test",
         redis_enabled=False,
-        nats_enabled=False,
         protobuf_enabled=False,
         upload_temp_dir=tmp_path,
         storage_backend="local",
         jwt_secret="a-test-secret-with-sufficient-entropy",
         auth_required=True,
         rate_limit_enabled=False,
+        ai_provider="anthropic",
     )
     monkeypatch.setattr(config_module, "_config", config)
 

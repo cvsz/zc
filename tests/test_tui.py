@@ -6,9 +6,12 @@ installed, matching how tests for other optional-dependency modules
 (zc_excel.py/zc_powerpoint.py) handle the same situation — see
 tests/test_config.py's pattern for the equivalent skip-if-missing idiom.
 """
+
 import pytest
 
-textual = pytest.importorskip("textual", reason="optional dependency for --tui, see requirements.txt")
+textual = pytest.importorskip(
+    "textual", reason="optional dependency for --tui, see requirements.txt"
+)
 
 import wire.tui as tui  # noqa: E402
 
@@ -29,7 +32,9 @@ async def test_missing_api_key_shows_error_message():
     async with app.run_test() as pilot:
         await pilot.pause()
         transcript = app.query_one("#transcript")
-        texts = [c.raw_text for c in transcript.children if isinstance(c, tui.ChatMessage)]
+        texts = [
+            c.raw_text for c in transcript.children if isinstance(c, tui.ChatMessage)
+        ]
         assert any("ANTHROPIC_API_KEY" in t for t in texts)
 
 
@@ -37,7 +42,9 @@ async def test_missing_api_key_shows_error_message():
 async def test_submitting_prompt_adds_user_and_assistant_messages(monkeypatch):
     # Keep the UI test hermetic and avoid leaving a provider worker running
     # after Textual's test harness exits. Generation has its own unit tests.
-    def fake_generation(self, prompt, model, system, temperature, streaming, reply_widget):
+    def fake_generation(
+        self, prompt, model, system, temperature, streaming, reply_widget
+    ):
         reply_widget.update_text("mock assistant reply")
 
     monkeypatch.setattr(tui.wireTUI, "_run_generation", fake_generation)
@@ -58,12 +65,17 @@ async def test_new_session_clears_transcript_and_history():
     app = tui.wireTUI(api_key="test-key")
     async with app.run_test() as pilot:
         await pilot.pause()
-        app.history = [{"role": "user", "content": "x"}, {"role": "assistant", "content": "y"}]
+        app.history = [
+            {"role": "user", "content": "x"},
+            {"role": "assistant", "content": "y"},
+        ]
         app.action_new_session()
         await pilot.pause()
         assert app.history == []
         transcript = app.query_one("#transcript")
-        assert len(transcript.children) == 1  # just the "new session started" system message
+        assert (
+            len(transcript.children) == 1
+        )  # just the "new session started" system message
 
 
 @pytest.mark.asyncio
@@ -128,7 +140,9 @@ def test_streamed_reply_shows_full_text_even_when_gated(monkeypatch):
         def __init__(self, **kwargs):
             self.messages = Messages()
 
-    monkeypatch.setitem(sys.modules, "anthropic", types.SimpleNamespace(Anthropic=Client))
+    monkeypatch.setitem(
+        sys.modules, "anthropic", types.SimpleNamespace(Anthropic=Client)
+    )
     monkeypatch.setattr(tui.time, "monotonic", lambda: 1.0)
 
     updates = []
@@ -151,6 +165,7 @@ def test_import_error_message_is_actionable_when_textual_missing(monkeypatch):
     # textual -- checks tui.py's own guard message stays informative.
     import importlib
     import sys as _sys
+
     real_textual = _sys.modules.get("textual")
     _sys.modules["textual"] = None  # forces an ImportError on next import
     for mod in list(_sys.modules):

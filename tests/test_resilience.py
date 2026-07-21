@@ -1,4 +1,5 @@
 """tests/test_resilience.py"""
+
 import pytest
 
 from wire.exceptions import APIError, CircuitOpenError, TransientAPIError
@@ -49,6 +50,7 @@ def test_retry_does_not_retry_non_retryable_errors():
 
 def test_retry_respects_explicit_retry_after():
     from wire.exceptions import RateLimitError
+
     sleeps = []
     calls = {"n": 0}
 

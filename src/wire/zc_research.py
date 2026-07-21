@@ -9,7 +9,7 @@ import json
 import urllib.error
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional
+from typing import Any, Optional
 
 import anthropic
 
@@ -144,3 +144,27 @@ def cmd_research(topic: str, api_key: str, model: str,
         print(f"✓ Report saved to {output}")
     else:
         print(md)
+
+
+def dispatch_research_command(args: Any, api_key: str, model: str) -> bool:
+    """Dispatch the parsed deep-research command."""
+    if not args.research:
+        return False
+    cmd_research(
+        args.research,
+        api_key,
+        model,
+        depth=args.research_depth,
+        source_urls=args.research_urls,
+        output=args.output,
+    )
+    return True
+
+
+__all__ = [
+    "DeepResearchAgent",
+    "Report",
+    "SubQ",
+    "cmd_research",
+    "dispatch_research_command",
+]

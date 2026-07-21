@@ -13,6 +13,7 @@ See docs/45_upgrade_v1.33.0_docx_pdf_native.md, CHANGELOG.md, and
 ROADMAP.md.
 """
 import argparse
+import json
 import os
 import sys
 from pathlib import Path
@@ -666,8 +667,10 @@ def build_parser():
     ag.add_argument("--agent-vault-secret-name", metavar="NAME",
                     dest="agent_vault_secret_name", default="",
                     help="Environment variable name (environment_variable credentials)")
-    ag.add_argument("--agent-vault-secret", metavar="VALUE", dest="agent_vault_secret",
-                    default="", help="The credential's secret value (write-only, never logged)")
+    ag.add_argument("--agent-vault-secret-file", metavar="FILE",
+                    dest="agent_vault_secret_file", default="",
+                    help="Read the credential secret from a mode 0600 or 0400 file; "
+                         "the value is never accepted on the command line")
     ag.add_argument("--agent-vault-allowed-domains", metavar="LIST",
                     dest="agent_vault_allowed_domains", default="",
                     help="Comma-separated allow-listed domains (environment_variable credentials)")
@@ -1439,6 +1442,21 @@ def main():
     # ── API key required ──
     key   = _api_key(args)
     model = _model(args)
+
+    try:
+        from wire.zc_agents_sdk import dispatch_managed_agent_command
+        from wire.zc_files import dispatch_file_command
+        from wire.zc_research import dispatch_research_command
+
+        if dispatch_managed_agent_command(args, key, model):
+            return
+        if dispatch_file_command(args, key, model):
+            return
+        if dispatch_research_command(args, key, model):
+            return
+    except (OSError, json.JSONDecodeError, ValueError) as exc:
+        print(f"[ERROR] {exc}", file=sys.stderr)
+        sys.exit(2)
 
     if args.interactive:
         from wire.zc_interactive import cmd_interactive

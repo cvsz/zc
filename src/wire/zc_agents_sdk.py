@@ -65,7 +65,8 @@ CLI flags:
                                  (with --agent-vault-add-credential)
   --agent-vault-mcp-url URL      MCP server URL (mcp_oauth/static_bearer)
   --agent-vault-secret-name NAME Environment variable name (environment_variable)
-  --agent-vault-secret VALUE     The credential's secret value (write-only)
+  --agent-vault-secret-file FILE Read the write-only credential secret from
+                                 a mode 0600 or 0400 file
   --agent-vault-allowed-domains LIST  Comma-separated allow-listed domains
                                  (environment_variable)
   --agent-vault-list             List vaults in the workspace
@@ -1684,6 +1685,225 @@ def cmd_agent_outcome_rubric_upload(file_path: str, api_key: str, model: str) ->
     print(f"  Reuse with: ai-coder --agent-managed-run \"...\" --agent-outcome \"...\" "
           f"--agent-outcome-rubric-file {result['id']}")
     return result["id"]
+
+
+def dispatch_managed_agent_command(
+    args: typing.Any,
+    api_key: str,
+    model: str,
+) -> bool:
+    """Dispatch one parsed hosted Managed Agents command."""
+    if args.agent_managed_run:
+        rubric = None
+        if args.agent_outcome_rubric:
+            rubric = Path(args.agent_outcome_rubric).read_text(encoding="utf-8")
+        overrides: dict | None = None
+        if args.agent_override_json:
+            loaded = json.loads(
+                Path(args.agent_override_json).read_text(encoding="utf-8")
+            )
+            if not isinstance(loaded, dict):
+                raise ValueError("--agent-override-json must contain a JSON object")
+            overrides = loaded
+        if args.agent_override_model or args.agent_override_system:
+            overrides = dict(overrides or {})
+            if args.agent_override_model:
+                overrides["model"] = args.agent_override_model
+            if args.agent_override_system:
+                overrides["system"] = args.agent_override_system
+        cmd_managed_agent_run(
+            args.agent_managed_run,
+            api_key,
+            model,
+            memory_store=args.agent_memory_store or None,
+            outcome_description=args.agent_outcome or None,
+            outcome_rubric=rubric,
+            outcome_rubric_file_id=args.agent_outcome_rubric_file or None,
+            outcome_max_iterations=args.agent_outcome_max_iter,
+            vault_id=args.agent_vault or None,
+            agent_overrides=overrides,
+            stream_deltas=args.agent_stream_deltas,
+        )
+    elif args.agent_memory_store_create:
+        if not args.agent_memory_store:
+            raise ValueError(
+                "--agent-memory-store-create requires --agent-memory-store"
+            )
+        cmd_agent_memory_store_create(args.agent_memory_store, api_key)
+    elif args.agent_memory_list:
+        depth = int(args.agent_memory_depth) if args.agent_memory_depth else None
+        cmd_agent_memory_list(
+            args.agent_memory_list,
+            api_key,
+            path_prefix=args.agent_memory_path_prefix or None,
+            depth=depth,
+        )
+    elif args.agent_memory_stores_list:
+        cmd_agent_memory_stores_list(
+            api_key,
+            include_archived=args.agent_memory_stores_include_archived,
+        )
+    elif args.agent_memory_store_archive:
+        cmd_agent_memory_store_archive(args.agent_memory_store_archive, api_key)
+    elif args.agent_memory_store_delete:
+        cmd_agent_memory_store_delete(
+            args.agent_memory_store_delete,
+            api_key,
+            confirm=args.agent_memory_store_delete_yes,
+        )
+    elif args.agent_memory_get:
+        if not args.agent_memory_id:
+            raise ValueError("--agent-memory-get requires --agent-memory-id")
+        cmd_agent_memory_get(args.agent_memory_get, args.agent_memory_id, api_key)
+    elif args.agent_memory_create:
+        if not args.agent_memory_path or not args.agent_memory_content:
+            raise ValueError(
+                "--agent-memory-create requires --agent-memory-path and "
+                "--agent-memory-content"
+            )
+        cmd_agent_memory_create(
+            args.agent_memory_create,
+            args.agent_memory_path,
+            args.agent_memory_content,
+            api_key,
+        )
+    elif args.agent_memory_update:
+        if not args.agent_memory_id:
+            raise ValueError("--agent-memory-update requires --agent-memory-id")
+        if not args.agent_memory_content and not args.agent_memory_path:
+            raise ValueError(
+                "--agent-memory-update requires --agent-memory-content or "
+                "--agent-memory-path"
+            )
+        cmd_agent_memory_update(
+            args.agent_memory_update,
+            args.agent_memory_id,
+            api_key,
+            content=args.agent_memory_content or None,
+            path=args.agent_memory_path or None,
+        )
+    elif args.agent_memory_delete:
+        if not args.agent_memory_id:
+            raise ValueError("--agent-memory-delete requires --agent-memory-id")
+        cmd_agent_memory_delete(
+            args.agent_memory_delete,
+            args.agent_memory_id,
+            api_key,
+            confirm=args.agent_memory_delete_yes,
+        )
+    elif args.agent_vault_create:
+        cmd_agent_vault_create(
+            args.agent_vault_create,
+            api_key,
+            external_user_id=args.agent_vault_external_user or None,
+        )
+    elif args.agent_vault_add_credential:
+        if not args.agent_vault_cred_type:
+            raise ValueError(
+                "--agent-vault-add-credential requires --agent-vault-cred-type"
+            )
+        secret_value = None
+        if args.agent_vault_secret_file:
+            secret_path = Path(args.agent_vault_secret_file)
+            if secret_path.stat().st_mode & 0o077:
+                raise ValueError(
+                    "--agent-vault-secret-file must have mode 0600 or 0400"
+                )
+            if secret_path.stat().st_size > 64 * 1024:
+                raise ValueError("--agent-vault-secret-file exceeds 64 KiB")
+            secret_value = secret_path.read_text(encoding="utf-8").rstrip("\r\n")
+            if not secret_value:
+                raise ValueError("--agent-vault-secret-file must not be empty")
+        domains = [
+            value.strip()
+            for value in args.agent_vault_allowed_domains.split(",")
+            if value.strip()
+        ]
+        cmd_agent_vault_add_credential(
+            args.agent_vault_add_credential,
+            args.agent_vault_cred_type,
+            api_key,
+            mcp_server_url=args.agent_vault_mcp_url or None,
+            secret_name=args.agent_vault_secret_name or None,
+            secret_value=secret_value,
+            allowed_domains=domains or None,
+            injection_location=args.agent_vault_injection_location or None,
+        )
+    elif args.agent_vault_list:
+        cmd_agent_vault_list(api_key)
+    elif args.agent_dream:
+        sessions = [
+            value.strip()
+            for value in args.agent_dream_sessions.split(",")
+            if value.strip()
+        ]
+        cmd_agent_dream(
+            args.agent_dream,
+            api_key,
+            model,
+            session_ids=sessions or None,
+            instructions=args.agent_dream_instructions or None,
+        )
+    elif args.agent_dream_get:
+        cmd_agent_dream_get(args.agent_dream_get, api_key)
+    elif args.agent_dream_list:
+        cmd_agent_dream_list(api_key)
+    elif args.agent_schedule_create:
+        if not args.agent_schedule_env or not args.agent_schedule_cron:
+            raise ValueError(
+                "--agent-schedule-create requires --agent-schedule-env and "
+                "--agent-schedule-cron"
+            )
+        cmd_agent_schedule_create(
+            args.agent_schedule_create,
+            args.agent_schedule_env,
+            args.agent_schedule_cron,
+            api_key,
+            timezone=args.agent_schedule_tz,
+            task=args.agent_schedule_task,
+        )
+    elif args.agent_schedule_list:
+        cmd_agent_schedule_list(api_key)
+    elif args.agent_schedule_cancel:
+        cmd_agent_schedule_cancel(args.agent_schedule_cancel, api_key)
+    elif args.agent_env_self_hosted:
+        cmd_agent_env_self_hosted_create(args.agent_env_self_hosted, api_key)
+    elif args.agent_env_work_stats:
+        cmd_agent_env_work_stats(args.agent_env_work_stats, api_key)
+    elif args.agent_webhook_register:
+        events = [
+            value.strip()
+            for value in args.agent_webhook_events.split(",")
+            if value.strip()
+        ]
+        cmd_agent_webhook_register(
+            args.agent_webhook_register,
+            api_key,
+            events=events or None,
+        )
+    elif args.agent_review_multiagent:
+        specialists = [
+            value.strip()
+            for value in args.agent_review_specialists.split(",")
+            if value.strip()
+        ]
+        if not specialists:
+            raise ValueError("--agent-review-specialists must not be empty")
+        cmd_agent_review_multiagent(
+            args.agent_review_multiagent,
+            specialists,
+            api_key,
+            model,
+        )
+    elif args.agent_outcome_rubric_upload:
+        cmd_agent_outcome_rubric_upload(
+            args.agent_outcome_rubric_upload,
+            api_key,
+            model,
+        )
+    else:
+        return False
+    return True
 
 
 # ── CLI entry points ───────────────────────────────────────────────────────

@@ -62,5 +62,9 @@ describe("ZcApiClient", () => {
       "response.output_text.delta",
       "response.completed",
     ]);
+    const [, init] = vi.mocked(globalThis.fetch).mock.calls[0];
+    expect(init?.headers).toMatchObject({
+      "Idempotency-Key": expect.any(String),
+    });
   });
 });

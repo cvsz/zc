@@ -23,11 +23,10 @@ class FakeRouter:
     async def acompletion(self, **kwargs: Any) -> Any:
         type(self).request = kwargs
         if kwargs.get("stream"):
+
             async def chunks():
                 yield SimpleNamespace(
-                    choices=[
-                        SimpleNamespace(delta=SimpleNamespace(content="routed "))
-                    ],
+                    choices=[SimpleNamespace(delta=SimpleNamespace(content="routed "))],
                     model="resolved-deployment",
                     usage=None,
                 )
@@ -45,9 +44,7 @@ class FakeRouter:
             return chunks()
         return SimpleNamespace(
             choices=[
-                SimpleNamespace(
-                    message=SimpleNamespace(content="routed inside zc")
-                )
+                SimpleNamespace(message=SimpleNamespace(content="routed inside zc"))
             ],
             model="resolved-deployment",
             usage=SimpleNamespace(prompt_tokens=11, completion_tokens=7),
@@ -143,7 +140,9 @@ async def test_ai_service_preserves_router_model_and_usage() -> None:
         def __init__(self, **_options: object) -> None:
             pass
 
-        async def generate(self, *_args: object, **_kwargs: object) -> ProviderGeneration:
+        async def generate(
+            self, *_args: object, **_kwargs: object
+        ) -> ProviderGeneration:
             return ProviderGeneration(
                 text="complete",
                 model="resolved-model",
@@ -195,10 +194,7 @@ def test_compose_starts_only_zc_with_embedded_router() -> None:
     service = compose["services"]["zc"]
     assert "depends_on" not in service
     assert service["environment"]["AI_PROVIDER"] == "${AI_PROVIDER:-litellm}"
-    assert (
-        service["environment"]["LITELLM_CONFIG_PATH"]
-        == "/app/litellm-config.yaml"
-    )
+    assert service["environment"]["LITELLM_CONFIG_PATH"] == "/app/litellm-config.yaml"
     assert service["environment"]["FRONTEND_ENABLED"] == "true"
     assert service["environment"]["REDIS_ENABLED"] == "false"
     assert service["network_mode"] == "host"
@@ -210,10 +206,17 @@ def test_router_config_has_no_proxy_master_key() -> None:
 
     assert "general_settings" not in router_config
     assert router_config["router_settings"]["num_retries"] == 2
-    assert any(
-        model["model_name"] == "zc-default"
+    default_model = next(
+        model
         for model in router_config["model_list"]
+        if model["model_name"] == "zc-default"
     )
+    assert default_model["model_info"] == {
+        "input_cost_per_token": 0.000002,
+        "output_cost_per_token": 0.00001,
+        "cache_creation_input_token_cost": 0.0000025,
+        "cache_read_input_token_cost": 0.0000002,
+    }
 
 
 def test_runtime_dependencies_pin_embedded_litellm() -> None:

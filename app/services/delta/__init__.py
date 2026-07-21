@@ -1,5 +1,5 @@
 # Delta Sync Service Package
-"""Enterprise-grade delta synchronization for wire CLI."""
+"""Local tenant-scoped delta synchronization."""
 
 from .sync_service import DeltaResult, DeltaSyncService
 

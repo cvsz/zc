@@ -1,4 +1,5 @@
 """tests/test_config.py"""
+
 import json
 
 from wire.config import Config

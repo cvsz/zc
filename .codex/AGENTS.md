@@ -11,7 +11,10 @@ This supplements the root `AGENTS.md` with a repo-local ECC baseline.
 ## MCP Baseline
 
 Treat `.codex/config.toml` as the default ECC-safe baseline for work in this repository.
-The generated baseline enables GitHub, Context7, Exa, Memory, Playwright, and Sequential Thinking.
+The generated baseline enables GitHub, Context7, Exa, Supabase, Cloudflare API,
+all Cloudflare product-specific MCP servers, Memory, Playwright, and Sequential
+Thinking. Exa, Supabase, and Cloudflare require local credentials or OAuth
+outside the repository.
 
 ## Multi-Agent Support
 

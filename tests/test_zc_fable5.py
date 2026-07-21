@@ -6,6 +6,7 @@ Covers both fallback patterns documented in zc_fable5.py:
   - legacy client-side manual retry (`fallback_chain` unset -> this
     module makes a second HTTP call itself on a refusal)
 """
+
 import pytest
 
 from wire.zc_fable5 import (
@@ -25,7 +26,11 @@ def _response(text="ok", stop_reason="end_turn", model=None, category=None):
     if model:
         data["model"] = model
     if stop_reason == "refusal":
-        data["stop_details"] = {"type": "refusal", "category": category, "explanation": ""}
+        data["stop_details"] = {
+            "type": "refusal",
+            "category": category,
+            "explanation": "",
+        }
     return data
 
 
@@ -34,8 +39,13 @@ def _response(text="ok", stop_reason="end_turn", model=None, category=None):
 
 def test_fallback_chain_no_refusal_reports_primary_served(monkeypatch):
     client = Fable5Client(api_key="k", fallback_chain=["zc-opus-4-8"])
-    monkeypatch.setattr(client, "_post", lambda payload, extra_headers=None: _response(
-        text="hello", stop_reason="end_turn", model=FABLE5_MODEL_ID))
+    monkeypatch.setattr(
+        client,
+        "_post",
+        lambda payload, extra_headers=None: _response(
+            text="hello", stop_reason="end_turn", model=FABLE5_MODEL_ID
+        ),
+    )
 
     result = client.call_with_fallback("hi")
 
@@ -52,8 +62,12 @@ def test_fallback_chain_refusal_served_by_fallback_model_single_call(monkeypatch
         calls.append(payload)
         # Platform handled the refusal+retry server-side; the response
         # reports the fallback model actually served the request.
-        return _response(text="handled by fallback", stop_reason="refusal",
-                         model="zc-opus-4-8", category="cyber")
+        return _response(
+            text="handled by fallback",
+            stop_reason="refusal",
+            model="zc-opus-4-8",
+            category="cyber",
+        )
 
     client = Fable5Client(api_key="k", fallback_chain=["zc-opus-4-8"])
     monkeypatch.setattr(client, "_post", fake_post)
@@ -90,7 +104,9 @@ def test_fallback_chain_attached_to_call_payload():
 def test_fallback_chain_not_attached_on_explicit_model_override():
     client = Fable5Client(api_key="k", fallback_chain=["zc-opus-4-8"])
     captured = {}
-    client._post = lambda payload, extra_headers=None: (captured.update(payload=payload) or _response())
+    client._post = lambda payload, extra_headers=None: (
+        captured.update(payload=payload) or _response()
+    )
 
     client.call("hi", model="zc-xxx")
 
@@ -106,7 +122,9 @@ def payload_has_fallbacks(payload):
 
 def test_manual_retry_no_refusal_returns_primary_response(monkeypatch):
     client = Fable5Client(api_key="k")  # no fallback_chain -> legacy path
-    monkeypatch.setattr(client, "_post", lambda payload, extra_headers=None: _response(text="fine"))
+    monkeypatch.setattr(
+        client, "_post", lambda payload, extra_headers=None: _response(text="fine")
+    )
 
     result = client.call_with_fallback("hi")
 
@@ -147,8 +165,13 @@ def test_manual_retry_falls_back_on_refusal_with_second_call(monkeypatch):
 
 def test_manual_retry_raises_refusal_error_when_fallback_disabled(monkeypatch):
     client = Fable5Client(api_key="k")
-    monkeypatch.setattr(client, "_post", lambda payload, extra_headers=None: _response(
-        stop_reason="refusal", category="frontier_llm"))
+    monkeypatch.setattr(
+        client,
+        "_post",
+        lambda payload, extra_headers=None: _response(
+            stop_reason="refusal", category="frontier_llm"
+        ),
+    )
 
     with pytest.raises(RefusalError) as exc_info:
         client.call_with_fallback("prompt", allow_fallback=False)
@@ -156,11 +179,18 @@ def test_manual_retry_raises_refusal_error_when_fallback_disabled(monkeypatch):
     assert exc_info.value.classifier == "frontier_llm"
 
 
-def test_manual_retry_raises_refusal_error_when_no_fallback_requested_and_category_null(monkeypatch):
+def test_manual_retry_raises_refusal_error_when_no_fallback_requested_and_category_null(
+    monkeypatch,
+):
     # category/explanation can legitimately be null even on a refusal.
     client = Fable5Client(api_key="k")
-    monkeypatch.setattr(client, "_post", lambda payload, extra_headers=None: _response(
-        stop_reason="refusal", category=None))
+    monkeypatch.setattr(
+        client,
+        "_post",
+        lambda payload, extra_headers=None: _response(
+            stop_reason="refusal", category=None
+        ),
+    )
 
     with pytest.raises(RefusalError) as exc_info:
         client.call_with_fallback("prompt", allow_fallback=False)
@@ -201,9 +231,7 @@ def test_primary_call_transport_error_short_circuits():
 
 
 def test_parse_fallback_chain_splits_and_strips():
-    assert parse_fallback_chain(" zc-opus-4-8 , zc-xxx ") == [
-        "zc-opus-4-8", "zc-xxx"
-    ]
+    assert parse_fallback_chain(" zc-opus-4-8 , zc-xxx ") == ["zc-opus-4-8", "zc-xxx"]
 
 
 def test_parse_fallback_chain_none_when_empty():
@@ -217,7 +245,9 @@ def test_parse_fallback_chain_rejects_more_than_three():
 
 
 def test_estimate_cost_usd_known_model():
-    cost = estimate_cost_usd(FABLE5_MODEL_ID, input_tokens=1_000_000, output_tokens=1_000_000)
+    cost = estimate_cost_usd(
+        FABLE5_MODEL_ID, input_tokens=1_000_000, output_tokens=1_000_000
+    )
     assert cost == pytest.approx(10.0 + 50.0)
 
 

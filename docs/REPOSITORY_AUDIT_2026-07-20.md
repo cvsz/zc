@@ -1,121 +1,188 @@
-# Repository Audit and Remediation Report — 2026-07-20
+# Repository Architecture Audit — 2026-07-20
 
-## Executive summary
+## Scope
 
-This report covers the repository-wide audit and remediation performed on branch `codex/fix-dev-httpx-dependency` for PR #11.
+This report records the current repository evidence for the canonical
+local-first `zcoder` runtime. It covers source wiring, persistence, packaging,
+the bundled frontend, container execution, native Ubuntu services, CI,
+release automation, and Terraform configuration. Historical upgrade and
+enterprise phase reports are point-in-time records and are not runtime proof.
 
-The original CI blocker was the invalid `httpx2` development dependency. The remediation was expanded to address the material packaging, runtime, Docker, CI, security, reliability, and documentation inconsistencies found during the audit.
+No Cloudflare resources were created or changed during this audit. No release,
+image, commit, or Git branch was published.
 
-## Remediation status
+## Canonical contract
 
-| Finding | Severity | Status | Resolution |
-|---|---|---|---|
-| Invalid `httpx2` dependency | P0 | Fixed | Replaced with `httpx>=0.27.0` |
-| Broken `zc`/`zcoder` entry points | P0 | Fixed | Added stable `app.main:cli` and package-install smoke tests |
-| Product identity conflict | P0 | Fixed for supported runtime | Canonical identity is `zcoder`; legacy `/v1/wire` routes remain for compatibility |
-| Version conflict | P1 | Fixed for supported runtime | Package, API, Docker, and living docs use `1.33.0` |
-| Port mismatch | P1 | Fixed | Local, CLI, Docker, CI, and docs use HTTP port `8000` |
-| Readiness hid startup failures | P1 | Fixed | Added structured component state and optional strict HTTP 503 behavior |
-| Print-based lifecycle logging | P1 | Fixed | Replaced lifecycle prints with Python logging |
-| Unsafe/invalid CORS defaults | P1 | Fixed | Production enables no cross-origin callers; debug wildcard has credentials disabled |
-| Nondeterministic `apt-get upgrade` | P1 | Fixed | Removed unrestricted OS upgrade from Docker build |
-| Changed-file-only Bandit gate | P1 | Fixed for supported runtime | CI scans all of `app/` with Bandit |
-| Missing package regression coverage | P1 | Fixed | CI installs package and runs `zc --help` and `zcoder --help` |
-| Documentation commands did not match code | P1 | Fixed | README and Quickstart now use executable commands and verified endpoints |
-| Broad legacy lint/security suppressions | P2 | Partially mitigated | Supported `app/` runtime is fully scanned; legacy trees still require incremental cleanup |
-| Lock files, SBOM, provenance | P2 | Open | Release-engineering work remains |
-| Multiple source/product trees | P2 | Open | Requires architecture decision and migration plan |
+| Concern | Current contract |
+|---|---|
+| Public hostname | `https://zeaz.dev` |
+| Origin | FastAPI on `127.0.0.1:8000` |
+| Edge | Cloudflare Access and remotely managed Tunnel |
+| Application authorization | Short-lived JWT, RBAC, and tenant checks |
+| AI routing | Embedded LiteLLM Router; no separate proxy |
+| Storage | Local filesystem, atomic JSON, and local SQLite |
+| Upload publication | Tenant-scoped quarantine only |
+| gRPC | Disabled in the public profile; loopback-only when enabled |
+| Optional services | Redis and gRPC disabled by default; local logs only |
+| Production workers | Exactly one |
 
-## Canonical supported runtime contract
+## Verified repository evidence
 
-- Product and package: `zcoder`
-- Version: `1.33.0`
-- Python: 3.11 and 3.12
-- Installed commands: `zc`, `zcoder`
-- Application: `app.main:app`
-- HTTP port: `8000`
-- Readiness: `GET /ready`
-- Liveness: `GET /v1/wire/health/live`
-- Legacy route prefix: `/v1/wire`, retained for backward compatibility
+- Production configuration fails closed unless authentication, Cloudflare
+  Access verification, exact `https://zeaz.dev` CORS, rate limiting, strict
+  readiness, persistent encryption material, and provider credentials are
+  configured. Unknown environment names are rejected, the production provider
+  must be embedded LiteLLM, and enabled gRPC can bind only to loopback with a
+  valid adjacent port. Canonical application identity and version cannot be
+  spoofed through environment overrides, and executable tests require both
+  environment examples to cover every runtime-owned setting.
+- Cloudflare Access assertions are verified at the origin against the team
+  JWKS with RS256, issuer, audience, expiry, issued-at, and subject checks.
+  JWKS fetches reject redirects, nonstandard team origins, and response bodies
+  larger than 256 KiB before buffering them in full.
+- Mutating routes require application authentication and durable
+  idempotency keys. Operational compatibility health routes require
+  application roles; only canonical local probes bypass origin Access.
+  Durable replay namespaces include the verified subject, tenant, and complete
+  application-role set, so a lower-privilege token cannot replay a response
+  produced under a higher-privilege token.
+- Upload state survives restart through atomic session metadata. Chunk and
+  final BLAKE3 digests, tenant ownership, size limits, free-space reservation,
+  symlink safety, quarantine publication, cleanup, and directory permissions
+  are enforced. Raw and multipart chunk ingestion resolves the session before
+  consuming file data and applies the exact expected chunk-size budget while
+  streaming.
+- Chat JSON writes are atomic and stale writes are rejected. SQLite resource
+  updates use optimistic concurrency so concurrent requests cannot silently
+  overwrite newer nested state.
+- File blobs use exclusive no-follow creation, mode `0600`, fsync, tenant
+  directories with mode `0700`, and no-follow reads. Multipart files remain
+  quarantined and unavailable to downloads or AI context until a trusted
+  local scanner marks them available; no public promotion route exists.
+- Managed worker environments, schedules, webhook delivery, and vault-backed
+  execution fail closed with HTTP 501 because the standalone runtime has no
+  dispatcher or worker for them. The API does not create misleading active
+  resources for unavailable capabilities. Iterative outcome evaluation and
+  chat-session dream inputs fail closed for the same reason; archived memory
+  stores cannot be used for new execution.
+- The Docker image runs as an unprivileged user and starts the validated
+  application CLI. Native systemd units use separate `zc` and `cloudflared`
+  users with hardened service settings.
+- Optional Redis/Valkey is restricted to a loopback URL in production. Its
+  circuit breaker has explicit closed, open, and single-probe half-open
+  behavior; authenticated health output redacts connection failures, and
+  Redis-backed rate limiting returns a sanitized 503 instead of falling open.
+- Unwired mock RBAC, latency-profiler, and OpenTelemetry exporter modules were
+  removed from the supported core. Request duration remains real structured
+  log data; gRPC reports measured transfer and delta timing without synthetic
+  latency percentiles.
+- Terraform uses the Cloudflare provider v5 contract, creates Access before
+  routing, requires explicit user and service-token policies, routes only to
+  loopback, requires Access at cloudflared, and terminates ingress with 404.
+- CI checks formatting, lint, typing, tests, the frontend, package contents,
+  all executable Python surfaces with Bandit, repository secrets with
+  Gitleaks, and a production-profile container smoke test.
+- Release automation validates the source version against an existing tag,
+  smoke-tests the production image before publication, publishes a
+  versioned image with SBOM and provenance, records its digest, and attaches
+  the built wheel to the GitHub release.
 
-## Reliability behavior
+## Verification commands
 
-Application lifespan records state for:
+The local completion gate is:
 
-- Redis cache
-- shared HTTP client
-- upload manager
-- optional gRPC server
+```bash
+pytest -q
+ruff check app tests
+ruff format --check app tests
+mypy app
+bandit -q -c pyproject.toml -r app src/wire webapp/backend
+gitleaks detect --no-banner --redact
+npm --prefix webapp/frontend-src test -- --run
+npm --prefix webapp/frontend-src run typecheck
+npm --prefix webapp/frontend-src run build
+npm --prefix webapp/frontend-src audit --audit-level=moderate
+terraform -chdir=infra/cloudflare fmt -check -recursive
+terraform -chdir=infra/cloudflare init -backend=false
+terraform -chdir=infra/cloudflare validate
+make requirements-lock-check
+make package-wheel
+git diff --check
+```
 
-Readiness returns a component map and a list of failed components.
+Container verification must additionally start the image with the complete
+production environment, verify `/ready`, verify an unauthenticated request is
+denied, and reject warning or traceback output.
 
-- `STRICT_READINESS=false`: degraded optional integrations return HTTP 200 with `status: degraded`.
-- `STRICT_READINESS=true`: any enabled failed component returns HTTP 503.
-- The standalone Docker profile disables Redis, protobuf/gRPC, NATS, and OpenTelemetry by default so the image has an explicit dependency-free baseline.
+## Evidence not available locally
 
-## Security improvements
+The following remain unverified until an operator supplies real account state
+and explicitly approves external changes:
 
-- Production CORS no longer uses the invalid `http://localhost:*` pattern.
-- Wildcard development origins are never combined with credentialed CORS.
-- Container execution remains non-root and uses a non-login shell.
-- Docker health checks use loopback and the canonical readiness endpoint.
-- CI runs Bandit across the full supported `app/` runtime rather than only changed files.
-- CI keeps CodeQL and adds package and container smoke validation.
+- Terraform plan against the real Cloudflare account and zone;
+- Terraform apply, DNS, Tunnel, and Access policy state;
+- real Access denial and allow flows through `https://zeaz.dev`;
+- LAN verification that ports 8000 and 8001 are unreachable;
+- tunnel-path latency, throughput, and upload-limit benchmarks;
+- offline backup restoration on an isolated host.
 
-## CI definition of done
+These are operational gates, not claims established by repository tests.
 
-The updated workflow requires:
+## Current host observation
 
-1. Ruff over the repository.
-2. Black over `app/` and `tests/`.
-3. mypy.
-4. Bandit over all of `app/`.
-5. Package installation and console-command smoke tests.
-6. pytest on Python 3.11 and 3.12.
-7. Web application tests.
-8. Coverage artifact generation.
-9. Docker build, container start, readiness, and liveness checks.
-10. CodeQL through the existing workflow.
+Read-only inspection on 2026-07-20 found that the repository deployment units
+are not installed: `zc.service` and `cloudflared-zc.service` are absent, no
+process listens on ports 8000 or 8001, and `/etc/zc/zc.env` plus the dedicated
+cloudflared token file do not exist.
 
-## Documentation policy
+The host instead runs a pre-existing `cloudflared.service` for the
+`zeaz-platform` tunnel as the interactive `zeazdev` user. Its local ingress
+maps `zeaz.dev` to `127.0.0.1:3003`, contains a wildcard hostname, and ends in
+HTTP 418. This conflicts with the canonical zc contract of a separate service
+user, `127.0.0.1:8000`, explicit Access protection, and a final HTTP 404 rule.
+An unauthenticated public request returned HTTP 404 from Cloudflare, which does
+not prove an Access deny flow.
 
-Living documents updated by this remediation:
+All configured Cloudflare API-token variants returned HTTP 401 during
+read-only DNS, Tunnel, and Access queries. No token was rotated and no account
+resource was changed. The current account state therefore remains unverified,
+and Terraform planning/import must not proceed until an operator supplies a
+working scoped token plus explicit Access identities and service-token IDs.
 
-- `README.md`
-- `QUICKSTART.md`
-- this audit report
+## Repository hygiene
 
-Historical upgrade reports, phase-completion records, and `.zc/skills/**/SKILL.md` files are not mass-rewritten. They are point-in-time evidence or operational agent instructions and should change only through explicit correction notices or corresponding behavior changes.
+`.web-venv/` previously contributed 11,862 generated files and approximately
+498 MiB to the Git index. It is now removed from the index and remains ignored;
+the operator's local environment is preserved on disk. A quality-policy test
+prevents `.venv/` or `.web-venv/` content from being tracked again.
 
-## Residual risks and next work
+The stale `mypy_errors.txt` report is removed in the current worktree. It
+described retired modules rather than the current type-check result and is now
+covered by an ignore rule for local reports. The deletion still needs to be
+included in the final repository change set before claiming the tracked index
+is clean.
 
-### Release reproducibility
+## Continuation audit — 2026-07-21
 
-- Generate hash-locked production dependencies.
-- Pin critical GitHub Actions to reviewed commit SHAs.
-- Produce SBOM and provenance attestations.
-- Sign or otherwise attest release images.
+The current structure is repo-complete for the canonical local-first
+application boundary, but not operationally complete for public production.
+The strongest local evidence is executable: targeted contract tests pass for
+runtime configuration, Cloudflare Access verification, Terraform structure,
+product boundaries, quality policy, and upload durability. Terraform validates
+locally against the checked-in provider lock and the Cloudflare configuration
+still routes one same-origin hostname to `http://127.0.0.1:8000` with Access
+required and a final `http_status:404` ingress rule.
 
-### Legacy tree consolidation
+The native preflight source units also pass `systemd-analyze verify`. The
+preflight script now treats an unqueryable systemd manager as unknown evidence
+instead of reporting that services are absent or inactive. This matters in
+sandboxed or non-systemd contexts where `systemctl` exists but cannot connect
+to the host bus.
 
-The repository still contains overlapping surfaces under `app/`, `src/wire/`, `webapp/`, and `.zc/`. A formal architecture decision should classify each as supported, experimental, legacy, or separately packaged.
-
-### Suppression cleanup
-
-Global Ruff and Bandit exceptions outside the supported runtime should be replaced incrementally with narrow, justified suppressions. The new full `app/` Bandit gate prevents new supported-runtime regressions while legacy cleanup proceeds.
-
-### Benchmark evidence
-
-Historical numerical performance claims are not considered current production evidence. A future benchmark report should version:
-
-- workload and dataset
-- hardware and operating system
-- dependency lock
-- commands and configuration
-- raw results
-- statistical method
-- CI artifact links
-
-## Audit limitations
-
-This work is a repository, code, packaging, container, CI, and documentation audit. It is not a production penetration test, load test, chaos exercise, Kubernetes deployment certification, or validation of external provider behavior.
+Current read-only host evidence still does not prove public-local deployment:
+no listener is active on ports 8000 or 8001, `zc.service` and
+`cloudflared-zc.service` cannot be verified from this context, the production
+environment and tunnel token files are not installed, and the observed
+cloudflared process belongs to an existing `zeaz-platform` tunnel rather than
+the canonical zc tunnel. Those are operator/external gates, not repository
+implementation gaps.

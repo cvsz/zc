@@ -92,9 +92,7 @@ async def get_project(
     service: DomainResourceService = Depends(get_domain_resource_service),
 ) -> dict:
     return {
-        "data": await service.store.get(
-            principal.tenant_id, "projects", project_id
-        )
+        "data": await service.store.get(principal.tenant_id, "projects", project_id)
     }
 
 
@@ -106,9 +104,7 @@ async def patch_project(
     service: DomainResourceService = Depends(get_domain_resource_service),
 ) -> dict:
     return {
-        "data": await service.patch_project(
-            principal.tenant_id, project_id, request
-        )
+        "data": await service.patch_project(principal.tenant_id, project_id, request)
     }
 
 
@@ -143,9 +139,7 @@ async def create_project_plan(
     service: DomainResourceService = Depends(get_domain_resource_service),
 ) -> dict:
     return {
-        "data": await service.plan_project(
-            principal.tenant_id, project_id, request
-        )
+        "data": await service.plan_project(principal.tenant_id, project_id, request)
     }
 
 
@@ -245,9 +239,7 @@ async def get_artifact(
     service: DomainResourceService = Depends(get_domain_resource_service),
 ) -> dict:
     return {
-        "data": await service.store.get(
-            principal.tenant_id, "artifacts", artifact_id
-        )
+        "data": await service.store.get(principal.tenant_id, "artifacts", artifact_id)
     }
 
 
@@ -259,9 +251,7 @@ async def patch_artifact(
     service: DomainResourceService = Depends(get_domain_resource_service),
 ) -> dict:
     return {
-        "data": await service.patch_artifact(
-            principal.tenant_id, artifact_id, request
-        )
+        "data": await service.patch_artifact(principal.tenant_id, artifact_id, request)
     }
 
 
@@ -335,11 +325,7 @@ async def get_research_report(
     principal: Principal = Depends(_read),
     service: DomainResourceService = Depends(get_domain_resource_service),
 ) -> dict:
-    return {
-        "data": await service.store.get(
-            principal.tenant_id, "research", report_id
-        )
-    }
+    return {"data": await service.store.get(principal.tenant_id, "research", report_id)}
 
 
 @router.delete("/research-reports/{report_id}", status_code=204)
@@ -362,16 +348,13 @@ async def create_file(
     from app.core.config import get_config
 
     maximum = get_config().max_message_size
-    content = bytearray()
-    while chunk := await upload.read(1024 * 1024):
-        content.extend(chunk)
-        if len(content) > maximum:
-            raise ValueError("file exceeds the API upload limit")
+    await upload.seek(0)
     item = await service.create_file(
         principal.tenant_id,
         upload.filename or "",
         upload.content_type,
-        bytes(content),
+        upload.file,
+        maximum,
     )
     response.headers["Location"] = f"/v1/files/{item['id']}"
     item.pop("blob_path", None)
@@ -410,18 +393,17 @@ async def download_file(
     principal: Principal = Depends(_read),
     service: DomainResourceService = Depends(get_domain_resource_service),
 ) -> StreamingResponse:
-    metadata, data = await service.file_content(principal.tenant_id, file_id)
-
-    async def content_stream() -> AsyncIterator[bytes]:
-        yield data
+    metadata, content_stream = await service.file_stream(
+        principal.tenant_id,
+        file_id,
+    )
 
     return StreamingResponse(
-        content_stream(),
+        content_stream,
         media_type=metadata["content_type"],
         headers={
             "Content-Disposition": (
-                "attachment; filename*=UTF-8''"
-                f"{quote(metadata['filename'], safe='')}"
+                f"attachment; filename*=UTF-8''{quote(metadata['filename'], safe='')}"
             )
         },
     )
@@ -434,9 +416,7 @@ async def ask_file(
     principal: Principal = Depends(_write),
     service: DomainResourceService = Depends(get_domain_resource_service),
 ) -> dict:
-    return {
-        "data": await service.ask_file(principal.tenant_id, file_id, request)
-    }
+    return {"data": await service.ask_file(principal.tenant_id, file_id, request)}
 
 
 @router.delete("/files/{file_id}", status_code=204)
@@ -480,11 +460,7 @@ async def get_managed_agent_run(
     principal: Principal = Depends(_read),
     service: DomainResourceService = Depends(get_domain_resource_service),
 ) -> dict:
-    return {
-        "data": await service.store.get(
-            principal.tenant_id, "agent-runs", run_id
-        )
-    }
+    return {"data": await service.store.get(principal.tenant_id, "agent-runs", run_id)}
 
 
 @router.post("/agent-dreams", status_code=201)
@@ -519,9 +495,7 @@ async def get_agent_dream(
     service: DomainResourceService = Depends(get_domain_resource_service),
 ) -> dict:
     return {
-        "data": await service.store.get(
-            principal.tenant_id, "agent-dreams", dream_id
-        )
+        "data": await service.store.get(principal.tenant_id, "agent-dreams", dream_id)
     }
 
 
@@ -589,9 +563,7 @@ async def create_agent_vault_credential(
     principal: Principal = Depends(_admin),
     service: DomainResourceService = Depends(get_domain_resource_service),
 ) -> dict:
-    item = await service.add_vault_credential(
-        principal.tenant_id, vault_id, request
-    )
+    item = await service.add_vault_credential(principal.tenant_id, vault_id, request)
     response.headers["Location"] = (
         f"/v1/agent-vaults/{vault_id}/credentials/{item['id']}"
     )
@@ -627,11 +599,7 @@ async def cancel_agent_schedule(
     principal: Principal = Depends(_admin),
     service: DomainResourceService = Depends(get_domain_resource_service),
 ) -> dict:
-    return {
-        "data": await service.cancel_schedule(
-            principal.tenant_id, schedule_id
-        )
-    }
+    return {"data": await service.cancel_schedule(principal.tenant_id, schedule_id)}
 
 
 @router.post("/agent-environments", status_code=201)
@@ -685,9 +653,7 @@ async def get_multiagent_review(
     service: DomainResourceService = Depends(get_domain_resource_service),
 ) -> dict:
     return {
-        "data": await service.store.get(
-            principal.tenant_id, "agent-reviews", review_id
-        )
+        "data": await service.store.get(principal.tenant_id, "agent-reviews", review_id)
     }
 
 
@@ -715,9 +681,7 @@ async def list_memory_stores(
         principal.tenant_id, "memory-stores", limit=10_000, offset=0
     )
     filtered = [
-        item
-        for item in all_items
-        if include_archived or item["status"] != "archived"
+        item for item in all_items if include_archived or item["status"] != "archived"
     ]
     return _page(filtered[offset : offset + limit], len(filtered), limit, offset)
 
@@ -728,9 +692,7 @@ async def archive_memory_store(
     principal: Principal = Depends(_write),
     service: DomainResourceService = Depends(get_domain_resource_service),
 ) -> dict:
-    return {
-        "data": await service.archive_memory_store(principal.tenant_id, store_id)
-    }
+    return {"data": await service.archive_memory_store(principal.tenant_id, store_id)}
 
 
 @router.delete("/memory-stores/{store_id}", status_code=204)
@@ -752,9 +714,7 @@ async def create_memory(
     service: DomainResourceService = Depends(get_domain_resource_service),
 ) -> dict:
     item = await service.create_memory(principal.tenant_id, store_id, request)
-    response.headers["Location"] = (
-        f"/v1/memory-stores/{store_id}/memories/{item['id']}"
-    )
+    response.headers["Location"] = f"/v1/memory-stores/{store_id}/memories/{item['id']}"
     return {"data": item}
 
 
@@ -818,9 +778,7 @@ async def patch_memory(
     }
 
 
-@router.delete(
-    "/memory-stores/{store_id}/memories/{memory_id}", status_code=204
-)
+@router.delete("/memory-stores/{store_id}/memories/{memory_id}", status_code=204)
 async def delete_memory(
     store_id: str,
     memory_id: str,
@@ -828,9 +786,7 @@ async def delete_memory(
     service: DomainResourceService = Depends(get_domain_resource_service),
 ) -> Response:
     await service.store.get(principal.tenant_id, "memory-stores", store_id)
-    await service.store.delete(
-        principal.tenant_id, f"memories:{store_id}", memory_id
-    )
+    await service.store.delete(principal.tenant_id, f"memories:{store_id}", memory_id)
     return Response(status_code=204)
 
 

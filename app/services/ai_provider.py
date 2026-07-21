@@ -104,8 +104,7 @@ class AnthropicCoderAdapter:
                 ) as response:
                     if response.status >= 400:
                         return (
-                            f"[API ERROR {response.status}] "
-                            "AI provider request failed"
+                            f"[API ERROR {response.status}] AI provider request failed"
                         )
                     body = json.loads(await response.text())
         except (aiohttp.ClientError, TimeoutError, ValueError):

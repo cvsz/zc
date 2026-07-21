@@ -4,7 +4,9 @@ IFS=$'\n\t'
 usage() { cat <<'USAGE'
 Usage: scripts/cloudflare/setup-cloudflare-tunnel.sh [--api-check]
 
-Offline by default. Prints safe operator commands. With --api-check, verifies cloudflared is installed and token env names are present, but does not create routes unless CONFIRM_APPLY=yes.
+Offline by default. Prints safe operator commands for the Terraform-managed
+Tunnel. With --api-check, verifies cloudflared and a permission-restricted
+token file without creating or changing Cloudflare resources.
 USAGE
 }
 log() { printf '[zeaz-cloudflare-setup] %s\n' "$*"; }
@@ -15,14 +17,27 @@ if ! $api_check; then
   log 'offline validation complete; no Cloudflare API calls made'
   cat <<'NEXT'
 Manual next steps after setting local secrets:
-  cloudflared tunnel login
-  cloudflared tunnel create "$CLOUDFLARE_TUNNEL_NAME"
-  cloudflared tunnel route dns "$CLOUDFLARE_TUNNEL_NAME" <hostname>
-  cloudflared tunnel --config generated/cloudflare/zc-production-tunnel-ingress.yml run
+  sudo install -d -o root -g cloudflared -m 750 /etc/cloudflared
+  sudo install -o cloudflared -g cloudflared -m 400 <downloaded-token-file> /etc/cloudflared/zc.token
+  sudo -u cloudflared cloudflared tunnel --no-autoupdate run --token-file /etc/cloudflared/zc.token
+
+Terraform owns the Tunnel, Access application, policies, ingress, and DNS.
+Do not create routes manually.
 NEXT
   exit 0
 fi
 command -v cloudflared >/dev/null 2>&1 || { log 'cloudflared not found'; exit 3; }
-: "${CLOUDFLARE_TUNNEL_NAME:?CLOUDFLARE_TUNNEL_NAME required for api check}"
-[[ "${CONFIRM_APPLY:-}" == yes ]] || { log 'api-check passed locally; set CONFIRM_APPLY=yes for manual route creation commands'; exit 0; }
-log 'CONFIRM_APPLY=yes set, but this script intentionally does not automate DNS route creation yet; run printed commands manually.'
+token_file="${CLOUDFLARE_TUNNEL_TOKEN_FILE:-/etc/cloudflared/zc.token}"
+[[ -f "$token_file" ]] || { log "token file not found: $token_file"; exit 4; }
+mode="$(stat -c '%a' "$token_file")"
+owner="$(stat -c '%U' "$token_file")"
+[[ "$mode" == "600" || "$mode" == "400" ]] || {
+  log "token file mode must be 600 or 400, got $mode"
+  exit 5
+}
+[[ "$owner" == "cloudflared" ]] || {
+  log "token file must be owned by cloudflared, got $owner"
+  exit 6
+}
+log "api-check passed; token file is present with restrictive permissions"
+log "no Cloudflare changes were made"

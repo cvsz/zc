@@ -8,6 +8,7 @@ per model. See docs/42_upgrade_v1.30.0.md for the full audit — before
 this fix, --thinking always sent manual budget_tokens, which is a 400
 error on every current-generation model except Opus 4.5 and Haiku 4.5.
 """
+
 import sys
 import types
 from unittest.mock import MagicMock
@@ -29,6 +30,7 @@ def thinking_mod(monkeypatch):
     import importlib
 
     import wire.zc_thinking as mod
+
     importlib.reload(mod)
     return mod
 
@@ -43,6 +45,7 @@ def _fake_message_response():
 
 # ── display_omitted (pre-existing v1.25.0 behaviour, still correct) ────────
 
+
 def test_generate_with_thinking_display_omitted_sets_field(thinking_mod):
     tc = thinking_mod.ThinkingCoder(api_key="sk-test", model="zc-opus-4-5")
     tc.client.messages.create.return_value = _fake_message_response()
@@ -53,7 +56,9 @@ def test_generate_with_thinking_display_omitted_sets_field(thinking_mod):
     assert kwargs["thinking"]["display"] == "omitted"
 
 
-def test_generate_with_thinking_display_omitted_default_false_no_regression(thinking_mod):
+def test_generate_with_thinking_display_omitted_default_false_no_regression(
+    thinking_mod,
+):
     tc = thinking_mod.ThinkingCoder(api_key="sk-test", model="zc-opus-4-5")
     tc.client.messages.create.return_value = _fake_message_response()
 
@@ -64,6 +69,7 @@ def test_generate_with_thinking_display_omitted_default_false_no_regression(thin
 
 
 # ── v1.30.0: model-aware adaptive/legacy routing ───────────────────────────
+
 
 def test_adaptive_capable_model_auto_selects_adaptive(thinking_mod):
     """Regression test for the core v1.30.0 bug: a bare --thinking on a
@@ -101,7 +107,9 @@ def test_manual_only_model_auto_selects_legacy_budget(thinking_mod):
     assert "output_config" not in kwargs
 
 
-def test_effort_legacy_budget_forces_manual_on_deprecated_but_supported_model(thinking_mod):
+def test_effort_legacy_budget_forces_manual_on_deprecated_but_supported_model(
+    thinking_mod,
+):
     """Opus 4.6 / Sonnet 4.6: budget_tokens is deprecated but still
     accepted, so --effort-legacy-budget should be allowed to force it."""
     tc = thinking_mod.ThinkingCoder(api_key="sk-test", model="zc-sonnet-4-6")
@@ -120,7 +128,9 @@ def test_effort_legacy_budget_refuses_on_hard_400_model(thinking_mod):
     never send the doomed request."""
     tc = thinking_mod.ThinkingCoder(api_key="sk-test", model="zc-xxx")
 
-    with pytest.raises(thinking_mod.ThinkingModeError, match="budget_tokens is not accepted"):
+    with pytest.raises(
+        thinking_mod.ThinkingModeError, match="budget_tokens is not accepted"
+    ):
         tc.generate_with_thinking("q", legacy_budget=True)
 
     tc.client.messages.create.assert_not_called()
@@ -129,11 +139,15 @@ def test_effort_legacy_budget_refuses_on_hard_400_model(thinking_mod):
 def test_explicit_adaptive_true_on_manual_only_model_raises(thinking_mod):
     tc = thinking_mod.ThinkingCoder(api_key="sk-test", model="zc-haiku-4-5-20251001")
 
-    with pytest.raises(thinking_mod.ThinkingModeError, match="doesn't support adaptive"):
+    with pytest.raises(
+        thinking_mod.ThinkingModeError, match="doesn't support adaptive"
+    ):
         tc.generate_with_thinking("q", adaptive=True)
 
 
-def test_explicit_adaptive_false_with_legacy_budget_raises_on_hard_400_model(thinking_mod):
+def test_explicit_adaptive_false_with_legacy_budget_raises_on_hard_400_model(
+    thinking_mod,
+):
     tc = thinking_mod.ThinkingCoder(api_key="sk-test", model="zc-xxx")
     tc.client.messages.create.return_value = _fake_message_response()
 
@@ -165,25 +179,36 @@ def test_streaming_uses_same_adaptive_routing(thinking_mod):
 
 # ── routing helper functions ────────────────────────────────────────────
 
+
 def test_supports_adaptive_thinking_matrix(thinking_mod):
-    for model in ("zc-xxx", "zc-opus-4-8", "zc-opus-4-7",
-                   "zc-mythos-5", "zc-fable-5",
-                   "zc-opus-4-6", "zc-sonnet-4-6"):
+    for model in (
+        "zc-xxx",
+        "zc-opus-4-8",
+        "zc-opus-4-7",
+        "zc-mythos-5",
+        "zc-fable-5",
+        "zc-opus-4-6",
+        "zc-sonnet-4-6",
+    ):
         assert thinking_mod.supports_adaptive_thinking(model), model
     for model in ("zc-opus-4-5", "zc-haiku-4-5-20251001", "zc-sonnet-4-5"):
         assert not thinking_mod.supports_adaptive_thinking(model), model
 
 
 def test_supports_manual_budget_tokens_matrix(thinking_mod):
-    for model in ("zc-opus-4-8", "zc-opus-4-7", "zc-xxx",
-                   "zc-mythos-5", "zc-fable-5"):
+    for model in ("zc-opus-4-8", "zc-opus-4-7", "zc-xxx", "zc-mythos-5", "zc-fable-5"):
         assert not thinking_mod.supports_manual_budget_tokens(model), model
-    for model in ("zc-opus-4-6", "zc-sonnet-4-6", "zc-opus-4-5",
-                   "zc-haiku-4-5-20251001"):
+    for model in (
+        "zc-opus-4-6",
+        "zc-sonnet-4-6",
+        "zc-opus-4-5",
+        "zc-haiku-4-5-20251001",
+    ):
         assert thinking_mod.supports_manual_budget_tokens(model), model
 
 
 # ── cmd_thinking wiring ─────────────────────────────────────────────────
+
 
 def test_cmd_thinking_threads_display_omitted(thinking_mod, monkeypatch):
     captured = {}
@@ -202,8 +227,14 @@ def test_cmd_thinking_threads_display_omitted(thinking_mod, monkeypatch):
     monkeypatch.setattr(thinking_mod, "ThinkingCoder", FakeCoder)
 
     thinking_mod.cmd_thinking(
-        "q", api_key="sk-test", model="zc-xxx", budget=8000,
-        effort=None, adaptive=None, show_thinking=False, stream=False,
+        "q",
+        api_key="sk-test",
+        model="zc-xxx",
+        budget=8000,
+        effort=None,
+        adaptive=None,
+        show_thinking=False,
+        stream=False,
         display_omitted=True,
     )
 
@@ -227,18 +258,27 @@ def test_cmd_thinking_threads_legacy_budget_flag(thinking_mod, monkeypatch):
     monkeypatch.setattr(thinking_mod, "ThinkingCoder", FakeCoder)
 
     thinking_mod.cmd_thinking(
-        "q", api_key="sk-test", model="zc-opus-4-5", budget=8000,
-        effort=None, adaptive=None, show_thinking=False, stream=False,
+        "q",
+        api_key="sk-test",
+        model="zc-opus-4-5",
+        budget=8000,
+        effort=None,
+        adaptive=None,
+        show_thinking=False,
+        stream=False,
         legacy_budget=True,
     )
 
     assert captured["legacy_budget"] is True
 
 
-def test_cmd_thinking_reads_correct_thinking_tokens_usage_field(thinking_mod, monkeypatch, capsys):
+def test_cmd_thinking_reads_correct_thinking_tokens_usage_field(
+    thinking_mod, monkeypatch, capsys
+):
     """Regression test: the old code read usage['thinking_input_tokens'],
     which doesn't exist in the real API response shape and always printed
     0. The real field is usage['output_tokens_details']['thinking_tokens']."""
+
     class FakeCoder:
         def __init__(self, api_key, model):
             pass
@@ -259,8 +299,14 @@ def test_cmd_thinking_reads_correct_thinking_tokens_usage_field(thinking_mod, mo
     monkeypatch.setattr(thinking_mod, "ThinkingCoder", FakeCoder)
 
     thinking_mod.cmd_thinking(
-        "q", api_key="sk-test", model="zc-xxx", budget=8000,
-        effort=None, adaptive=None, show_thinking=False, stream=False,
+        "q",
+        api_key="sk-test",
+        model="zc-xxx",
+        budget=8000,
+        effort=None,
+        adaptive=None,
+        show_thinking=False,
+        stream=False,
     )
 
     out = capsys.readouterr().out

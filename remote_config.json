@@ -1,0 +1,66 @@
+{
+  "ingress": [
+    {
+      "service": "http://z-platform-agent-orchestrator-1:8500",
+      "hostname": "orchestrator.zeaz.dev"
+    },
+    {
+      "service": "http://z-platform-agent-provider-1:8800",
+      "hostname": "provider.zeaz.dev"
+    },
+    {
+      "service": "http://z-platform-ai-gateway-1:8400",
+      "hostname": "ai.zeaz.dev"
+    },
+    {
+      "service": "http://z-platform-billing-ledger-1:8700",
+      "hostname": "billing.zeaz.dev"
+    },
+    {
+      "service": "http://127.0.0.1:80",
+      "hostname": "grafana.zeaz.dev"
+    },
+    {
+      "service": "http://z-platform-phase6-jaeger-1:16686",
+      "hostname": "jaeger.zeaz.dev"
+    },
+    {
+      "service": "http://phase6-api:8080",
+      "hostname": "phase6.zeaz.dev"
+    },
+    {
+      "service": "http://127.0.0.1:80",
+      "hostname": "prometheus.zeaz.dev"
+    },
+    {
+      "service": "http://z-platform-workspace-runtime-1:8600",
+      "hostname": "workspace.zeaz.dev"
+    },
+    {
+      "service": "http://zaicoder-web:3005",
+      "hostname": "zai.zeaz.dev"
+    },
+    {
+      "service": "http://127.0.0.1:3021",
+      "hostname": "zchat.zeaz.dev"
+    },
+    {
+      "service": "http://127.0.0.1:3021",
+      "hostname": "zchat-staging.zeaz.dev"
+    },
+    {
+      "service": "http://127.0.0.1:3021",
+      "hostname": "zchat-web.zeaz.dev"
+    },
+    {
+      "service": "http://zwallet:3040",
+      "hostname": "wallet.zeaz.dev"
+    },
+    {
+      "service": "http_status:404"
+    }
+  ],
+  "warp-routing": {
+    "enabled": false
+  }
+}

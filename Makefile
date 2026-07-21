@@ -1,43 +1,29 @@
-.PHONY: install install-dev test test-cov lint format typecheck security check run tui docker-build docker-run health clean \
-        build start stop restart update upgrade updgrade status logs bootstrap requirements-lock requirements-lock-check
+.PHONY: setup install install-dev test test-cov lint format typecheck security audit check run tui \
+        docker-build docker-run health clean build start stop restart update upgrade updgrade status \
+        logs bootstrap requirements-lock requirements-lock-check package-wheel config-gen test-config-gen
 
-# ── Web console (webapp/) ───────────────────────────────────────────────
-# `build`/`start`/`stop`/`restart`/`update`/`upgrade` all target the
-# FastAPI+static web console in webapp/ (backend/server.py + frontend/).
-# They never touch the plain CLI (`make run` still runs `python main.py`
-# directly, unaffected). All state lives in-repo so these are safe to run
-# from a fresh clone with no other setup:
-#   .web-venv/            — dedicated virtualenv (kept separate from any
-#                            venv you use for CLI development, so upgrading
-#                            the web console's deps can never break the CLI)
-#   logs/web.log           — server stdout/stderr
-#   .web.pid               — pid of the running uvicorn process, if any
-VENV        := .web-venv
+# Canonical local-first FastAPI + bundled React runtime.
+VENV        := .venv
 VENV_PY     := $(VENV)/bin/python
 VENV_PIP    := $(VENV)/bin/pip
 VENV_UVICORN:= $(VENV)/bin/uvicorn
-PID_FILE    := .web.pid
-LOG_FILE    := logs/web.log
-HOST        ?= 0.0.0.0
-PORT        ?= 8420
+PID_FILE    := .zc.pid
+LOG_FILE    := logs/zc.log
+HOST        ?= 127.0.0.1
+PORT        ?= 8000
 
 # Idempotent developer and CI setup entrypoint.
 setup: bootstrap
 
-# Build: create the venv (idempotent) and install/refresh every dependency
-# the web console needs — the CLI core's requirements.txt (Coder/etc. import
-# straight into the backend, see webapp/backend/server.py) plus
-# webapp/requirements-web.txt (fastapi/uvicorn). Nothing to compile for the
-# frontend -- it's plain HTML/CSS/JS served as static files, no bundler.
 build:
 	@test -d $(VENV) || python3 -m venv $(VENV)
 	$(VENV_PIP) install --upgrade pip --disable-pip-version-check -q
-	$(VENV_PIP) install -q -r requirements.txt -r webapp/requirements-web.txt -r app/requirements.txt
+	$(VENV_PIP) install --require-hashes -q -r requirements-deploy.lock
+	npm --prefix webapp/frontend-src ci
+	npm --prefix webapp/frontend-src run build
 	@mkdir -p logs
 	@echo "✅ build complete — venv at $(VENV)/"
 
-# Start: refuse to double-start if a live process is already using
-# PID_FILE, otherwise launch uvicorn detached (nohup) and record its pid.
 start:
 	@if [ -f $(PID_FILE) ] && kill -0 $$(cat $(PID_FILE)) 2>/dev/null; then \
 		echo "⚠️  already running (pid $$(cat $(PID_FILE))) — use 'make restart'"; \
@@ -45,8 +31,10 @@ start:
 	fi
 	@test -x $(VENV_UVICORN) || { echo "❌ not built yet — run 'make build' first"; exit 1; }
 	@mkdir -p logs
-	@setsid nohup env PYTHONPATH=src $(VENV_UVICORN) webapp.backend.server:app --app-dir . \
-		--host $(HOST) --port $(PORT) < /dev/null > $(LOG_FILE) 2>&1 & echo $$! > $(PID_FILE)
+	@setsid nohup env PYTHONPATH=src ENVIRONMENT=development AUTH_REQUIRED=false \
+		API_HOST=$(HOST) API_PORT=$(PORT) PROTOBUF_ENABLED=false \
+		$(VENV_UVICORN) app.main:app --app-dir . --host $(HOST) --port $(PORT) --workers 1 \
+		< /dev/null > $(LOG_FILE) 2>&1 & echo $$! > $(PID_FILE)
 	@sleep 1
 	@if kill -0 $$(cat $(PID_FILE)) 2>/dev/null; then \
 		echo "🚀 started (pid $$(cat $(PID_FILE))) — http://$(HOST):$(PORT)  (logs: $(LOG_FILE))"; \
@@ -70,28 +58,19 @@ stop:
 
 restart: stop start
 
-# Update: refresh dependencies to their latest allowed versions (and pull
-# the latest source if this checkout is a git repo). Does not restart the
-# server automatically — run `make restart` after if one is running.
-update:
-	@if [ -d .git ]; then echo "📥 git pull…"; git pull; fi
-	@test -d $(VENV) || python3 -m venv $(VENV)
-	$(VENV_PIP) install --upgrade pip --disable-pip-version-check -q
-	$(VENV_PIP) install -q --upgrade -r requirements.txt -r webapp/requirements-web.txt -r app/requirements.txt
-	@echo "✅ dependencies updated"
+update: build
+	@echo "✅ local dependencies and frontend rebuilt from repository locks"
 
-# Upgrade: update()'s superset — also verifies the result, and restarts a
-# currently-running server so the upgrade takes effect immediately instead
-# of silently running stale code until someone remembers to restart it.
 upgrade: update
-	@echo "🔎 version: $$(PYTHONPATH=src $(VENV_PY) -m wire.main --version 2>/dev/null || echo unknown)"
+	@echo "🔎 version: $$(PYTHONPATH=src $(VENV_PY) -c 'from app.core.config import APP_VERSION; print(APP_VERSION)')"
+	@$(MAKE) check
 	@if [ -f $(PID_FILE) ] && kill -0 $$(cat $(PID_FILE)) 2>/dev/null; then \
 		echo "🔁 restarting running server to pick up the upgrade…"; \
 		$(MAKE) restart; \
 	else \
 		echo "ℹ️  server wasn't running — 'make start' whenever you're ready"; \
 	fi
-	@PYTHONPATH=src $(VENV_PY) -m wire.main --health-check || true
+	@echo "✅ upgrade verification complete"
 
 # Backward-compatible spelling retained for existing operator runbooks.
 updgrade: upgrade
@@ -108,11 +87,11 @@ status:
 logs:
 	@tail -f $(LOG_FILE)
 
-install:
-	pip install --break-system-packages -r requirements.txt -r app/requirements.txt
+install: build
 
 install-dev:
-	pip install --break-system-packages -r requirements-dev.txt
+	@test -d $(VENV) || python3 -m venv $(VENV)
+	$(VENV_PIP) install -r requirements-dev.txt
 
 requirements-lock:
 	uv pip compile --python-version 3.11 --python-platform x86_64-unknown-linux-gnu \
@@ -129,7 +108,7 @@ test:
 	PYTHONPATH=src pytest
 
 test-cov:
-	PYTHONPATH=src pytest --cov=src tests/ --cov-report=term-missing
+	PYTHONPATH=src pytest --cov=app tests/ --cov-report=term-missing --cov-fail-under=70
 
 lint:
 	ruff check .
@@ -138,54 +117,74 @@ format:
 	black .
 
 typecheck:
-	mypy app scripts tests src/wire/main.py --ignore-missing-imports || echo "Ignoring mypy system package bug"
+	mypy app
 
 security:
-	bandit -c pyproject.toml -r app
+	bandit -q -c pyproject.toml -r app
 
 audit:
 	ruff check .
 	bandit -c pyproject.toml -r app
-	PYTHONPATH=src pytest --cov=src tests/ --cov-report=term-missing
+	PYTHONPATH=src pytest --cov=app tests/ --cov-report=term-missing --cov-fail-under=70
 
 proto-gen:
-	python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. app/proto/wire.proto
+	python -m grpc_tools.protoc -I app/proto \
+		--python_out=app/proto \
+		--grpc_python_out=app/proto \
+		app/proto/wire.proto
+	perl -pi -e 's/^import wire_pb2 as/from . import wire_pb2 as/' app/proto/wire_pb2_grpc.py
 
 check: lint typecheck security test-cov
 
+package-wheel:
+	rm -rf build dist
+	npm --prefix webapp/frontend-src ci
+	npm --prefix webapp/frontend-src run build
+	python -m pip wheel . --no-deps --wheel-dir dist
+	@unzip -l dist/zcoder-*.whl | grep -q 'app/main.py'
+	@unzip -l dist/zcoder-*.whl | grep -q 'webapp/frontend-dist/index.html'
+	@! unzip -l dist/zcoder-*.whl | grep -Eq \
+		'app/api/control_panel.py|app/core/(security|monitoring|performance|resiliency).py|app/services/storage.py'
+
 run:
-	PYTHONPATH=src python -m wire.main
+	PYTHONPATH=src ENVIRONMENT=development AUTH_REQUIRED=false PROTOBUF_ENABLED=false \
+		python -m app.main --host 127.0.0.1 --port 8000 --workers 1
 
 tui:
+	@echo "Starting the optional legacy CLI TUI"
 	PYTHONPATH=src python -m wire.main --tui
 
 health:
-	PYTHONPATH=src python -m wire.main --health-check
+	curl -fsS http://127.0.0.1:8000/ready
 
 bootstrap:
 	@echo "🔍 Running pre-flight checks before install..."
 	@command -v python3 >/dev/null 2>&1 || { echo >&2 "❌ Python 3 is required but it's not installed. Aborting."; exit 1; }
-	@command -v pip >/dev/null 2>&1 || { echo >&2 "❌ pip is required but it's not installed. Aborting."; exit 1; }
+	@command -v npm >/dev/null 2>&1 || { echo >&2 "❌ npm is required but it's not installed. Aborting."; exit 1; }
 	@echo "✅ System requirements met. Proceeding to install..."
-	$(MAKE) install
-	$(MAKE) install-dev
 	$(MAKE) build
+	$(MAKE) install-dev
 	@echo "🎉 Bootstrap complete! System is ready."
 
 docker-build:
-	docker build -t wire:latest .
-
+	docker build -t zcoder:local .
 
 docker-run:
-	docker run --rm -e ANTHROPIC_API_KEY=$${ANTHROPIC_API_KEY} wire:latest
+	docker run --rm --network host \
+		-e ENVIRONMENT=development \
+		-e AUTH_REQUIRED=false \
+		-e PROTOBUF_ENABLED=false \
+		-e ANTHROPIC_API_KEY=$${ANTHROPIC_API_KEY:-} \
+		zcoder:local
 
 clean:
 	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
 	rm -rf .pytest_cache .mypy_cache .ruff_cache .coverage coverage.xml dist build
+	rm -f .zc.pid
 
 config-gen:
 	python scripts/zai-config-gen.py generate
 
 test-config-gen:
 	python -m py_compile scripts/zai-config-gen.py
-	python -m pytest tests/test_config_gen.py || echo "No tests for config-gen yet"
+	python -m pytest tests/test_config_gen.py

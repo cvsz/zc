@@ -14,13 +14,38 @@ Cloudflare Access + Tunnel
       |
 app/ FastAPI on 127.0.0.1:8000
       |
-local files + atomic session metadata
+local files + atomic JSON + local SQLite metadata
 ```
 
-The repository also retains an installed compatibility CLI under `src/wire/`,
-an optional local web adapter under `webapp/`, and development-only agent
-configuration. Their ownership, dependency direction, and migration gates are
-defined by
+For public-local production requests, `cloudflared` and the FastAPI origin
+both validate the Cloudflare Access assertion. The origin verifies the RS256
+signature against the team JWKS, plus issuer, audience, expiry, issued-at, and
+subject claims. Application JWT/RBAC and tenant checks remain a separate inner
+authorization layer.
+
+Upload chunks, resumable metadata, and assembled files remain on local disk.
+Assembly publishes atomically into a tenant-scoped quarantine directory with
+service-user-only permissions. No download route promotes quarantined content,
+and non-local storage backends fail configuration validation.
+
+The compatibility `/v1/files` multipart route follows the same trust boundary:
+new files are recorded as `quarantined`, cannot be downloaded or sent to the
+AI provider, and have no public promotion endpoint. A future local malware
+scanner may mark a file `available` only through a separately reviewed trusted
+service boundary.
+
+Every authenticated mutating HTTP request crosses a durable local idempotency
+boundary after Cloudflare Access validation and the request-size guard. Cache
+keys are scoped to the verified application subject and tenant, HTTP route,
+query string, and caller-provided `Idempotency-Key`. A reused key with a
+different body is rejected, concurrent duplicates execute once, and bounded
+response records survive a process restart.
+
+The repository also retains the `zc-legacy` compatibility CLI under
+`src/wire/`, a compatibility web adapter under `webapp/backend/`, and
+development-only agent configuration. The bundled React frontend under
+`webapp/frontend-src/` calls the supported API directly. Their ownership,
+dependency direction, and migration gates are defined by
 [ADR-001](docs/adr/ADR-001-product-surface-boundaries.md) and enforced by
 tests.
 
@@ -160,13 +185,18 @@ major version could flip this to raise-by-default with a
 
 ## State & persistence
 
-All local state is flat JSON files under the user's home directory —
-`~/.ai-coder-config.json` (config), `~/.ai-coder/` (projects, artifacts,
-files registry, sessions). There is no database. This keeps the tool
-zero-install beyond Python + `pip install -r requirements.txt`, at the
-cost of no concurrent-writer safety — two CLI invocations writing to the
-same project file at once can race. Not addressed in this pass; noted
-here so it isn't rediscovered as a surprise.
+The supported `app/` runtime stores operational state under configured local
+state directories rather than hosted services. Upload sessions and chat
+sessions use tenant-scoped atomic JSON files. Domain resources use local
+SQLite with optimistic concurrency, and idempotency records are persisted on
+local disk so retried mutating requests can replay safely after a process
+restart. Production paths are expected to live under `/var/lib/zc`; local
+development defaults use `./data/`.
+
+The `zc-legacy` compatibility CLI under `src/wire/` still keeps its historical
+state in flat JSON files under the user's home directory, including
+`~/.ai-coder-config.json` and `~/.ai-coder/`. That legacy storage model does
+not define the canonical public-local server persistence contract.
 
 ## Packaging
 

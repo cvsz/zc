@@ -13,8 +13,104 @@ args = ["-y", "@modelcontextprotocol/server-github"]
 command = "npx"
 args = ["-y", "@upstash/context7-mcp@latest"]
 
+# Optional external MCPs require local credentials or OAuth. Keep secrets out
+# of this repo and provide them through environment variables or Codex auth.
 [mcp_servers.exa]
 url = "https://mcp.exa.ai/mcp"
+bearer_token_env_var = "EXA_API_KEY"
+enabled = true
+
+[mcp_servers.supabase]
+url = "https://mcp.supabase.com/mcp"
+enabled = true
+
+[mcp_servers.cloudflare]
+command = "npx"
+args = ["-y", "mcp-remote", "https://mcp.cloudflare.com/mcp"]
+enabled = false
+
+[mcp_servers.cloudflare-api]
+url = "https://mcp.cloudflare.com/mcp"
+bearer_token_env_var = "CLOUDFLARE_API_TOKEN"
+enabled = true
+
+[mcp_servers.cloudflare-docs]
+url = "https://docs.mcp.cloudflare.com/mcp"
+enabled = true
+
+[mcp_servers.cloudflare-bindings]
+url = "https://bindings.mcp.cloudflare.com/mcp"
+bearer_token_env_var = "CLOUDFLARE_API_TOKEN"
+enabled = true
+
+[mcp_servers.cloudflare-builds]
+url = "https://builds.mcp.cloudflare.com/mcp"
+bearer_token_env_var = "CLOUDFLARE_API_TOKEN"
+enabled = true
+
+[mcp_servers.cloudflare-observability]
+url = "https://observability.mcp.cloudflare.com/mcp"
+bearer_token_env_var = "CLOUDFLARE_API_TOKEN"
+enabled = true
+
+[mcp_servers.cloudflare-radar]
+url = "https://radar.mcp.cloudflare.com/mcp"
+bearer_token_env_var = "CLOUDFLARE_API_TOKEN"
+enabled = true
+
+[mcp_servers.cloudflare-containers]
+url = "https://containers.mcp.cloudflare.com/mcp"
+bearer_token_env_var = "CLOUDFLARE_API_TOKEN"
+enabled = true
+
+[mcp_servers.cloudflare-browser]
+url = "https://browser.mcp.cloudflare.com/mcp"
+bearer_token_env_var = "CLOUDFLARE_API_TOKEN"
+enabled = true
+
+[mcp_servers.cloudflare-logs]
+url = "https://logs.mcp.cloudflare.com/mcp"
+bearer_token_env_var = "CLOUDFLARE_API_TOKEN"
+enabled = true
+
+[mcp_servers.cloudflare-ai-gateway]
+url = "https://ai-gateway.mcp.cloudflare.com/mcp"
+bearer_token_env_var = "CLOUDFLARE_API_TOKEN"
+enabled = true
+
+[mcp_servers.cloudflare-autorag]
+url = "https://autorag.mcp.cloudflare.com/mcp"
+bearer_token_env_var = "CLOUDFLARE_API_TOKEN"
+enabled = true
+
+[mcp_servers.cloudflare-auditlogs]
+url = "https://auditlogs.mcp.cloudflare.com/mcp"
+bearer_token_env_var = "CLOUDFLARE_API_TOKEN"
+enabled = true
+
+[mcp_servers.cloudflare-dns-analytics]
+url = "https://dns-analytics.mcp.cloudflare.com/mcp"
+bearer_token_env_var = "CLOUDFLARE_API_TOKEN"
+enabled = true
+
+[mcp_servers.cloudflare-dex]
+url = "https://dex.mcp.cloudflare.com/mcp"
+bearer_token_env_var = "CLOUDFLARE_API_TOKEN"
+enabled = true
+
+[mcp_servers.cloudflare-casb]
+url = "https://casb.mcp.cloudflare.com/mcp"
+bearer_token_env_var = "CLOUDFLARE_API_TOKEN"
+enabled = true
+
+[mcp_servers.cloudflare-graphql]
+url = "https://graphql.mcp.cloudflare.com/mcp"
+bearer_token_env_var = "CLOUDFLARE_API_TOKEN"
+enabled = true
+
+[mcp_servers.cloudflare-agents]
+url = "https://agents.cloudflare.com/mcp"
+enabled = true
 
 [mcp_servers.memory]
 command = "npx"
@@ -37,12 +133,12 @@ max_depth = 1
 
 [agents.explorer]
 description = "Read-only codebase explorer for gathering evidence before changes are proposed."
-config_file = "agents/explorer.toml"
+config_file = "/home/zeazdev/zc/.codex/agents/explorer.toml"
 
 [agents.reviewer]
 description = "PR reviewer focused on correctness, security, and missing tests."
-config_file = "agents/reviewer.toml"
+config_file = "/home/zeazdev/zc/.codex/agents/reviewer.toml"
 
 [agents.docs_researcher]
 description = "Documentation specialist that verifies APIs, framework behavior, and release notes."
-config_file = "agents/docs-researcher.toml"
+config_file = "/home/zeazdev/zc/.codex/agents/docs-researcher.toml"

@@ -8,21 +8,38 @@ bad() { printf 'FAIL: %s\n' "$*" >&2; fail=1; }
 warn() { printf 'WARN: %s\n' "$*" >&2; }
 
 check_cmd() {
-  command -v "$1" >/dev/null 2>&1 && ok "command found: $1" || warn "command missing: $1"
+  if command -v "$1" >/dev/null 2>&1; then
+    ok "command found: $1"
+  else
+    warn "command missing: $1"
+  fi
 }
 
 echo "=== Cloudflare Stability Check ==="
 
 echo
 echo "--- Cost / paid feature guardrails ---"
-[[ "${COST_LOCK:-true}" == "true" ]] && ok "COST_LOCK=true" || bad "COST_LOCK must be true"
-[[ "${CLOUDFLARE_PLAN_TIER:-Free}" == "Free" ]] && ok "CLOUDFLARE_PLAN_TIER=Free" || bad "CLOUDFLARE_PLAN_TIER must be Free"
-[[ "${ALLOW_PAID_CLOUDFLARE_FEATURES:-false}" == "false" ]] && ok "paid Cloudflare features disabled" || bad "ALLOW_PAID_CLOUDFLARE_FEATURES must be false"
-[[ "${ALLOW_LOAD_BALANCING:-false}" == "false" ]] && ok "Load Balancing disabled" || bad "ALLOW_LOAD_BALANCING must be false"
-[[ "${ALLOW_ADVANCED_WAF:-false}" == "false" ]] && ok "Advanced WAF disabled" || bad "ALLOW_ADVANCED_WAF must be false"
-[[ "${ALLOW_LOGPUSH:-false}" == "false" ]] && ok "Logpush disabled" || bad "ALLOW_LOGPUSH must be false"
-[[ "${ALLOW_R2_WRITE:-false}" == "false" ]] && ok "R2 writes disabled" || bad "ALLOW_R2_WRITE must be false"
-[[ "${ALLOW_WORKERS_DEPLOY:-false}" == "false" ]] && ok "Workers deploy disabled" || bad "ALLOW_WORKERS_DEPLOY must be false"
+check_guard() {
+  local actual="$1"
+  local expected="$2"
+  local success_message="$3"
+  local failure_message="$4"
+
+  if [[ "$actual" == "$expected" ]]; then
+    ok "$success_message"
+  else
+    bad "$failure_message"
+  fi
+}
+
+check_guard "${COST_LOCK:-true}" "true" "COST_LOCK=true" "COST_LOCK must be true"
+check_guard "${CLOUDFLARE_PLAN_TIER:-Free}" "Free" "CLOUDFLARE_PLAN_TIER=Free" "CLOUDFLARE_PLAN_TIER must be Free"
+check_guard "${ALLOW_PAID_CLOUDFLARE_FEATURES:-false}" "false" "paid Cloudflare features disabled" "ALLOW_PAID_CLOUDFLARE_FEATURES must be false"
+check_guard "${ALLOW_LOAD_BALANCING:-false}" "false" "Load Balancing disabled" "ALLOW_LOAD_BALANCING must be false"
+check_guard "${ALLOW_ADVANCED_WAF:-false}" "false" "Advanced WAF disabled" "ALLOW_ADVANCED_WAF must be false"
+check_guard "${ALLOW_LOGPUSH:-false}" "false" "Logpush disabled" "ALLOW_LOGPUSH must be false"
+check_guard "${ALLOW_R2_WRITE:-false}" "false" "R2 writes disabled" "ALLOW_R2_WRITE must be false"
+check_guard "${ALLOW_WORKERS_DEPLOY:-false}" "false" "Workers deploy disabled" "ALLOW_WORKERS_DEPLOY must be false"
 
 echo
 echo "--- Forbidden global API key variables ---"
@@ -59,10 +76,20 @@ fi
 
 echo
 echo "--- Source validation ---"
-make yaml-validate
-make workflow-validate
-make phase51-validate
-make phase52-validate
+bash -n "${BASH_SOURCE[0]}" scripts/cloudflare/*.sh
+scripts/cloudflare/check-cloudflare-config.sh
+terraform -chdir=infra/cloudflare fmt -check -recursive
+terraform -chdir=infra/cloudflare validate
+python3 - <<'PY'
+from pathlib import Path
+
+import yaml
+
+for path in sorted(Path(".github/workflows").glob("*.y*ml")):
+    with path.open(encoding="utf-8") as stream:
+        yaml.safe_load(stream)
+    print(f"PASS: valid YAML: {path}")
+PY
 
 echo
 echo "--- Cloudflare plan dry-run ---"
@@ -104,8 +131,8 @@ check_url() {
 
 check_url apex "https://zeaz.dev"
 check_url www "https://www.zeaz.dev"
-check_url zc "https://${ZC_PUBLIC_HOST:-zai.zeaz.dev}"
-check_url api "https://${ZC_API_PUBLIC_HOST:-api.zeaz.dev}/v1/wire/health/live"
+check_url zc "https://${ZC_PUBLIC_HOST:-zeaz.dev}"
+check_url api "https://${ZC_PUBLIC_HOST:-zeaz.dev}/v1/wire/health/live"
 
 echo
 if [[ "$fail" -ne 0 ]]; then

@@ -41,7 +41,7 @@ Safety:
 
 Regeneration:
   --regenerate           Create replacement account tokens for --types
-  --types <csv|all>      dns,zt,workers,pages,waf,tunnel,r2,d1 or all
+  --types <csv|all>      dns,zt,tunnel or all (canonical zc scope only)
   --write <file>         Write generated tokens to env file
   --perm-id <id>         Override permission-group ID for every generated token
   --refresh-permissions  Refresh permission-group cache before regeneration
@@ -81,6 +81,11 @@ warn(){ log "WARN: $*" >&2; }
 die(){ log "ERROR: $*" >&2; exit 1; }
 log_err(){ log "$*" >&2; }
 has(){ command -v "$1" >/dev/null 2>&1; }
+
+if [[ "$DRY_RUN" != "true" ]]; then
+  [[ "${ZC_ALLOW_CLOUDFLARE_CREDENTIAL_MUTATION:-false}" == "true" ]] ||
+    die "live credential mutation requires ZC_ALLOW_CLOUDFLARE_CREDENTIAL_MUTATION=true"
+fi
 
 has jq || die "jq is required"
 if ! $OFFLINE; then
@@ -174,12 +179,7 @@ resolve_permission_id(){
   case "$token_type" in
     dns) env_key="CLOUDFLARE_DNS_PERMISSION_GROUP_ID"; pattern='(?i)^dns write$' ;;
     zt) env_key="CLOUDFLARE_ZT_PERMISSION_GROUP_ID"; pattern='(?i)\bZero Trust\b.*Write' ;;
-    workers) env_key="CLOUDFLARE_WORKERS_PERMISSION_GROUP_ID"; pattern='(?i)\bWorkers Scripts?\b.*Write' ;;
-    pages) env_key="CLOUDFLARE_PAGES_PERMISSION_GROUP_ID"; pattern='(?i)^Pages Write$' ;;
-    waf) env_key="CLOUDFLARE_WAF_PERMISSION_GROUP_ID"; pattern='(?i)(waf.*(write|edit)|rulesets.*(write|edit)|firewall.*(write|edit))' ;;
     tunnel) env_key="CLOUDFLARE_TUNNEL_PERMISSION_GROUP_ID"; pattern='(?i)(tunnel.*(write|edit)|cloudflare tunnel.*(write|edit))' ;;
-    r2) env_key="CLOUDFLARE_R2_PERMISSION_GROUP_ID"; pattern='(?i)\bR2 Storage\b.*Write' ;;
-    d1) env_key="CLOUDFLARE_D1_PERMISSION_GROUP_ID"; pattern='(?i)(d1.*(write|edit))' ;;
     *) return 1 ;;
   esac
 
@@ -192,20 +192,6 @@ resolve_permission_id(){
   jq -r --arg re "$pattern" '
     (.result // [])
     | map(select(([.name // "", .description // "", .scope // "", (.scopes // [] | tostring), (.resource_groups // [] | tostring)] | join(" ")) | test($re)))
-    | .[0].id // empty
-  ' "$cache"
-}
-
-resolve_workers_routes_permission_id(){
-  local cache explicit
-  explicit="${CLOUDFLARE_WORKERS_ROUTES_PERMISSION_GROUP_ID:-}"
-  [[ -n "$explicit" ]] && { printf '%s' "$explicit"; return 0; }
-
-  cache="$(fetch_permission_groups)"
-  [[ -f "$cache" ]] || die "permission-group cache file not found: $cache"
-  jq -r '
-    (.result // [])
-    | map(select(([.name // "", .description // "", .scope // "", (.scopes // [] | tostring), (.resource_groups // [] | tostring)] | join(" ")) | test("(?i)\\bWorkers Routes\\b.*Write")))
     | .[0].id // empty
   ' "$cache"
 }
@@ -232,12 +218,6 @@ env_file_value(){
   local file="$1" key="$2"
   [[ -f "$file" ]] || return 0
   awk -F= -v k="$key" '$1 == k {v=$0; sub(/^[^=]*=/, "", v); gsub(/^"|"$/, "", v); print v}' "$file" | tail -n 1
-}
-
-write_optional_env(){
-  local key="$1" value="$2"
-  [[ -n "${value//[[:space:]]/}" ]] || return 0
-  printf '%s="%s"\n' "$key" "$value"
 }
 
 epoch_of(){
@@ -359,46 +339,25 @@ $REGENERATE || { log "done"; exit 0; }
 [[ "$ASSUME_YES" == "true" || "$DRY_RUN" == "true" ]] || die "refusing token regeneration without --yes"
 
 if [[ "$TYPES_CSV" == "all" ]]; then
-  TYPES_CSV="dns,zt,workers,pages,waf,tunnel,r2,d1"
+  TYPES_CSV="dns,zt,tunnel"
 fi
 
 declare -A TOKEN_NAME_MAP=(
   [dns]="zeaz-dns-token"
   [zt]="zeaz-zt-token"
-  [workers]="zeaz-workers-token"
-  [pages]="zeaz-pages-token"
-  [waf]="zeaz-waf-token"
   [tunnel]="zeaz-tunnel-token"
-  [r2]="zeaz-r2-token"
-  [d1]="zeaz-d1-token"
-  [audit]="zeaz-audit-token"
-  [ai_gateway]="zeaz-ai-gateway-token"
 )
 
 declare -A RESOURCE_MAP=(
   [dns]="com.cloudflare.api.account.zone.${CLOUDFLARE_ZONE_ID:-}"
-  [waf]="com.cloudflare.api.account.zone.${CLOUDFLARE_ZONE_ID:-}"
   [zt]="com.cloudflare.api.account.${CLOUDFLARE_ACCOUNT_ID}"
-  [workers]="com.cloudflare.api.account.${CLOUDFLARE_ACCOUNT_ID}"
-  [pages]="com.cloudflare.api.account.${CLOUDFLARE_ACCOUNT_ID}"
   [tunnel]="com.cloudflare.api.account.${CLOUDFLARE_ACCOUNT_ID}"
-  [r2]="com.cloudflare.api.account.${CLOUDFLARE_ACCOUNT_ID}"
-  [d1]="com.cloudflare.api.account.${CLOUDFLARE_ACCOUNT_ID}"
-  [audit]="com.cloudflare.api.account.${CLOUDFLARE_ACCOUNT_ID}"
-  [ai_gateway]="com.cloudflare.api.account.${CLOUDFLARE_ACCOUNT_ID}"
 )
 
 declare -A ENV_KEY_MAP=(
   [dns]="CLOUDFLARE_DNS_TOKEN"
   [zt]="CLOUDFLARE_ZT_TOKEN"
-  [workers]="CLOUDFLARE_WORKERS_TOKEN"
-  [pages]="CLOUDFLARE_PAGES_TOKEN"
-  [waf]="CLOUDFLARE_WAF_TOKEN"
   [tunnel]="CLOUDFLARE_TUNNEL_TOKEN"
-  [r2]="CLOUDFLARE_R2_TOKEN"
-  [d1]="CLOUDFLARE_D1_TOKEN"
-  [audit]="CLOUDFLARE_AUDIT_TOKEN"
-  [ai_gateway]="CLOUDFLARE_AI_GATEWAY_TOKEN"
 )
 
 IFS=',' read -r -a TYPES_ARR <<< "$TYPES_CSV"
@@ -409,7 +368,7 @@ for t in "${TYPES_ARR[@]}"; do
   [[ -z "$t" ]] && continue
   [[ -n "${TOKEN_NAME_MAP[$t]:-}" ]] || { warn "unknown token type: $t"; continue; }
 
-  if [[ "$t" == "dns" || "$t" == "waf" ]]; then
+  if [[ "$t" == "dns" ]]; then
     [[ -n "${CLOUDFLARE_ZONE_ID:-}" ]] || die "CLOUDFLARE_ZONE_ID is required for $t token"
   fi
 
@@ -419,26 +378,7 @@ for t in "${TYPES_ARR[@]}"; do
   current_count="$(printf '%s' "$TOKEN_LIST_JSON" | jq '(.result // []) | length')"
   [[ "$current_count" -lt "$TOKEN_QUOTA" ]] || die "token quota reached ($current_count/$TOKEN_QUOTA)"
 
-  if [[ "$t" == "workers" ]]; then
-    route_perm="$(resolve_workers_routes_permission_id)"
-    [[ -n "$route_perm" ]] || { warn "could not resolve Workers Routes Write permission-group ID; zeaz-workers-token will not be able to update routes"; }
-    if [[ -n "$route_perm" ]]; then
-      payload="$(jq -n \
-        --arg name "${TOKEN_NAME_MAP[$t]}" \
-        --arg script_resource "${RESOURCE_MAP[$t]}" \
-        --arg route_resource "com.cloudflare.api.account.zone.${CLOUDFLARE_ZONE_ID:-}" \
-        --arg script_perm "$perm" \
-        --arg route_perm "$route_perm" \
-        '{name:$name, policies:[
-          {effect:"allow", resources:{($script_resource):"*"}, permission_groups:[{id:$script_perm}]},
-          {effect:"allow", resources:{($route_resource):"*"}, permission_groups:[{id:$route_perm}]}
-        ]}')"
-    else
-      payload="$(jq -n --arg name "${TOKEN_NAME_MAP[$t]}" --arg resource "${RESOURCE_MAP[$t]}" --arg perm "$perm" '{name:$name, policies:[{effect:"allow", resources:{($resource):"*"}, permission_groups:[{id:$perm}]}]}')"
-    fi
-  else
-    payload="$(jq -n --arg name "${TOKEN_NAME_MAP[$t]}" --arg resource "${RESOURCE_MAP[$t]}" --arg perm "$perm" '{name:$name, policies:[{effect:"allow", resources:{($resource):"*"}, permission_groups:[{id:$perm}]}]}')"
-  fi
+  payload="$(jq -n --arg name "${TOKEN_NAME_MAP[$t]}" --arg resource "${RESOURCE_MAP[$t]}" --arg perm "$perm" '{name:$name, policies:[{effect:"allow", resources:{($resource):"*"}, permission_groups:[{id:$perm}]}]}')"
 
   if $DRY_RUN; then
     log "DRY-RUN: would create ${TOKEN_NAME_MAP[$t]} with permission_group=$perm resource=${RESOURCE_MAP[$t]}"
@@ -459,7 +399,7 @@ done
 tmp="$(mktemp "${OUT_FILE}.XXXXXX")"
 chmod 600 "$tmp"
 
-MANAGED_KEYS=(CLOUDFLARE_DNS_TOKEN CLOUDFLARE_ZT_TOKEN CLOUDFLARE_WORKERS_TOKEN CLOUDFLARE_PAGES_TOKEN CLOUDFLARE_WAF_TOKEN CLOUDFLARE_TUNNEL_TOKEN CLOUDFLARE_R2_TOKEN CLOUDFLARE_D1_TOKEN CLOUDFLARE_AUDIT_TOKEN CLOUDFLARE_AI_GATEWAY_TOKEN CLOUDFLARE_AI_GATEWAY_SLUG)
+MANAGED_KEYS=(CLOUDFLARE_DNS_TOKEN CLOUDFLARE_ZT_TOKEN CLOUDFLARE_TUNNEL_TOKEN)
 if [[ -f "$OUT_FILE" ]]; then
   while IFS= read -r line || [[ -n "$line" ]]; do
     key="$(printf '%s' "$line" | sed -E 's/^([A-Za-z0-9_]+)=.*/\1/')"
@@ -472,11 +412,10 @@ fi
 {
   printf 'CLOUDFLARE_ACCOUNT_ID="%s"\n' "${CLOUDFLARE_ACCOUNT_ID:-$(env_file_value "$OUT_FILE" CLOUDFLARE_ACCOUNT_ID)}"
   printf 'CLOUDFLARE_ZONE_ID="%s"\n' "${CLOUDFLARE_ZONE_ID:-$(env_file_value "$OUT_FILE" CLOUDFLARE_ZONE_ID)}"
-  printf 'CLOUDFLARE_AI_GATEWAY_SLUG="%s"\n' "${CLOUDFLARE_AI_GATEWAY_SLUG:-$(env_file_value "$OUT_FILE" CLOUDFLARE_AI_GATEWAY_SLUG || true)}" | sed 's/=""$/="zeaz"/'
   printf '\n'
 } >> "$tmp"
 
-for t in dns zt workers pages waf tunnel r2 d1; do
+for t in dns zt tunnel; do
   key="${ENV_KEY_MAP[$t]}"
   val="${GENERATED[$t]:-}"
   if [[ -n "$val" ]]; then
@@ -486,9 +425,6 @@ for t in dns zt workers pages waf tunnel r2 d1; do
     printf '%s="%s"\n' "$key" "$existing" >> "$tmp"
   fi
 done
-
-write_optional_env CLOUDFLARE_AUDIT_TOKEN "${CLOUDFLARE_AUDIT_TOKEN:-$(env_file_value "$OUT_FILE" CLOUDFLARE_AUDIT_TOKEN)}" >> "$tmp"
-write_optional_env CLOUDFLARE_AI_GATEWAY_TOKEN "${CLOUDFLARE_AI_GATEWAY_TOKEN:-$(env_file_value "$OUT_FILE" CLOUDFLARE_AI_GATEWAY_TOKEN)}" >> "$tmp"
 
 if $DRY_RUN; then
   log "DRY-RUN: preview of $OUT_FILE"

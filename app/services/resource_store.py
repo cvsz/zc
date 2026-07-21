@@ -5,8 +5,9 @@ from __future__ import annotations
 import asyncio
 import builtins
 import json
+import os
 import sqlite3
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -23,17 +24,34 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _next_timestamp(previous: str) -> str:
+    """Return a UTC revision timestamp strictly newer than the previous one."""
+    now = datetime.now(timezone.utc)
+    previous_time = datetime.fromisoformat(previous)
+    if now <= previous_time:
+        now = previous_time + timedelta(microseconds=1)
+    return now.isoformat()
+
+
 class ResourceStore:
     """Store JSON resources with tenant included in every primary key."""
 
     def __init__(self, database_path: Path) -> None:
         self.database_path = database_path
-        self.database_path.parent.mkdir(parents=True, exist_ok=True)
+        if self.database_path.is_symlink():
+            raise RuntimeError("Resource database must not be a symlink")
+        self.database_path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        if self.database_path.parent.is_symlink():
+            raise RuntimeError("Resource database directory must not be a symlink")
+        os.chmod(self.database_path.parent, 0o700)
         self._initialized = False
         self._init_lock = asyncio.Lock()
 
     def _connect(self) -> sqlite3.Connection:
+        if self.database_path.is_symlink():
+            raise RuntimeError("Resource database must not be a symlink")
         connection = sqlite3.connect(self.database_path, timeout=10)
+        os.chmod(self.database_path, 0o600)
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA journal_mode=WAL")
         connection.execute("PRAGMA foreign_keys=ON")
@@ -116,9 +134,7 @@ class ResourceStore:
         self, tenant_id: str, domain: str, resource_id: str
     ) -> dict[str, Any]:
         await self.initialize()
-        return await asyncio.to_thread(
-            self._get_sync, tenant_id, domain, resource_id
-        )
+        return await asyncio.to_thread(self._get_sync, tenant_id, domain, resource_id)
 
     def _get_sync(
         self, tenant_id: str, domain: str, resource_id: str
@@ -192,17 +208,24 @@ class ResourceStore:
         data: dict[str, Any],
     ) -> dict[str, Any]:
         existing = self._get_sync(tenant_id, domain, resource_id)
+        expected_updated_at = data.get("updated_at")
+        if (
+            expected_updated_at is not None
+            and expected_updated_at != existing["updated_at"]
+        ):
+            raise ResourceConflictError(f"{domain} resource was modified")
         document = {
             **data,
             "id": resource_id,
             "created_at": existing["created_at"],
-            "updated_at": _now(),
+            "updated_at": _next_timestamp(existing["updated_at"]),
         }
         with self._connect() as connection:
             result = connection.execute(
                 """
                 UPDATE resources SET data = ?, updated_at = ?
                 WHERE tenant_id = ? AND domain = ? AND resource_id = ?
+                  AND updated_at = ?
                 """,
                 (
                     json.dumps(document, separators=(",", ":")),
@@ -210,10 +233,11 @@ class ResourceStore:
                     tenant_id,
                     domain,
                     resource_id,
+                    existing["updated_at"],
                 ),
             )
         if result.rowcount != 1:
-            raise ResourceNotFoundError(f"{domain} resource not found")
+            raise ResourceConflictError(f"{domain} resource was modified")
         return document
 
     async def delete(self, tenant_id: str, domain: str, resource_id: str) -> None:

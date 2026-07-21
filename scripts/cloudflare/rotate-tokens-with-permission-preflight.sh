@@ -3,12 +3,11 @@ set -Eeuo pipefail
 IFS=$'\n\t'
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=scripts/cloudflare/lib/env-scope.sh
+# shellcheck disable=SC1091
 source "$SCRIPT_DIR/lib/env-scope.sh"
 cf_load_cloudflare_env_scope
 cd "$PROJECT_ROOT"
 
-API_BASE="${CLOUDFLARE_API_BASE:-https://api.cloudflare.com/client/v4}"
 CACHE_DIR="${CACHE_DIR:-./.cache/cloudflare-permissions}"
 REFRESH=false
 OFFLINE=false
@@ -69,25 +68,11 @@ pick_permission(){
         elif has("(?i)^DNS View Write$") then 1
         elif has("(?i)dns.*(write|edit)") and (has("(?i)settings") | not) and (has("(?i)(dns firewall|account)") | not) then 10
         else 999 end
-      elif $k == "waf" then
-        if has("(?i)^Account WAF Write$") or has("(?i)^Zone.*WAF.*Write$") then 0
-        elif has("(?i)(waf|web application firewall|rulesets?).*(write|edit)") then 1
-        else 999 end
       elif $k == "zt" then
         if has("(?i)^Access: Apps and Policies Write$") then 0
         elif has("(?i)(Zero Trust|Access:).*(write|edit)") and (has("(?i)(Report|Read|PII|Resilience|Seats)") | not) then 1
         else 999 end
-      elif $k == "workers" then
-        if has("(?i)^Workers Scripts Write$") and (has("(?i)(AI|CI|KV|Containers|Observability|Routes|Tail|Websearch|R2)") | not) then 0
-        elif has("(?i)(Workers Scripts|Workers).*(write|edit)") and (has("(?i)(AI|CI|KV|Containers|Observability|Routes|Tail|Websearch|R2)") | not) then 1
-        else 999 end
-      elif $k == "workers_routes" then if has("(?i)^Workers Routes Write$") then 0 else 999 end
-      elif $k == "pages" then if has("(?i)^Pages Write$") then 0 else 999 end
       elif $k == "tunnel" then if has("(?i)^Cloudflare Tunnel Write$") then 0 else 999 end
-      elif $k == "r2" then if has("(?i)^Workers R2 Storage Write$") then 0 else 999 end
-      elif $k == "d1" then if has("(?i)^D1 Write$") then 0 else 999 end
-      elif $k == "audit" then if has("(?i)^AI Audit Write$") then 0 else 999 end
-      elif $k == "ai_gateway" then if has("(?i)^AI Gateway Write$") then 0 else 999 end
       else 999 end;
     (.result // [])
     | map(. + {__score: score($kind)})
@@ -111,14 +96,6 @@ export_if_missing(){
 
 export_if_missing CLOUDFLARE_DNS_PERMISSION_GROUP_ID "$(pick_permission dns)" dns
 export_if_missing CLOUDFLARE_ZT_PERMISSION_GROUP_ID "$(pick_permission zt)" zt
-export_if_missing CLOUDFLARE_WORKERS_PERMISSION_GROUP_ID "$(pick_permission workers)" workers
-export_if_missing CLOUDFLARE_WORKERS_ROUTES_PERMISSION_GROUP_ID "$(pick_permission workers_routes)" workers-routes
-export_if_missing CLOUDFLARE_PAGES_PERMISSION_GROUP_ID "$(pick_permission pages)" pages
-export_if_missing CLOUDFLARE_WAF_PERMISSION_GROUP_ID "$(pick_permission waf)" waf
 export_if_missing CLOUDFLARE_TUNNEL_PERMISSION_GROUP_ID "$(pick_permission tunnel)" tunnel
-export_if_missing CLOUDFLARE_R2_PERMISSION_GROUP_ID "$(pick_permission r2)" r2
-export_if_missing CLOUDFLARE_D1_PERMISSION_GROUP_ID "$(pick_permission d1)" d1
-export_if_missing CLOUDFLARE_AUDIT_PERMISSION_GROUP_ID "$(pick_permission audit)" audit
-export_if_missing CLOUDFLARE_AI_GATEWAY_PERMISSION_GROUP_ID "$(pick_permission ai_gateway)" ai-gateway
 
 exec bash scripts/cloudflare/run-token-rotation.sh "$@"

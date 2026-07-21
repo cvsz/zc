@@ -50,9 +50,7 @@ def test_excel_session_applies_allowed_transform_and_blocks_file_write() -> None
     session._history_stack = []
     session._pending_charts = []
 
-    ok, _message = session.apply_code(
-        'sheets["Sheet1"] = sheets["Sheet1"].dropna()'
-    )
+    ok, _message = session.apply_code('sheets["Sheet1"] = sheets["Sheet1"].dropna()')
     assert ok is True
     assert len(session.sheets["Sheet1"]) == 1
 

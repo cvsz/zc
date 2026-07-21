@@ -14,7 +14,9 @@ class StrictModel(BaseModel):
 class ProjectCreate(StrictModel):
     name: str = Field(min_length=1, max_length=200)
     description: str = Field(default="", max_length=20_000)
-    template: Literal["blank", "web_app", "api", "cli_tool", "data_pipeline", "ml_model"] = "blank"
+    template: Literal[
+        "blank", "web_app", "api", "cli_tool", "data_pipeline", "ml_model"
+    ] = "blank"
 
 
 class ProjectPatch(StrictModel):
@@ -153,9 +155,7 @@ class VaultCreate(StrictModel):
 
 
 class VaultCredentialCreate(StrictModel):
-    credential_type: Literal[
-        "mcp_oauth", "static_bearer", "environment_variable"
-    ]
+    credential_type: Literal["mcp_oauth", "static_bearer", "environment_variable"]
     secret_value: str = Field(min_length=1, max_length=100_000)
     mcp_server_url: HttpUrl | None = None
     secret_name: str | None = Field(default=None, max_length=200)
@@ -177,9 +177,9 @@ class EnvironmentCreate(StrictModel):
 
 class MultiAgentReviewCreate(StrictModel):
     file_id: str = Field(min_length=1, max_length=64)
-    specialists: list[
-        Literal["security", "style", "test-coverage"]
-    ] = Field(min_length=1, max_length=3)
+    specialists: list[Literal["security", "style", "test-coverage"]] = Field(
+        min_length=1, max_length=3
+    )
     model: str | None = Field(default=None, max_length=128)
 
 

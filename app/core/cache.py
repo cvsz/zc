@@ -1,20 +1,9 @@
-"""
-app/core/cache.py - Enterprise caching layer with Redis/Valkey
+"""In-process cache with an optional local Redis/Valkey layer."""
 
-Multi-layer caching strategy:
-- L1: In-memory (asyncio.Lock protected)
-- L2: Redis/Valkey cluster
-- L3: CDN edge (configured externally)
-
-Features:
-- Automatic serialization/deserialization
-- TTL management with jitter
-- Cache invalidation patterns
-- Circuit breaker for Redis failures
-"""
 import asyncio
 import hashlib
 import json
+import time
 from typing import Any, Generic, Optional, TypeVar
 
 import redis.asyncio as redis
@@ -22,28 +11,28 @@ from redis.asyncio import ConnectionPool
 
 from .config import Config, get_config
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 
 class CacheKey:
     """Namespace-aware cache key builder."""
 
     PREFIXES = {
-        'model': 'mdl',
-        'session': 'ses',
-        'upload': 'upl',
-        'user': 'usr',
-        'feature': 'ftf',
-        'rate': 'rtl',
-        'metric': 'met',
+        "model": "mdl",
+        "session": "ses",
+        "upload": "upl",
+        "user": "usr",
+        "feature": "ftf",
+        "rate": "rtl",
+        "metric": "met",
     }
 
     @classmethod
     def build(cls, namespace: str, *parts: str) -> str:
         """Build a namespaced cache key."""
-        prefix = cls.PREFIXES.get(namespace, 'gen')
+        prefix = cls.PREFIXES.get(namespace, "gen")
         key_parts = [prefix] + list(parts)
-        return ':'.join(key_parts)
+        return ":".join(key_parts)
 
     @classmethod
     def hash_key(cls, data: Any) -> str:
@@ -98,8 +87,8 @@ class Layer1Cache(Generic[T]):
 
 class EnterpriseCache:
     """
-    Multi-layer enterprise cache with automatic failover.
-    
+    Two-layer local cache with bounded in-memory fallback.
+
     Usage:
         cache = EnterpriseCache()
         await cache.set("user:123", {"name": "Alice"}, ttl=3600)
@@ -112,10 +101,12 @@ class EnterpriseCache:
         self.redis_pool: Optional[ConnectionPool] = None
         self.redis_client: Optional[redis.Redis] = None
         self._connected = False
-        self._circuit_open = True
+        self._circuit_open = False
         self._circuit_failures = 0
         self._circuit_threshold = 5
         self._circuit_reset_time = 60  # seconds
+        self._circuit_opened_at = 0.0
+        self._circuit_half_open = False
 
     async def connect(self) -> None:
         """Initialize Redis connection pool."""
@@ -133,10 +124,14 @@ class EnterpriseCache:
             # Test connection
             await self.redis_client.ping()
             self._connected = True
-            self._circuit_open = True
+            self._circuit_open = False
+            self._circuit_failures = 0
+            self._circuit_half_open = False
         except Exception:
             self._connected = False
-            self._circuit_open = False
+            self._circuit_open = True
+            self._circuit_opened_at = time.monotonic()
+            self._circuit_half_open = False
             raise
 
     async def disconnect(self) -> None:
@@ -147,37 +142,45 @@ class EnterpriseCache:
 
     def _serialize(self, value: Any) -> bytes:
         """Serialize value to bytes."""
-        return json.dumps(value, default=str).encode('utf-8')
+        return json.dumps(value, default=str).encode("utf-8")
 
     def _deserialize(self, data: bytes) -> Any:
         """Deserialize bytes to value."""
-        return json.loads(data.decode('utf-8'))
+        return json.loads(data.decode("utf-8"))
 
     async def _check_circuit(self) -> bool:
         """Check if circuit breaker allows Redis access."""
-        if self._circuit_open:
+        if not self._circuit_open:
             return True
-
-        # Circuit is closed, check if we should retry
-        # In production, use Redis to track global failure state
-        self._circuit_failures = 0
-        self._circuit_open = True
+        if self._circuit_half_open:
+            return False
+        if time.monotonic() - self._circuit_opened_at < self._circuit_reset_time:
+            return False
+        self._circuit_half_open = True
         return True
 
     async def _record_failure(self) -> None:
         """Record a Redis failure."""
         self._circuit_failures += 1
-        if self._circuit_failures >= self._circuit_threshold:
-            self._circuit_open = False
+        if self._circuit_half_open or self._circuit_failures >= self._circuit_threshold:
+            self._circuit_open = True
+            self._circuit_opened_at = time.monotonic()
+            self._circuit_half_open = False
+
+    def _record_success(self) -> None:
+        """Close the circuit and clear prior transient failures."""
+        self._circuit_open = False
+        self._circuit_half_open = False
+        self._circuit_failures = 0
 
     async def get(self, key: str, default: Optional[Any] = None) -> Any:
         """
         Get value from cache (L1 -> L2).
-        
+
         Args:
             key: Cache key
             default: Default value if not found
-            
+
         Returns:
             Cached value or default
         """
@@ -187,9 +190,14 @@ class EnterpriseCache:
             return l1_value
 
         # Try L2 (Redis)
-        if self._connected and self.redis_client is not None and await self._check_circuit():
+        if (
+            self._connected
+            and self.redis_client is not None
+            and await self._check_circuit()
+        ):
             try:
                 data = await self.redis_client.get(key)
+                self._record_success()
                 if data:
                     value = self._deserialize(data)
                     # Populate L1
@@ -210,24 +218,30 @@ class EnterpriseCache:
     ) -> bool:
         """
         Set value in cache (L1 + L2).
-        
+
         Args:
             key: Cache key
             value: Value to cache
             ttl: Time-to-live in seconds (None = use default)
             nx: Only set if key doesn't exist
             xx: Only set if key exists
-            
+
         Returns:
             True if set successfully
         """
-        ttl = ttl or self.config.redis_ttl_default
+        ttl = self.config.redis_ttl_default if ttl is None else ttl
+        if ttl <= 0:
+            raise ValueError("cache TTL must be positive")
 
         # Always set L1
         await self.l1_cache.set(key, value)
 
         # Set L2 (Redis)
-        if self._connected and self.redis_client is not None and await self._check_circuit():
+        if (
+            self._connected
+            and self.redis_client is not None
+            and await self._check_circuit()
+        ):
             try:
                 data = self._serialize(value)
                 if nx:
@@ -236,6 +250,7 @@ class EnterpriseCache:
                     result = await self.redis_client.set(key, data, ex=ttl, xx=True)
                 else:
                     result = await self.redis_client.set(key, data, ex=ttl)
+                self._record_success()
                 return bool(result)
             except Exception:
                 await self._record_failure()
@@ -246,9 +261,14 @@ class EnterpriseCache:
         """Delete value from cache (L1 + L2)."""
         l1_deleted = await self.l1_cache.delete(key)
 
-        if self._connected and self.redis_client is not None and await self._check_circuit():
+        if (
+            self._connected
+            and self.redis_client is not None
+            and await self._check_circuit()
+        ):
             try:
                 l2_deleted = await self.redis_client.delete(key)
+                self._record_success()
                 return l1_deleted or bool(l2_deleted)
             except Exception:
                 await self._record_failure()
@@ -260,9 +280,15 @@ class EnterpriseCache:
         if await self.l1_cache.get(key) is not None:
             return True
 
-        if self._connected and self.redis_client is not None and await self._check_circuit():
+        if (
+            self._connected
+            and self.redis_client is not None
+            and await self._check_circuit()
+        ):
             try:
-                return bool(await self.redis_client.exists(key))
+                result = bool(await self.redis_client.exists(key))
+                self._record_success()
+                return result
             except Exception:
                 await self._record_failure()
 
@@ -270,9 +296,15 @@ class EnterpriseCache:
 
     async def increment(self, key: str, amount: int = 1) -> int:
         """Atomically increment a counter."""
-        if self._connected and self.redis_client is not None and await self._check_circuit():
+        if (
+            self._connected
+            and self.redis_client is not None
+            and await self._check_circuit()
+        ):
             try:
-                return await self.redis_client.incrby(key, amount)
+                result = await self.redis_client.incrby(key, amount)
+                self._record_success()
+                return result
             except Exception:
                 await self._record_failure()
 
@@ -287,18 +319,30 @@ class EnterpriseCache:
 
     async def get_ttl(self, key: str) -> int:
         """Get remaining TTL for a key."""
-        if self._connected and self.redis_client is not None and await self._check_circuit():
+        if (
+            self._connected
+            and self.redis_client is not None
+            and await self._check_circuit()
+        ):
             try:
-                return await self.redis_client.ttl(key)
+                result = await self.redis_client.ttl(key)
+                self._record_success()
+                return result
             except Exception:
                 await self._record_failure()
         return -1
 
     async def expire(self, key: str, ttl: int) -> bool:
         """Set expiration on an existing key."""
-        if self._connected and self.redis_client is not None and await self._check_circuit():
+        if (
+            self._connected
+            and self.redis_client is not None
+            and await self._check_circuit()
+        ):
             try:
-                return bool(await self.redis_client.expire(key, ttl))
+                result = bool(await self.redis_client.expire(key, ttl))
+                self._record_success()
+                return result
             except Exception:
                 await self._record_failure()
         return False
@@ -306,22 +350,33 @@ class EnterpriseCache:
     async def clear_pattern(self, pattern: str) -> int:
         """Delete all keys matching a pattern."""
         count = 0
-        if self._connected and self.redis_client is not None and await self._check_circuit():
+        if (
+            self._connected
+            and self.redis_client is not None
+            and await self._check_circuit()
+        ):
             try:
                 cursor = 0
                 while True:
-                    cursor, keys = await self.redis_client.scan(cursor, match=pattern, count=100)
+                    cursor, keys = await self.redis_client.scan(
+                        cursor, match=pattern, count=100
+                    )
                     if keys:
                         await self.redis_client.delete(*keys)
                         count += len(keys)
                     if cursor == 0:
                         break
+                self._record_success()
             except Exception:
                 await self._record_failure()
 
         # Also clear L1 matches
         async with self.l1_cache._lock:
-            to_delete = [k for k in self.l1_cache._cache.keys() if k.startswith(pattern.replace('*', ''))]
+            to_delete = [
+                k
+                for k in self.l1_cache._cache.keys()
+                if k.startswith(pattern.replace("*", ""))
+            ]
             for k in to_delete:
                 await self.l1_cache.delete(k)
 
@@ -330,22 +385,25 @@ class EnterpriseCache:
     async def health_check(self) -> dict[str, Any]:
         """Check cache health status."""
         status: dict[str, Any] = {
-            'l1_size': len(self.l1_cache._cache),
-            'l1_max': self.l1_cache._max_size,
-            'redis_connected': self._connected,
-            'circuit_open': self._circuit_open,
-            'circuit_failures': self._circuit_failures,
+            "l1_size": len(self.l1_cache._cache),
+            "l1_max": self.l1_cache._max_size,
+            "redis_connected": self._connected,
+            "circuit_open": self._circuit_open,
+            "circuit_failures": self._circuit_failures,
         }
 
         if self._connected and self.redis_client is not None:
             try:
-                info = await self.redis_client.info('memory')
-                status['redis_memory_used'] = info.get('used_memory_human', 'unknown')
-                status['redis_keys'] = await self.redis_client.dbsize()
-            except Exception as e:
-                status['redis_error'] = str(e)
+                info = await self.redis_client.info("memory")
+                status["redis_memory_used"] = info.get("used_memory_human", "unknown")
+                status["redis_keys"] = await self.redis_client.dbsize()
+                self._record_success()
+            except Exception:
+                status["redis_error"] = "unavailable"
                 await self._record_failure()
 
+        status["circuit_open"] = self._circuit_open
+        status["circuit_failures"] = self._circuit_failures
         return status
 
 

@@ -17,5 +17,11 @@ def test_release_image_emits_sbom_and_max_provenance() -> None:
 def test_release_smoke_test_uses_the_published_image() -> None:
     workflow = RELEASE_WORKFLOW.read_text(encoding="utf-8")
 
-    assert "ghcr.io/${{ github.repository }}:${{ steps.version.outputs.value }}" in workflow
-    assert 'python -c "from app.main import app; assert app.title == \'zcoder\'"' in workflow
+    assert (
+        "ghcr.io/${{ github.repository }}:${{ steps.version.outputs.value }}"
+        in workflow
+    )
+    assert (
+        "python -c \"from app.main import app; assert app.title == 'zcoder'\""
+        in workflow
+    )

@@ -4,6 +4,7 @@ Covers zc_skills_api.py: SkillRef wire-format, the container.skills
 builder, the multi-turn client used by --excel-native/--pptx-native, the
 file_id extraction helper, and the two info-only CLI commands.
 """
+
 import pytest
 
 from wire.zc_skills_api import (
@@ -39,9 +40,15 @@ def test_skillref_custom_includes_version():
 
 
 def test_build_container_skills_accepts_mixed_refs_and_dicts():
-    out = build_container_skills([SkillRef.prebuilt("pptx"), {"type": "custom", "skill_id": "x"}])
-    assert out == {"skills": [{"type": "anthropic", "skill_id": "pptx"},
-                              {"type": "custom", "skill_id": "x"}]}
+    out = build_container_skills(
+        [SkillRef.prebuilt("pptx"), {"type": "custom", "skill_id": "x"}]
+    )
+    assert out == {
+        "skills": [
+            {"type": "anthropic", "skill_id": "pptx"},
+            {"type": "custom", "skill_id": "x"},
+        ]
+    }
 
 
 def test_build_container_skills_rejects_over_eight():
@@ -81,20 +88,29 @@ def test_call_with_skills_sends_expected_betas_and_container(monkeypatch):
     client.call_with_skills("do something", skills=["xlsx"])
 
     assert captured["betas"] == [CODE_EXECUTION_BETA, SKILLS_BETA]
-    assert captured["payload"]["container"] == {"skills": [{"type": "anthropic", "skill_id": "xlsx"}]}
-    assert captured["payload"]["tools"] == [{"type": "code_execution_20250825", "name": "code_execution"}]
+    assert captured["payload"]["container"] == {
+        "skills": [{"type": "anthropic", "skill_id": "xlsx"}]
+    }
+    assert captured["payload"]["tools"] == [
+        {"type": "code_execution_20250825", "name": "code_execution"}
+    ]
 
 
 def test_call_with_skills_turn_reuses_container_id(monkeypatch):
     client = SkillsApiClient(api_key="k")
     captured = {}
-    monkeypatch.setattr(client, "_post", lambda payload, betas: (
-        captured.update(payload=payload, betas=betas) or {"content": []}
-    ))
+    monkeypatch.setattr(
+        client,
+        "_post",
+        lambda payload, betas: (
+            captured.update(payload=payload, betas=betas) or {"content": []}
+        ),
+    )
 
     client.call_with_skills_turn(
         messages=[{"role": "user", "content": "hi"}],
-        skills=["pptx"], container_id="cont_123",
+        skills=["pptx"],
+        container_id="cont_123",
     )
 
     assert captured["payload"]["container"]["id"] == "cont_123"
@@ -104,13 +120,16 @@ def test_call_with_skills_turn_reuses_container_id(monkeypatch):
 def test_call_with_skills_turn_adds_files_beta_when_uploading(monkeypatch):
     client = SkillsApiClient(api_key="k")
     captured = {}
-    monkeypatch.setattr(client, "_post", lambda payload, betas: (
-        captured.update(betas=betas) or {"content": []}
-    ))
+    monkeypatch.setattr(
+        client,
+        "_post",
+        lambda payload, betas: captured.update(betas=betas) or {"content": []},
+    )
 
     client.call_with_skills_turn(
         messages=[{"role": "user", "content": build_user_content("hi", ["f1"])}],
-        skills=["pptx"], has_file_uploads=True,
+        skills=["pptx"],
+        has_file_uploads=True,
     )
 
     assert captured["betas"] == [CODE_EXECUTION_BETA, SKILLS_BETA, FILES_API_BETA]
@@ -120,19 +139,27 @@ def test_call_with_skills_turn_adds_files_beta_when_uploading(monkeypatch):
 
 
 def test_extract_output_file_ids_from_code_execution_block():
-    data = {"content": [
-        {"type": "text", "text": "done"},
-        {"type": "code_execution_tool_result",
-         "content": {"content": [{"type": "file", "file_id": "file_abc"}]}},
-    ]}
+    data = {
+        "content": [
+            {"type": "text", "text": "done"},
+            {
+                "type": "code_execution_tool_result",
+                "content": {"content": [{"type": "file", "file_id": "file_abc"}]},
+            },
+        ]
+    }
     assert extract_output_file_ids(data) == ["file_abc"]
 
 
 def test_extract_output_file_ids_from_bash_block_flat_list():
-    data = {"content": [
-        {"type": "bash_code_execution_tool_result",
-         "content": [{"file_id": "file_1"}, {"file_id": "file_2"}]},
-    ]}
+    data = {
+        "content": [
+            {
+                "type": "bash_code_execution_tool_result",
+                "content": [{"file_id": "file_1"}, {"file_id": "file_2"}],
+            },
+        ]
+    }
     assert extract_output_file_ids(data) == ["file_1", "file_2"]
 
 

@@ -12,6 +12,7 @@ tests/test_zc_compliance_api.py, rather than mocking urlopen_json
 directly — this is what actually proves the anthropic-beta header is
 (or isn't) sent on the wire.
 """
+
 import json
 
 import wire.zc_code_exec as mod
@@ -34,7 +35,9 @@ class _FakeResp:
         return False
 
 
-def _install_fake_urlopen(monkeypatch, captured_headers: dict, response_body: Optional[dict] = None):
+def _install_fake_urlopen(
+    monkeypatch, captured_headers: dict, response_body: Optional[dict] = None
+):
     response_body = response_body or {"content": [], "usage": {}}
 
     def fake_urlopen(req, timeout=None):
@@ -72,7 +75,9 @@ def test_default_version_sends_no_beta_header(monkeypatch):
 def test_legacy_version_sends_beta_header(monkeypatch):
     captured = {}
     _install_fake_urlopen(monkeypatch, captured)
-    coder = CodeExecutionCoder(api_key="sk-test", code_exec_version="code_execution_20250522")
+    coder = CodeExecutionCoder(
+        api_key="sk-test", code_exec_version="code_execution_20250522"
+    )
 
     coder.execute("do something")
 
@@ -88,7 +93,9 @@ def test_execute_uses_instance_version_in_tool_descriptor(monkeypatch):
         return _FakeResp(json.dumps({"content": [], "usage": {}}).encode())
 
     monkeypatch.setattr(mod.urllib.request, "urlopen", fake_urlopen)
-    coder = CodeExecutionCoder(api_key="sk-test", code_exec_version="code_execution_20250522")
+    coder = CodeExecutionCoder(
+        api_key="sk-test", code_exec_version="code_execution_20250522"
+    )
 
     coder.execute("do something")
 
@@ -105,11 +112,17 @@ def test_execute_block_parsing_unaffected_by_version(monkeypatch):
     response_body = {
         "content": [
             {"type": "text", "text": "Here is the result:"},
-            {"type": "server_tool_use", "name": "code_execution",
-             "input": {"code": "print(1+1)"}},
-            {"type": "server_tool_result", "content": [
-                {"type": "text", "text": "2\n"},
-            ]},
+            {
+                "type": "server_tool_use",
+                "name": "code_execution",
+                "input": {"code": "print(1+1)"},
+            },
+            {
+                "type": "server_tool_result",
+                "content": [
+                    {"type": "text", "text": "2\n"},
+                ],
+            },
         ],
         "usage": {"input_tokens": 10, "output_tokens": 5},
     }
@@ -128,8 +141,12 @@ def test_cmd_code_exec_threads_code_exec_version(monkeypatch, capsys):
     captured = {}
     _install_fake_urlopen(monkeypatch, captured)
 
-    mod.cmd_code_exec("do something", api_key="sk-test", model="zc-xxx",
-                      code_exec_version="code_execution_20250522")
+    mod.cmd_code_exec(
+        "do something",
+        api_key="sk-test",
+        model="zc-xxx",
+        code_exec_version="code_execution_20250522",
+    )
 
     header_map_lower = {k.lower(): v for k, v in captured.items()}
     assert header_map_lower.get("anthropic-beta") == "code-execution-2025-05-22"

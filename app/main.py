@@ -1,15 +1,16 @@
 """FastAPI application and supported console entry point for zcoder."""
 
 import argparse
+import asyncio
 import logging
 import time
 from collections.abc import AsyncGenerator
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 from typing import Optional
 
 import uvicorn
-from fastapi import FastAPI, Request, Response, status
+from fastapi import Depends, FastAPI, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, JSONResponse
@@ -21,11 +22,18 @@ from .api.v1.ai_routes import router as ai_router
 from .api.v1.chat_routes import router as chat_router
 from .api.v1.resource_routes import router as resource_router
 from .core.cache import get_cache, init_cache, shutdown_cache
+from .core.auth import Principal, require_roles
 from .core.config import get_config
 from .core.http_client import init_http_client, shutdown_http_client
+from .core.logging import configure_application_logging
 from .middleware.rate_limiter import RateLimitMiddleware
+from .middleware.cloudflare_access import CloudflareAccessMiddleware
+from .middleware.idempotency import IdempotencyMiddleware
+from .middleware.request_context import RequestContextMiddleware
+from .middleware.request_size import RequestSizeLimitMiddleware
 from .services.upload_manager import init_upload_manager
 from .services.ai_service import AIService, AIServiceError, UnknownCapabilityError
+from .services.domain_resources import StandaloneCapabilityUnavailableError
 from .services.ai_provider import close_embedded_litellm
 from .services.resource_store import ResourceConflictError, ResourceNotFoundError
 
@@ -39,9 +47,7 @@ class ResponseHeadersMiddleware:
     def __init__(self, app: ASGIApp) -> None:
         self.app = app
 
-    async def __call__(
-        self, scope: Scope, receive: Receive, send: Send
-    ) -> None:
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
@@ -53,18 +59,17 @@ class ResponseHeadersMiddleware:
                 duration_ms = (time.perf_counter() - started_at) * 1000
                 headers = list(message.get("headers", []))
                 frontend_path = str(scope.get("path", ""))
-                is_frontend = (
-                    frontend_path in {"/", "/favicon.svg"}
-                    or frontend_path.startswith("/assets/")
-                )
+                is_frontend = frontend_path in {
+                    "/",
+                    "/favicon.svg",
+                } or frontend_path.startswith("/assets/")
                 content_security_policy = (
-                    b"default-src 'self'; script-src 'self'; style-src 'self'; "
-                    b"img-src 'self' data:; connect-src 'self'; font-src 'self'; "
+                    b"default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; "
+                    b"img-src 'self' data:; connect-src 'self' wss: https:; font-src 'self' data:; "
                     b"object-src 'none'; frame-ancestors 'none'; base-uri 'none'; "
                     b"form-action 'self'"
                     if is_frontend
-                    else b"default-src 'none'; frame-ancestors 'none'; "
-                    b"base-uri 'none'"
+                    else b"default-src 'none'; frame-ancestors 'none'; base-uri 'none'"
                 )
                 headers.extend(
                     [
@@ -94,11 +99,23 @@ def _set_component_state(
     app.state.components[name] = {"ready": ready, "error": error}
 
 
+async def _upload_maintenance(upload_manager: object, interval: float) -> None:
+    """Periodically enforce local upload retention without another service."""
+    cleanup = getattr(upload_manager, "cleanup_expired")
+    while True:
+        await asyncio.sleep(interval)
+        try:
+            await cleanup()
+        except Exception:
+            logger.exception("Upload retention maintenance failed")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Initialize optional integrations and expose their state to readiness."""
     config = get_config()
     config.validate()
+    configure_application_logging(config.environment == "production")
     app.state.components = {}
 
     logger.info(
@@ -109,24 +126,33 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         try:
             await init_cache()
             _set_component_state(app, "redis", True)
-        except Exception as exc:  # startup state is reported by /ready
+        except Exception:  # startup state is reported by /ready
             logger.exception("Cache initialization failed")
-            _set_component_state(app, "redis", False, str(exc))
+            _set_component_state(app, "redis", False, "unavailable")
     else:
         _set_component_state(app, "redis", True, "disabled")
     try:
         await init_http_client()
         _set_component_state(app, "http_client", True)
-    except Exception as exc:
+    except Exception:
         logger.exception("HTTP client initialization failed")
-        _set_component_state(app, "http_client", False, str(exc))
+        _set_component_state(app, "http_client", False, "unavailable")
 
+    upload_maintenance_task: asyncio.Task[None] | None = None
     try:
-        await init_upload_manager()
+        upload_manager = await init_upload_manager()
+        maintenance_interval = min(
+            3600.0,
+            max(60.0, config.upload_retention_seconds / 4),
+        )
+        upload_maintenance_task = asyncio.create_task(
+            _upload_maintenance(upload_manager, maintenance_interval),
+            name="upload-retention-maintenance",
+        )
         _set_component_state(app, "upload_manager", True)
-    except Exception as exc:
+    except Exception:
         logger.exception("Upload manager initialization failed")
-        _set_component_state(app, "upload_manager", False, str(exc))
+        _set_component_state(app, "upload_manager", False, "unavailable")
 
     if config.ai_provider == "litellm":
         if await AIService(config=config).provider_ready():
@@ -146,13 +172,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                 port=config.api_port + 1,
                 upload_manager=get_upload_manager(),
                 delta_service=None,
+                max_message_size=config.max_message_size,
             )
             await grpc_server.start()
             app.state.grpc_server = grpc_server
             _set_component_state(app, "grpc", True)
-        except Exception as exc:
+        except Exception:
             logger.exception("gRPC server initialization failed")
-            _set_component_state(app, "grpc", False, str(exc))
+            _set_component_state(app, "grpc", False, "unavailable")
     else:
         _set_component_state(app, "grpc", True, "disabled")
 
@@ -160,6 +187,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     if hasattr(app.state, "grpc_server"):
         await app.state.grpc_server.stop(grace=5.0)
+    if upload_maintenance_task is not None:
+        upload_maintenance_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await upload_maintenance_task
     if config.ai_provider == "litellm":
         await close_embedded_litellm()
     await shutdown_http_client()
@@ -176,6 +207,7 @@ app = FastAPI(
     openapi_url="/openapi.json" if config.debug else None,
     lifespan=lifespan,
 )
+
 
 @app.exception_handler(ResourceNotFoundError)
 async def resource_not_found_handler(
@@ -222,6 +254,21 @@ async def unknown_capability_handler(
     )
 
 
+@app.exception_handler(StandaloneCapabilityUnavailableError)
+async def standalone_capability_unavailable_handler(
+    _request: Request, _exc: StandaloneCapabilityUnavailableError
+) -> JSONResponse:
+    return JSONResponse(
+        status_code=501,
+        content={
+            "error": {
+                "code": "standalone_capability_unavailable",
+                "message": "This capability is not available in the standalone runtime.",
+            }
+        },
+    )
+
+
 @app.exception_handler(AIServiceError)
 async def ai_service_error_handler(
     _request: Request, _exc: AIServiceError
@@ -238,9 +285,7 @@ async def ai_service_error_handler(
 
 
 @app.exception_handler(ValueError)
-async def domain_validation_handler(
-    _request: Request, exc: ValueError
-) -> JSONResponse:
+async def domain_validation_handler(_request: Request, exc: ValueError) -> JSONResponse:
     return JSONResponse(
         status_code=422,
         content={
@@ -251,6 +296,34 @@ async def domain_validation_handler(
         },
     )
 
+
+@app.exception_handler(Exception)
+async def unexpected_error_handler(request: Request, _exc: Exception) -> JSONResponse:
+    request_id = getattr(request.state, "request_id", "unknown")
+    logger.exception("Unhandled request error", extra={"request_id": request_id})
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": {
+                "code": "internal_error",
+                "message": "The request could not be completed.",
+                "request_id": request_id,
+            }
+        },
+        headers={
+            "X-Request-ID": request_id,
+            "Cache-Control": "no-store",
+            "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+            "X-Content-Type-Options": "nosniff",
+            "X-Frame-Options": "DENY",
+            "Referrer-Policy": "no-referrer",
+            "Content-Security-Policy": (
+                "default-src 'none'; frame-ancestors 'none'; base-uri 'none'"
+            ),
+        },
+    )
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=config.cors_origins,
@@ -259,13 +332,21 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.add_middleware(GZipMiddleware, minimum_size=1000)
-app.add_middleware(ResponseHeadersMiddleware)
+app.add_middleware(IdempotencyMiddleware, config=config)
+app.add_middleware(
+    RequestSizeLimitMiddleware,
+    max_body_bytes=config.max_message_size,
+)
 if config.rate_limit_enabled:
     app.add_middleware(
         RateLimitMiddleware,
         requests_per_minute=config.rate_limit_requests,
         burst=config.rate_limit_requests,
+        window_seconds=config.rate_limit_window,
     )
+app.add_middleware(CloudflareAccessMiddleware)
+app.add_middleware(RequestContextMiddleware)
+app.add_middleware(ResponseHeadersMiddleware)
 
 app.include_router(wire_router)
 app.include_router(ai_router)
@@ -278,7 +359,11 @@ if config.control_panel_enabled:
 
 
 @app.get("/v1/meta")
-async def metadata() -> dict[str, str]:
+async def metadata(
+    _principal: Principal = Depends(
+        require_roles("admin", "developer", "agent", "cli_service", "viewer")
+    ),
+) -> dict[str, str]:
     return {
         "name": config.app_name,
         "version": config.version,
@@ -329,7 +414,9 @@ async def readiness() -> Response:
 
 
 @app.get("/health/cache")
-async def cache_health() -> dict:
+async def cache_health(
+    _principal: Principal = Depends(require_roles("admin")),
+) -> dict:
     """Expose cache state without leaking connection credentials."""
     return await get_cache().health_check()
 
@@ -348,11 +435,21 @@ def run_server(
     workers: Optional[int] = None,
 ) -> None:
     cfg = get_config()
+    cfg.validate()
+    effective_host = host if host is not None else cfg.api_host
+    effective_port = port if port is not None else cfg.api_port
+    effective_workers = workers if workers is not None else cfg.api_workers
+    if cfg.environment == "production" and effective_host != "127.0.0.1":
+        raise RuntimeError("Production server must bind to 127.0.0.1")
+    if cfg.environment == "production" and effective_workers != 1:
+        raise RuntimeError("Production server must use exactly one worker")
+    if effective_port < 1 or effective_port > 65535:
+        raise RuntimeError("Server port must be between 1 and 65535")
     uvicorn.run(
         "app.main:app",
-        host=host or cfg.api_host,
-        port=port or cfg.api_port,
-        workers=workers or cfg.api_workers,
+        host=effective_host,
+        port=effective_port,
+        workers=effective_workers,
         log_level="info" if cfg.debug else "warning",
         access_log=cfg.debug,
         loop="uvloop",

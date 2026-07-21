@@ -6,8 +6,11 @@ import asyncio
 import json
 import hashlib
 import mimetypes
+import os
+import stat
 from pathlib import Path
-from typing import Any
+from collections.abc import AsyncIterator
+from typing import Any, BinaryIO
 from uuid import uuid4
 
 from app.models.ai import AIResponseRequest
@@ -37,6 +40,10 @@ from app.models.domain_resources import (
 from .ai_service import AIService, get_ai_service_instance
 from .project_templates import PROJECT_TEMPLATES
 from .resource_store import ResourceNotFoundError, ResourceStore
+
+
+class StandaloneCapabilityUnavailableError(RuntimeError):
+    """Reject control-plane features that have no local execution runtime."""
 
 
 def _id(prefix: str) -> str:
@@ -155,9 +162,7 @@ class DomainResourceService:
         request: TaskPatch,
     ) -> dict[str, Any]:
         project = await self.store.get(tenant_id, "projects", project_id)
-        task = next(
-            (item for item in project["tasks"] if item["id"] == task_id), None
-        )
+        task = next((item for item in project["tasks"] if item["id"] == task_id), None)
         if task is None:
             raise ResourceNotFoundError("project task not found")
         task.update(request.model_dump(exclude_none=True))
@@ -168,13 +173,17 @@ class DomainResourceService:
         self, tenant_id: str, project_id: str, task_id: str, model: str | None = None
     ) -> dict[str, Any]:
         project = await self.store.get(tenant_id, "projects", project_id)
-        task = next(
-            (item for item in project["tasks"] if item["id"] == task_id), None
-        )
+        task = next((item for item in project["tasks"] if item["id"] == task_id), None)
         if task is None:
             raise ResourceNotFoundError("project task not found")
         task["status"] = "in_progress"
-        await self.store.replace(tenant_id, "projects", project_id, project)
+        project = await self.store.replace(
+            tenant_id,
+            "projects",
+            project_id,
+            project,
+        )
+        task = next(item for item in project["tasks"] if item["id"] == task_id)
         try:
             response = await self.ai_service.create_response(
                 AIResponseRequest(
@@ -258,9 +267,7 @@ class DomainResourceService:
             }
         )
         artifact["current_version"] = number
-        return await self.store.replace(
-            tenant_id, "artifacts", artifact_id, artifact
-        )
+        return await self.store.replace(tenant_id, "artifacts", artifact_id, artifact)
 
     async def patch_artifact(
         self, tenant_id: str, artifact_id: str, request: ArtifactPatch
@@ -270,9 +277,7 @@ class DomainResourceService:
         if "tags" in updates:
             updates["tags"] = sorted(set(updates["tags"]))
         artifact.update(updates)
-        return await self.store.replace(
-            tenant_id, "artifacts", artifact_id, artifact
-        )
+        return await self.store.replace(tenant_id, "artifacts", artifact_id, artifact)
 
     async def artifact_diff(
         self,
@@ -342,21 +347,24 @@ class DomainResourceService:
             )
         except Exception:
             record["status"] = "failed"
-            await self.store.replace(
-                tenant_id, "research", record["id"], record
-            )
+            await self.store.replace(tenant_id, "research", record["id"], record)
             raise
         record["status"] = "completed"
         record["report"] = response.output_text
         record["response_id"] = response.id
-        return await self.store.replace(
-            tenant_id, "research", record["id"], record
-        )
+        return await self.store.replace(tenant_id, "research", record["id"], record)
 
     def _tenant_blob_dir(self, tenant_id: str) -> Path:
         digest = hashlib.sha256(tenant_id.encode("utf-8")).hexdigest()
         path = self.blob_root / digest
-        path.mkdir(parents=True, exist_ok=True)
+        if self.blob_root.is_symlink():
+            raise RuntimeError("Blob storage root must not be a symlink")
+        self.blob_root.mkdir(parents=True, exist_ok=True, mode=0o700)
+        os.chmod(self.blob_root, 0o700)
+        path.mkdir(parents=False, exist_ok=True, mode=0o700)
+        if path.is_symlink() or path.resolve().parent != self.blob_root.resolve():
+            raise RuntimeError("Invalid tenant blob storage directory")
+        os.chmod(path, 0o700)
         return path
 
     async def create_file(
@@ -364,7 +372,8 @@ class DomainResourceService:
         tenant_id: str,
         filename: str,
         content_type: str | None,
-        data: bytes,
+        source: BinaryIO,
+        maximum_size: int,
     ) -> dict[str, Any]:
         safe_name = Path(filename).name
         forbidden = set('<>:"|?*\\/') | {chr(value) for value in range(32)}
@@ -377,28 +386,134 @@ class DomainResourceService:
             raise ValueError("invalid filename")
         file_id = _id("fil")
         blob_path = self._tenant_blob_dir(tenant_id) / file_id
-        await asyncio.to_thread(blob_path.write_bytes, data)
-        return await self.store.create(
-            tenant_id,
-            "files",
-            file_id,
-            {
-                "filename": safe_name,
-                "content_type": content_type
-                or mimetypes.guess_type(safe_name)[0]
-                or "application/octet-stream",
-                "size": len(data),
-                "sha256": hashlib.sha256(data).hexdigest(),
-                "blob_path": str(blob_path),
-            },
+        try:
+            size, digest = await asyncio.to_thread(
+                self._write_blob_from_file,
+                blob_path,
+                source,
+                maximum_size,
+            )
+            return await self.store.create(
+                tenant_id,
+                "files",
+                file_id,
+                {
+                    "filename": safe_name,
+                    "content_type": content_type
+                    or mimetypes.guess_type(safe_name)[0]
+                    or "application/octet-stream",
+                    "size": size,
+                    "sha256": digest,
+                    "blob_path": str(blob_path),
+                    "status": "quarantined",
+                },
+            )
+        except Exception:
+            blob_path.unlink(missing_ok=True)
+            raise
+
+    @staticmethod
+    def _write_blob_from_file(
+        path: Path,
+        source: BinaryIO,
+        maximum_size: int,
+    ) -> tuple[int, str]:
+        descriptor = os.open(
+            path,
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+            0o600,
         )
+        size = 0
+        digest = hashlib.sha256()
+        try:
+            with os.fdopen(descriptor, "wb", closefd=False) as stream:
+                while chunk := source.read(1024 * 1024):
+                    size += len(chunk)
+                    if size > maximum_size:
+                        raise ValueError("file exceeds the API upload limit")
+                    digest.update(chunk)
+                    stream.write(chunk)
+                stream.flush()
+                os.fsync(stream.fileno())
+            directory_fd = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
+            try:
+                os.fsync(directory_fd)
+            finally:
+                os.close(directory_fd)
+        finally:
+            os.close(descriptor)
+        return size, digest.hexdigest()
+
+    @staticmethod
+    def _read_blob(path: Path) -> bytes:
+        descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+        try:
+            metadata = os.fstat(descriptor)
+            if not stat.S_ISREG(metadata.st_mode):
+                raise ResourceNotFoundError("file content not found")
+            with os.fdopen(descriptor, "rb", closefd=False) as stream:
+                return stream.read()
+        finally:
+            os.close(descriptor)
 
     async def file_content(self, tenant_id: str, file_id: str) -> tuple[dict, bytes]:
         metadata = await self.store.get(tenant_id, "files", file_id)
-        path = Path(metadata["blob_path"])
-        if not path.is_file() or path.parent != self._tenant_blob_dir(tenant_id):
+        if metadata.get("status") != "available":
             raise ResourceNotFoundError("file content not found")
-        return metadata, await asyncio.to_thread(path.read_bytes)
+        if int(metadata["size"]) > 1_000_000:
+            raise ValueError("file is too large for direct AI context")
+        path = Path(metadata["blob_path"])
+        if path.parent != self._tenant_blob_dir(tenant_id):
+            raise ResourceNotFoundError("file content not found")
+        try:
+            data = await asyncio.to_thread(self._read_blob, path)
+        except (FileNotFoundError, OSError) as exc:
+            raise ResourceNotFoundError("file content not found") from exc
+        return metadata, data
+
+    async def file_stream(
+        self,
+        tenant_id: str,
+        file_id: str,
+    ) -> tuple[dict[str, Any], AsyncIterator[bytes]]:
+        """Open one no-follow descriptor and stream bounded file chunks."""
+        metadata = await self.store.get(tenant_id, "files", file_id)
+        if metadata.get("status") != "available":
+            raise ResourceNotFoundError("file content not found")
+        path = Path(metadata["blob_path"])
+        if path.parent != self._tenant_blob_dir(tenant_id):
+            raise ResourceNotFoundError("file content not found")
+        descriptor: int | None = None
+        try:
+            descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+            file_stat = os.fstat(descriptor)
+            if not stat.S_ISREG(file_stat.st_mode) or file_stat.st_size != int(
+                metadata["size"]
+            ):
+                raise ResourceNotFoundError("file content not found")
+        except (FileNotFoundError, OSError) as exc:
+            if descriptor is not None:
+                os.close(descriptor)
+            raise ResourceNotFoundError("file content not found") from exc
+        except Exception:
+            if descriptor is not None:
+                os.close(descriptor)
+            raise
+        if descriptor is None:
+            raise ResourceNotFoundError("file content not found")
+
+        async def chunks() -> AsyncIterator[bytes]:
+            try:
+                while chunk := await asyncio.to_thread(
+                    os.read,
+                    descriptor,
+                    1024 * 1024,
+                ):
+                    yield chunk
+            finally:
+                os.close(descriptor)
+
+        return metadata, chunks()
 
     async def delete_file(self, tenant_id: str, file_id: str) -> None:
         metadata = await self.store.get(tenant_id, "files", file_id)
@@ -411,8 +526,6 @@ class DomainResourceService:
         self, tenant_id: str, file_id: str, request: FileQuestion
     ) -> dict[str, Any]:
         metadata, data = await self.file_content(tenant_id, file_id)
-        if len(data) > 1_000_000:
-            raise ValueError("file is too large for direct AI context")
         content = data.decode("utf-8", errors="replace")
         response = await self.ai_service.create_response(
             AIResponseRequest(
@@ -431,8 +544,20 @@ class DomainResourceService:
     async def create_agent_run(
         self, tenant_id: str, request: ManagedAgentRunCreate
     ) -> dict[str, Any]:
+        if request.outcome_max_iterations != 1:
+            raise StandaloneCapabilityUnavailableError(
+                "Iterative outcome evaluation is not available in the standalone "
+                "runtime."
+            )
         memory_context = ""
         if request.memory_store_id:
+            memory_store = await self.store.get(
+                tenant_id,
+                "memory-stores",
+                request.memory_store_id,
+            )
+            if memory_store["status"] != "active":
+                raise ValueError("memory store is archived")
             memories, _ = await self.store.list(
                 tenant_id, f"memories:{request.memory_store_id}", limit=100
             )
@@ -440,11 +565,10 @@ class DomainResourceService:
                 f"{item['path']}: {item['content']}" for item in memories
             )[:200_000]
         if request.vault_id:
-            vault = await self.store.get(
-                tenant_id, "agent-vaults", request.vault_id
+            raise StandaloneCapabilityUnavailableError(
+                "Vault-backed agent execution is not available in the standalone "
+                "runtime."
             )
-            if vault["status"] != "active":
-                raise ValueError("vault is archived")
         run = await self.store.create(
             tenant_id,
             "agent-runs",
@@ -488,18 +612,14 @@ class DomainResourceService:
             )
         except Exception:
             run["status"] = "failed"
-            await self.store.replace(
-                tenant_id, "agent-runs", run["id"], run
-            )
+            await self.store.replace(tenant_id, "agent-runs", run["id"], run)
             raise
         run["status"] = "completed"
         run["output_text"] = response.output_text
         run["response_id"] = response.id
         return await self.store.replace(tenant_id, "agent-runs", run["id"], run)
 
-    async def create_memory_store(
-        self, tenant_id: str, name: str
-    ) -> dict[str, Any]:
+    async def create_memory_store(self, tenant_id: str, name: str) -> dict[str, Any]:
         return await self.store.create(
             tenant_id,
             "memory-stores",
@@ -520,9 +640,7 @@ class DomainResourceService:
             tenant_id, f"memories:{store_id}", limit=10_000
         )
         for memory in memories:
-            await self.store.delete(
-                tenant_id, f"memories:{store_id}", memory["id"]
-            )
+            await self.store.delete(tenant_id, f"memories:{store_id}", memory["id"])
         await self.store.delete(tenant_id, "memory-stores", store_id)
 
     async def create_memory(
@@ -546,9 +664,7 @@ class DomainResourceService:
         request: MemoryPatch,
     ) -> dict[str, Any]:
         await self.store.get(tenant_id, "memory-stores", store_id)
-        memory = await self.store.get(
-            tenant_id, f"memories:{store_id}", memory_id
-        )
+        memory = await self.store.get(tenant_id, f"memories:{store_id}", memory_id)
         memory.update(request.model_dump(exclude_none=True))
         return await self.store.replace(
             tenant_id, f"memories:{store_id}", memory_id, memory
@@ -557,9 +673,17 @@ class DomainResourceService:
     async def create_dream(
         self, tenant_id: str, request: DreamCreate
     ) -> dict[str, Any]:
-        await self.store.get(
-            tenant_id, "memory-stores", request.memory_store_id
+        if request.session_ids:
+            raise StandaloneCapabilityUnavailableError(
+                "Chat-session dream inputs are not available in the standalone runtime."
+            )
+        memory_store = await self.store.get(
+            tenant_id,
+            "memory-stores",
+            request.memory_store_id,
         )
+        if memory_store["status"] != "active":
+            raise ValueError("memory store is archived")
         memories, _ = await self.store.list(
             tenant_id, f"memories:{request.memory_store_id}", limit=10_000
         )
@@ -590,9 +714,7 @@ class DomainResourceService:
             )
         except Exception:
             dream["status"] = "failed"
-            await self.store.replace(
-                tenant_id, "agent-dreams", dream["id"], dream
-            )
+            await self.store.replace(tenant_id, "agent-dreams", dream["id"], dream)
             raise
         output_store = await self.create_memory_store(
             tenant_id, f"Dream output {dream['id']}"
@@ -605,22 +727,13 @@ class DomainResourceService:
         dream["status"] = "completed"
         dream["output_store_id"] = output_store["id"]
         dream["response_id"] = response.id
-        return await self.store.replace(
-            tenant_id, "agent-dreams", dream["id"], dream
-        )
+        return await self.store.replace(tenant_id, "agent-dreams", dream["id"], dream)
 
     async def create_webhook(
         self, tenant_id: str, request: WebhookCreate
     ) -> dict[str, Any]:
-        return await self.store.create(
-            tenant_id,
-            "agent-webhooks",
-            _id("whk"),
-            {
-                "url": str(request.url),
-                "event_types": request.event_types,
-                "status": "active",
-            },
+        raise StandaloneCapabilityUnavailableError(
+            "Webhook delivery is not available in the standalone runtime."
         )
 
     async def create_vault(
@@ -659,29 +772,18 @@ class DomainResourceService:
         vault["credentials"].append(credential)
         await self.store.replace(tenant_id, "agent-vaults", vault_id, vault)
         return {
-            key: value
-            for key, value in credential.items()
-            if key != "encrypted_secret"
+            key: value for key, value in credential.items() if key != "encrypted_secret"
         }
 
     async def create_schedule(
         self, tenant_id: str, request: ScheduleCreate
     ) -> dict[str, Any]:
-        # Cron execution is reconciled by the deployment worker. The API owns
-        # desired state and never shells out from an HTTP request.
-        return await self.store.create(
-            tenant_id,
-            "agent-schedules",
-            _id("sch"),
-            {**request.model_dump(), "status": "active"},
+        raise StandaloneCapabilityUnavailableError(
+            "Scheduled agent execution is not available in the standalone runtime."
         )
 
-    async def cancel_schedule(
-        self, tenant_id: str, schedule_id: str
-    ) -> dict[str, Any]:
-        schedule = await self.store.get(
-            tenant_id, "agent-schedules", schedule_id
-        )
+    async def cancel_schedule(self, tenant_id: str, schedule_id: str) -> dict[str, Any]:
+        schedule = await self.store.get(tenant_id, "agent-schedules", schedule_id)
         schedule["status"] = "cancelled"
         return await self.store.replace(
             tenant_id, "agent-schedules", schedule_id, schedule
@@ -690,26 +792,14 @@ class DomainResourceService:
     async def create_environment(
         self, tenant_id: str, request: EnvironmentCreate
     ) -> dict[str, Any]:
-        return await self.store.create(
-            tenant_id,
-            "agent-environments",
-            _id("env"),
-            {
-                "name": request.name,
-                "kind": "self_hosted",
-                "status": "awaiting_worker",
-                "queue_depth": 0,
-                "pending": 0,
-                "workers_polling": 0,
-            },
+        raise StandaloneCapabilityUnavailableError(
+            "Managed worker environments are not available in the standalone runtime."
         )
 
     async def create_multiagent_review(
         self, tenant_id: str, request: MultiAgentReviewCreate
     ) -> dict[str, Any]:
-        metadata, data = await self.file_content(
-            tenant_id, request.file_id
-        )
+        metadata, data = await self.file_content(tenant_id, request.file_id)
         if len(data) > 1_000_000:
             raise ValueError("review input exceeds the direct context limit")
         content = data.decode("utf-8", errors="replace")
@@ -742,9 +832,7 @@ class DomainResourceService:
                 findings[specialist] = response.output_text
         except Exception:
             review["status"] = "failed"
-            await self.store.replace(
-                tenant_id, "agent-reviews", review["id"], review
-            )
+            await self.store.replace(tenant_id, "agent-reviews", review["id"], review)
             raise
         review["status"] = "completed"
         review["findings"] = findings

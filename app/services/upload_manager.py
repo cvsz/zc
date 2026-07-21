@@ -1,28 +1,16 @@
-"""
-app/services/upload_manager.py - Enterprise file upload service
+"""Tenant-scoped resumable uploads backed by private local storage."""
 
-Features:
-- Chunked uploads with configurable chunk sizes (default 4MB)
-- Resumable uploads via session tracking
-- Delta updates using BLAKE3 content hashing
-- Content-addressable storage for deduplication
-- Async processing pipeline integration
-- Real-time progress tracking via Redis
-
-Architecture:
-1. Client initiates upload with file metadata
-2. Server returns missing chunk indices (delta detection)
-3. Client uploads chunks in parallel
-4. Server validates and stores each chunk
-5. Finalization assembles complete file
-"""
 import asyncio
 import hashlib
 import json
 import os
 import re
+import shutil
+import stat
+import tempfile
 import time
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Optional
 
 import aiofiles
@@ -35,6 +23,7 @@ from ..core.config import Config, get_config
 @dataclass
 class UploadSession:
     """Represents an active upload session."""
+
     session_id: str
     tenant_id: str
     file_id: str
@@ -47,7 +36,7 @@ class UploadSession:
     chunk_hashes: dict[int, str] = field(default_factory=dict)
     created_at: float = field(default_factory=time.time)
     expires_at: float = field(default_factory=lambda: time.time() + 3600)
-    status: str = "pending"  # pending, uploading, completed, failed
+    status: str = "pending"  # pending, uploading, completed, quarantined, failed
     error_message: Optional[str] = None
 
     def is_expired(self) -> bool:
@@ -63,23 +52,25 @@ class UploadSession:
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            'session_id': self.session_id,
-            'tenant_id': self.tenant_id,
-            'file_id': self.file_id,
-            'file_name': self.file_name,
-            'total_size': self.total_size,
-            'expected_hash': self.expected_hash,
-            'chunk_size': self.chunk_size,
-            'total_chunks': self.total_chunks,
-            'uploaded_chunks': sorted(self.uploaded_chunks),
-            'chunk_hashes': {str(key): value for key, value in self.chunk_hashes.items()},
-            'uploaded_count': len(self.uploaded_chunks),
-            'missing_chunks': self.missing_chunks(),
-            'progress_percent': self.progress_percent(),
-            'status': self.status,
-            'created_at': self.created_at,
-            'expires_at': self.expires_at,
-            'error_message': self.error_message,
+            "session_id": self.session_id,
+            "tenant_id": self.tenant_id,
+            "file_id": self.file_id,
+            "file_name": self.file_name,
+            "total_size": self.total_size,
+            "expected_hash": self.expected_hash,
+            "chunk_size": self.chunk_size,
+            "total_chunks": self.total_chunks,
+            "uploaded_chunks": sorted(self.uploaded_chunks),
+            "chunk_hashes": {
+                str(key): value for key, value in self.chunk_hashes.items()
+            },
+            "uploaded_count": len(self.uploaded_chunks),
+            "missing_chunks": self.missing_chunks(),
+            "progress_percent": self.progress_percent(),
+            "status": self.status,
+            "created_at": self.created_at,
+            "expires_at": self.expires_at,
+            "error_message": self.error_message,
         }
 
     @classmethod
@@ -108,12 +99,12 @@ class UploadSession:
 
 class UploadManager:
     """
-    Enterprise-grade file upload manager with chunking and resumability.
-    
+    Durable local file upload manager with chunking and resumability.
+
     Usage:
         manager = UploadManager()
         await manager.init()
-        
+
         # Initialize upload
         session = await manager.init_upload(
             file_id="doc123",
@@ -121,7 +112,7 @@ class UploadManager:
             total_size=1073741824,  # 1GB
             client_chunk_hashes={0: "hash1", 1: "hash2"}  # For delta
         )
-        
+
         # Upload chunks
         await manager.upload_chunk(
             session_id=session.session_id,
@@ -129,28 +120,35 @@ class UploadManager:
             data=chunk_bytes,
             chunk_hash=computed_hash
         )
-        
+
         # Finalize
         await manager.finalize_upload(session.session_id)
     """
 
     _SAFE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+    _BLAKE3_DIGEST = re.compile(r"^[0-9a-f]{64}$")
 
     def __init__(self, config: Optional[Config] = None):
         self.config = config or get_config()
         self.cache = get_cache()
 
-        # In-memory session store (synced with Redis)
+        # In-memory working set recovered from durable metadata and optional cache.
         self._sessions: dict[str, UploadSession] = {}
         self._lock = asyncio.Lock()
 
         # Storage paths
         self.chunks_dir = self.config.upload_temp_dir / "chunks"
         self.files_dir = self.config.upload_temp_dir / "files"
+        self.quarantine_dir = self.config.upload_temp_dir / "quarantine"
         self.sessions_dir = self.config.upload_temp_dir / "sessions"
-        self.chunks_dir.mkdir(parents=True, exist_ok=True)
-        self.files_dir.mkdir(parents=True, exist_ok=True)
-        self.sessions_dir.mkdir(parents=True, exist_ok=True)
+        for directory in (
+            self.config.upload_temp_dir,
+            self.chunks_dir,
+            self.files_dir,
+            self.quarantine_dir,
+            self.sessions_dir,
+        ):
+            self._ensure_private_dir(directory)
 
     async def init(self) -> None:
         """Initialize the upload manager."""
@@ -158,15 +156,18 @@ class UploadManager:
         if not self.cache._connected:
             await self.cache.connect()
 
-        # Recover any incomplete sessions from Redis
+        # Recover incomplete sessions from local metadata and optional cache.
         await self._recover_sessions()
+        await self.cleanup_expired()
 
     async def _recover_sessions(self) -> None:
-        """Recover incomplete upload sessions from Redis."""
+        """Recover incomplete upload sessions after process restart."""
         for session_path in self.sessions_dir.glob("sess_*.json"):
             try:
                 async with aiofiles.open(session_path, "r") as session_file:
-                    session = UploadSession.from_dict(json.loads(await session_file.read()))
+                    session = UploadSession.from_dict(
+                        json.loads(await session_file.read())
+                    )
                 if not session.is_expired():
                     self._sessions[session.session_id] = session
                 else:
@@ -203,14 +204,14 @@ class UploadManager:
     ) -> UploadSession:
         """
         Initialize a new upload session.
-        
+
         Args:
             file_id: Unique identifier for the file
             file_name: Original filename
             total_size: Total file size in bytes
             client_chunk_hashes: Map of chunk_index -> hash for delta detection
             chunk_size: Override default chunk size
-            
+
         Returns:
             UploadSession with missing chunk indices
         """
@@ -222,14 +223,16 @@ class UploadManager:
             raise ValueError(
                 f"total_size must be between 1 and {self.config.upload_max_size}"
             )
-        chunk_size = chunk_size or self.config.upload_chunk_size
+        chunk_size = self.config.upload_chunk_size if chunk_size is None else chunk_size
         if chunk_size <= 0 or chunk_size > self.config.max_message_size:
             raise ValueError("chunk_size is outside the configured limit")
-        if expected_hash and not re.fullmatch(r"[0-9a-f]{64}", expected_hash):
+        if expected_hash and not self._BLAKE3_DIGEST.fullmatch(expected_hash):
             raise ValueError("expected_hash must be a lowercase BLAKE3 digest")
         total_chunks = (total_size + chunk_size - 1) // chunk_size
 
-        session_id = f"sess_{file_id}_{hashlib.blake2b(os.urandom(16)).hexdigest()[:16]}"
+        session_id = (
+            f"sess_{file_id}_{hashlib.blake2b(os.urandom(16)).hexdigest()[:16]}"
+        )
 
         session = UploadSession(
             session_id=session_id,
@@ -240,33 +243,57 @@ class UploadManager:
             expected_hash=expected_hash,
             chunk_size=chunk_size,
             total_chunks=total_chunks,
+            expires_at=time.time() + self.config.upload_retention_seconds,
         )
 
         # Detect existing chunks for delta upload
         if client_chunk_hashes:
             for idx, client_hash in client_chunk_hashes.items():
-                if 0 <= idx < total_chunks:
-                    # Check if we already have this chunk
-                    chunk_path = self.chunks_dir / tenant_id / client_hash
-                    if chunk_path.exists():
-                        session.uploaded_chunks.add(idx)
-                        session.chunk_hashes[idx] = client_hash
+                if idx < 0 or idx >= total_chunks:
+                    raise ValueError("client chunk index is outside the upload range")
+                if not self._BLAKE3_DIGEST.fullmatch(client_hash):
+                    raise ValueError(
+                        "client chunk hash must be a lowercase BLAKE3 digest"
+                    )
+                chunk_path = self._safe_chunk_path(tenant_id, client_hash)
+                if self._is_regular_file_without_symlink(chunk_path):
+                    session.uploaded_chunks.add(idx)
+                    session.chunk_hashes[idx] = client_hash
 
-        # Store session
+        # Reserve enough local disk for this upload and all active sessions.
         async with self._lock:
+            reserved = sum(
+                existing.total_size
+                for existing in self._sessions.values()
+                if not existing.is_expired()
+                and existing.status
+                not in {"completed", "quarantined", "failed", "cancelled"}
+            )
+            free_bytes = shutil.disk_usage(self.config.upload_temp_dir).free
+            required = total_size + reserved + self.config.upload_min_free_bytes
+            if required > free_bytes:
+                raise ValueError("Insufficient local disk space for upload")
             self._sessions[session_id] = session
 
         # Cache session metadata
-        cache_key = CacheKey.build('upload', 'session', session_id)
-        await self.cache.set(cache_key, session.to_dict(), ttl=3600)
+        cache_key = CacheKey.build("upload", "session", session_id)
+        await self.cache.set(
+            cache_key,
+            session.to_dict(),
+            ttl=self.config.upload_retention_seconds,
+        )
 
-        # Track in Redis for distributed systems
-        redis_key = CacheKey.build('upload', 'active', session_id)
-        await self.cache.set(redis_key, {
-            'file_id': file_id,
-            'status': 'pending',
-            'created_at': time.time(),
-        }, ttl=3600)
+        # Track active state through the configured cache backend.
+        redis_key = CacheKey.build("upload", "active", session_id)
+        await self.cache.set(
+            redis_key,
+            {
+                "file_id": file_id,
+                "status": "pending",
+                "created_at": time.time(),
+            },
+            ttl=self.config.upload_retention_seconds,
+        )
         await self._persist_session(session)
 
         return session
@@ -281,13 +308,13 @@ class UploadManager:
     ) -> bool:
         """
         Upload a single chunk.
-        
+
         Args:
             session_id: Upload session ID
             chunk_index: Zero-based chunk index
             data: Raw chunk bytes
             chunk_hash: BLAKE3 hash of the chunk
-            
+
         Returns:
             True if successfully stored
         """
@@ -302,7 +329,11 @@ class UploadManager:
         if chunk_index < 0:
             raise ValueError("Chunk index must be non-negative")
         if chunk_index >= session.total_chunks:
-            raise ValueError(f"Chunk index {chunk_index} exceeds total {session.total_chunks}")
+            raise ValueError(
+                f"Chunk index {chunk_index} exceeds total {session.total_chunks}"
+            )
+        if not self._BLAKE3_DIGEST.fullmatch(chunk_hash):
+            raise ValueError("chunk_hash must be a lowercase BLAKE3 digest")
 
         expected_size = session.chunk_size
         if chunk_index == session.total_chunks - 1:
@@ -321,19 +352,25 @@ class UploadManager:
 
         # Store chunk (content-addressable)
         tenant_chunk_dir = self.chunks_dir / session.tenant_id
-        tenant_chunk_dir.mkdir(parents=True, exist_ok=True)
-        chunk_path = tenant_chunk_dir / chunk_hash
+        self._ensure_private_dir(tenant_chunk_dir)
+        chunk_path = self._safe_chunk_path(session.tenant_id, chunk_hash)
+        if chunk_path.is_symlink():
+            raise ValueError("Chunk storage entry is not a regular file")
         if not chunk_path.exists():
             temporary_path = chunk_path.with_name(
                 f".{chunk_path.name}.{os.getpid()}.{chunk_index}.part"
             )
-            async with aiofiles.open(temporary_path, 'wb') as f:
+            async with aiofiles.open(temporary_path, "wb") as f:
                 await f.write(data)
                 await f.flush()
+                await asyncio.to_thread(os.fsync, f.fileno())
+            os.chmod(temporary_path, 0o600)
             try:
                 os.link(temporary_path, chunk_path)
+                self._fsync_directory(chunk_path.parent)
             except FileExistsError:
-                pass
+                if not self._is_regular_file_without_symlink(chunk_path):
+                    raise ValueError("Chunk storage entry is not a regular file")
             finally:
                 temporary_path.unlink(missing_ok=True)
 
@@ -341,37 +378,47 @@ class UploadManager:
         async with self._lock:
             session.uploaded_chunks.add(chunk_index)
             session.chunk_hashes[chunk_index] = chunk_hash
-            session.status = 'uploading'
+            session.status = "uploading"
 
         # Update cache
-        cache_key = CacheKey.build('upload', 'session', session_id)
-        await self.cache.set(cache_key, session.to_dict(), ttl=3600)
+        cache_key = CacheKey.build("upload", "session", session_id)
+        await self.cache.set(
+            cache_key,
+            session.to_dict(),
+            ttl=self.config.upload_retention_seconds,
+        )
 
-        # Update progress in Redis for real-time monitoring
-        progress_key = CacheKey.build('upload', 'progress', session_id)
-        await self.cache.set(progress_key, {
-            'uploaded': len(session.uploaded_chunks),
-            'total': session.total_chunks,
-            'percent': session.progress_percent(),
-        }, ttl=3600)
+        # Update the optional cache view used by progress readers.
+        progress_key = CacheKey.build("upload", "progress", session_id)
+        await self.cache.set(
+            progress_key,
+            {
+                "uploaded": len(session.uploaded_chunks),
+                "total": session.total_chunks,
+                "percent": session.progress_percent(),
+            },
+            ttl=self.config.upload_retention_seconds,
+        )
 
         # Check if complete
         if len(session.uploaded_chunks) == session.total_chunks:
-            session.status = 'completed'
-            await self.cache.set(cache_key, session.to_dict(), ttl=3600)
+            session.status = "completed"
+            await self.cache.set(
+                cache_key,
+                session.to_dict(),
+                ttl=self.config.upload_retention_seconds,
+            )
         await self._persist_session(session)
 
         return True
 
-    async def finalize_upload(
-        self, session_id: str, tenant_id: str = "default"
-    ) -> str:
+    async def finalize_upload(self, session_id: str, tenant_id: str = "default") -> str:
         """
         Finalize an upload by assembling all chunks.
-        
+
         Args:
             session_id: Upload session ID
-            
+
         Returns:
             Path to the assembled file
         """
@@ -379,33 +426,56 @@ class UploadManager:
         if not session:
             raise ValueError(f"Invalid session: {session_id}")
 
-        if session.status != 'completed':
-            raise ValueError(
-                f"Upload not complete: {session.status} "
-                f"({len(session.uploaded_chunks)}/{session.total_chunks})"
-            )
+        async with self._lock:
+            if session.status != "completed":
+                raise ValueError(
+                    f"Upload not complete: {session.status} "
+                    f"({len(session.uploaded_chunks)}/{session.total_chunks})"
+                )
+            session.status = "finalizing"
 
         # Assemble file
-        tenant_files_dir = self.files_dir / session.tenant_id
-        tenant_files_dir.mkdir(parents=True, exist_ok=True)
-        output_path = tenant_files_dir / session.file_id
-        temporary_path = output_path.with_suffix(".part")
+        try:
+            tenant_quarantine_dir = self.quarantine_dir / session.tenant_id
+            self._ensure_private_dir(tenant_quarantine_dir)
+            output_path = tenant_quarantine_dir / session.file_id
+            if output_path.is_symlink():
+                raise ValueError("Quarantine destination is not a regular file")
+            descriptor, temporary_name = tempfile.mkstemp(
+                prefix=f".{session.file_id}.",
+                suffix=".part",
+                dir=tenant_quarantine_dir,
+            )
+            try:
+                os.fchmod(descriptor, 0o600)
+            finally:
+                os.close(descriptor)
+        except Exception:
+            async with self._lock:
+                if session.status == "finalizing":
+                    session.status = "completed"
+            raise
+        temporary_path = Path(temporary_name)
         full_digest = blake3.blake3()
         bytes_written = 0
         try:
-            async with aiofiles.open(temporary_path, 'wb') as output:
+            async with aiofiles.open(temporary_path, "wb") as output:
                 for idx in range(session.total_chunks):
                     chunk_hash = session.chunk_hashes.get(idx)
                     if not chunk_hash:
                         raise ValueError(f"Missing chunk {idx}")
 
-                    chunk_path = self.chunks_dir / session.tenant_id / chunk_hash
-                    async with aiofiles.open(chunk_path, 'rb') as chunk_file:
+                    chunk_path = self._safe_chunk_path(session.tenant_id, chunk_hash)
+                    if not self._is_regular_file_without_symlink(chunk_path):
+                        raise ValueError(f"Missing or invalid chunk {idx}")
+                    async with aiofiles.open(chunk_path, "rb") as chunk_file:
                         while block := await chunk_file.read(1024 * 1024):
                             full_digest.update(block)
                             bytes_written += len(block)
                             await output.write(block)
                 await output.flush()
+                await asyncio.to_thread(os.fsync, output.fileno())
+            os.chmod(temporary_path, 0o600)
 
             if bytes_written != session.total_size:
                 raise ValueError(
@@ -416,29 +486,82 @@ class UploadManager:
                 raise ValueError(
                     f"Final hash mismatch: expected {session.expected_hash}, got {computed_hash}"
                 )
-            os.replace(temporary_path, output_path)
+            try:
+                os.link(temporary_path, output_path)
+            except FileExistsError as exc:
+                raise ValueError(
+                    "A quarantined file already uses this file_id"
+                ) from exc
+            temporary_path.unlink()
+            self._fsync_directory(output_path.parent)
         except Exception:
             temporary_path.unlink(missing_ok=True)
+            async with self._lock:
+                if session.status == "finalizing":
+                    session.status = "completed"
             raise
 
         # Update session
         async with self._lock:
-            session.status = 'finalized'
-
-        # Cleanup: remove individual chunks after TTL
-        # (In production, schedule background cleanup)
+            session.status = "quarantined"
 
         await self.cache.set(
             CacheKey.build("upload", "session", session_id),
             session.to_dict(),
-            ttl=3600,
+            ttl=self.config.upload_retention_seconds,
         )
         await self._persist_session(session)
         return str(output_path)
 
-    async def cancel_upload(
-        self, session_id: str, tenant_id: str = "default"
-    ) -> bool:
+    async def cleanup_expired(self) -> None:
+        """Remove expired session state and retained untrusted file data."""
+        async with self._lock:
+            expired_ids = [
+                session_id
+                for session_id, session in self._sessions.items()
+                if session.is_expired()
+            ]
+            for session_id in expired_ids:
+                del self._sessions[session_id]
+            active_hashes = {
+                digest
+                for session in self._sessions.values()
+                if not session.is_expired()
+                for digest in session.chunk_hashes.values()
+            }
+        for session_id in expired_ids:
+            for key in (
+                CacheKey.build("upload", "session", session_id),
+                CacheKey.build("upload", "active", session_id),
+                CacheKey.build("upload", "progress", session_id),
+            ):
+                await self.cache.delete(key)
+            self._session_path(session_id).unlink(missing_ok=True)
+        await asyncio.to_thread(self._cleanup_stale_files_sync, active_hashes)
+
+    def _cleanup_stale_files_sync(
+        self,
+        active_hashes: set[str] | None = None,
+    ) -> None:
+        """Remove expired local chunks and quarantined assemblies."""
+        cutoff = time.time() - self.config.upload_retention_seconds
+        active_hashes = active_hashes or set()
+        for root in (self.chunks_dir, self.quarantine_dir):
+            for path in root.rglob("*"):
+                try:
+                    metadata = path.lstat()
+                except FileNotFoundError:
+                    continue
+                if stat.S_ISLNK(metadata.st_mode):
+                    path.unlink(missing_ok=True)
+                    continue
+                if not stat.S_ISREG(metadata.st_mode) or metadata.st_mtime >= cutoff:
+                    continue
+                if root == self.chunks_dir and path.name in active_hashes:
+                    continue
+                path.unlink(missing_ok=True)
+
+    async def cancel_upload(self, session_id: str, tenant_id: str = "default") -> bool:
         """Cancel an upload session."""
         session = await self.get_session(session_id, tenant_id)
         if not session:
@@ -446,11 +569,13 @@ class UploadManager:
         async with self._lock:
             if session_id in self._sessions:
                 session = self._sessions[session_id]
-                session.status = 'cancelled'
+                if session.status == "finalizing":
+                    return False
+                session.status = "cancelled"
                 del self._sessions[session_id]
 
         # Remove from cache
-        cache_key = CacheKey.build('upload', 'session', session_id)
+        cache_key = CacheKey.build("upload", "session", session_id)
         await self.cache.delete(cache_key)
         self._session_path(session_id).unlink(missing_ok=True)
 
@@ -462,7 +587,7 @@ class UploadManager:
         """Get upload progress."""
         session = await self.get_session(session_id, tenant_id)
         if not session:
-            return {'error': 'Session not found'}
+            return {"error": "Session not found"}
 
         return session.to_dict()
 
@@ -475,6 +600,20 @@ class UploadManager:
                 if session.tenant_id == tenant_id and not session.is_expired()
             ]
 
+    async def get_session_counts(self) -> tuple[int, int]:
+        """Return process-local active and incomplete session counts."""
+        async with self._lock:
+            sessions = [
+                session
+                for session in self._sessions.values()
+                if not session.is_expired()
+            ]
+        pending = sum(
+            session.status not in {"completed", "quarantined", "failed"}
+            for session in sessions
+        )
+        return len(sessions), pending
+
     async def get_session(
         self, session_id: str, tenant_id: str = "default"
     ) -> Optional[UploadSession]:
@@ -484,13 +623,15 @@ class UploadManager:
                 session = self._sessions[session_id]
                 if not session.is_expired():
                     if session.tenant_id != tenant_id:
-                        raise PermissionError("Upload session belongs to another tenant")
+                        raise PermissionError(
+                            "Upload session belongs to another tenant"
+                        )
                     return session
                 else:
                     del self._sessions[session_id]
 
         # Try cache
-        cache_key = CacheKey.build('upload', 'session', session_id)
+        cache_key = CacheKey.build("upload", "session", session_id)
         cached = await self.cache.get(cache_key)
         if cached:
             session = UploadSession.from_dict(cached)
@@ -523,47 +664,101 @@ class UploadManager:
 
         return None
 
-    def _session_path(self, session_id: str) -> Any:
+    def _session_path(self, session_id: str) -> Path:
         """Return a safe local metadata path for a generated session ID."""
-        if not session_id.startswith("sess_") or not self._SAFE_ID.fullmatch(session_id):
+        if not session_id.startswith("sess_") or not self._SAFE_ID.fullmatch(
+            session_id
+        ):
             raise ValueError("Invalid upload session identifier")
         return self.sessions_dir / f"{session_id}.json"
+
+    @staticmethod
+    def _ensure_private_dir(path: Any) -> None:
+        """Create a local storage directory and restrict it to the service user."""
+        path.mkdir(parents=True, exist_ok=True, mode=0o700)
+        if path.is_symlink() or not path.is_dir():
+            raise RuntimeError(f"Storage directory is unsafe: {path}")
+        os.chmod(path, 0o700)
+
+    def _safe_chunk_path(self, tenant_id: str, chunk_hash: str) -> Any:
+        """Return a digest-addressed path after validating every path component."""
+        if not self._SAFE_ID.fullmatch(tenant_id):
+            raise ValueError("tenant_id must be a safe opaque identifier")
+        if not self._BLAKE3_DIGEST.fullmatch(chunk_hash):
+            raise ValueError("chunk_hash must be a lowercase BLAKE3 digest")
+        return self.chunks_dir / tenant_id / chunk_hash
+
+    @staticmethod
+    def _is_regular_file_without_symlink(path: Any) -> bool:
+        """Reject symlinks and non-regular filesystem objects."""
+        try:
+            mode = path.lstat().st_mode
+        except FileNotFoundError:
+            return False
+        return not stat.S_ISLNK(mode) and stat.S_ISREG(mode)
 
     async def _persist_session(self, session: UploadSession) -> None:
         """Atomically persist resumable metadata for dependency-free local mode."""
         session_path = self._session_path(session.session_id)
-        temporary_path = session_path.with_suffix(
-            f".{os.getpid()}.part"
+        payload = json.dumps(session.to_dict(), separators=(",", ":"))
+        await asyncio.to_thread(
+            self._persist_session_sync,
+            session_path,
+            payload,
         )
-        async with aiofiles.open(temporary_path, "w") as session_file:
-            await session_file.write(json.dumps(session.to_dict(), separators=(",", ":")))
-            await session_file.flush()
-        os.replace(temporary_path, session_path)
+
+    def _persist_session_sync(self, session_path: Path, payload: str) -> None:
+        descriptor, temporary_name = tempfile.mkstemp(
+            prefix=f".{session_path.name}.",
+            suffix=".part",
+            dir=session_path.parent,
+        )
+        temporary_path = Path(temporary_name)
+        try:
+            os.fchmod(descriptor, 0o600)
+            with os.fdopen(descriptor, "w", encoding="utf-8") as session_file:
+                session_file.write(payload)
+                session_file.flush()
+                os.fsync(session_file.fileno())
+            os.replace(temporary_path, session_path)
+            self._fsync_directory(session_path.parent)
+        finally:
+            temporary_path.unlink(missing_ok=True)
+
+    @staticmethod
+    def _fsync_directory(directory: Path) -> None:
+        descriptor = os.open(directory, os.O_RDONLY | os.O_DIRECTORY)
+        try:
+            os.fsync(descriptor)
+        finally:
+            os.close(descriptor)
 
     async def _get_session(self, session_id: str) -> Optional[UploadSession]:
         """Backward-compatible internal lookup for the default tenant."""
         return await self.get_session(session_id, "default")
 
     async def health_check(self) -> dict[str, Any]:
-        """Check upload manager health."""
+        """Return a sanitized local-storage readiness summary."""
         async with self._lock:
-            active_sessions = len([
-                s for s in self._sessions.values()
-                if not s.is_expired() and s.status in ('pending', 'uploading')
-            ])
+            active_sessions = len(
+                [
+                    s
+                    for s in self._sessions.values()
+                    if not s.is_expired() and s.status in ("pending", "uploading")
+                ]
+            )
 
         # Check disk space
         try:
             stat = os.statvfs(self.config.upload_temp_dir)
-            free_gb = (stat.f_bavail * stat.f_frsize) / (1024 ** 3)
+            free_bytes = stat.f_bavail * stat.f_frsize
         except Exception:
-            free_gb = 0
+            free_bytes = 0
 
         return {
-            'active_sessions': active_sessions,
-            'temp_dir': str(self.config.upload_temp_dir),
-            'free_disk_gb': round(free_gb, 2),
-            'cache_connected': self.cache._connected,
+            "ready": free_bytes >= self.config.upload_min_free_bytes,
+            "active_sessions": active_sessions,
+            "free_disk_bytes": free_bytes,
         }
 
 

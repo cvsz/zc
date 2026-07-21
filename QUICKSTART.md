@@ -9,7 +9,12 @@ python3.11 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
 python -m pip install .
+cp .env.example .env
 ```
+
+Set `ANTHROPIC_API_KEY` in the ignored `.env` file before making model calls.
+The development server can start without it, but embedded LiteLLM readiness
+will be degraded and inference will be unavailable.
 
 Windows PowerShell:
 
@@ -18,6 +23,7 @@ py -3.11 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
 python -m pip install .
+Copy-Item .env.example .env
 ```
 
 ## Run through the installed command
@@ -30,7 +36,9 @@ zc --host 127.0.0.1 --port 8000 --workers 1
 zcoder --host 127.0.0.1 --port 8000 --workers 1
 ```
 
-Direct Uvicorn execution remains available:
+Direct Uvicorn execution is for local development diagnostics only. Use the
+installed `zc` command in production so bind and worker invariants are checked
+before Uvicorn starts:
 
 ```bash
 python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
@@ -51,11 +59,11 @@ OpenAPI UI is exposed at `http://127.0.0.1:8000/docs` only when `DEBUG=true`.
 
 ```bash
 python -m pip install -r requirements-dev.txt
-ruff check .
-black --check app tests
-mypy . --ignore-missing-imports
-bandit -r app -ll
-pytest --ignore=tests/test_webapp_server.py --cov --cov-report=term-missing
+ruff check app tests
+ruff format --check app tests
+mypy app
+bandit -q -c pyproject.toml -r app src/wire webapp/backend
+pytest -q
 ```
 
 Web console tests require the additional web dependencies:
@@ -71,10 +79,14 @@ The container uses the same HTTP contract as local execution: port `8000`, `/rea
 
 ```bash
 docker build -t zcoder:local .
-docker run --rm --name zcoder-local -p 8000:8000 zcoder:local
+docker compose up
 ```
 
-The default standalone image disables Redis, gRPC, NATS, and OpenTelemetry. Enable integrations explicitly through environment variables and provide their infrastructure before turning on strict readiness.
+The Compose profile uses host networking because the canonical process binds
+to `127.0.0.1`; bridge-mode `-p 8000:8000` cannot reach a loopback-only
+listener inside the container. Redis and gRPC are optional and disabled by
+default. NATS and OpenTelemetry runtimes are not wired into the supported
+standalone process.
 
 ## Important configuration
 
@@ -84,7 +96,7 @@ The default standalone image disables Redis, gRPC, NATS, and OpenTelemetry. Enab
 | `APP_VERSION` | `1.33.0` | Runtime version |
 | `API_PORT` | `8000` | HTTP listen port |
 | `STRICT_READINESS` | `false` | Return 503 when an enabled component fails |
-| `REDIS_ENABLED` | `true` from source; `false` in Docker | Redis cache integration |
+| `REDIS_ENABLED` | `false` | Redis cache integration |
 | `PROTOBUF_ENABLED` | `true` from source; `false` in Docker | gRPC integration |
 | `DEBUG` | `false` | Development CORS and API documentation |
 

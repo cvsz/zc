@@ -13,6 +13,10 @@ interface Page<T> extends Envelope<T[]> {
   meta: { total: number; limit: number; offset: number };
 }
 
+function idempotencyKey(): string {
+  return crypto.randomUUID();
+}
+
 export class ZcApiError extends Error {
   constructor(
     message: string,
@@ -34,11 +38,14 @@ export class ZcApiClient {
   }
 
   private async request<T>(path: string, init?: RequestInit): Promise<T> {
+    const method = (init?.method ?? "GET").toUpperCase();
+    const mutating = ["POST", "PUT", "PATCH", "DELETE"].includes(method);
     const response = await fetch(path, {
       credentials: "same-origin",
       ...init,
       headers: {
         ...this.headers(Boolean(init?.body)),
+        ...(mutating ? { "Idempotency-Key": idempotencyKey() } : {}),
         ...init?.headers,
       },
     });
@@ -128,7 +135,10 @@ export class ZcApiClient {
       {
         method: "POST",
         credentials: "same-origin",
-        headers: this.headers(true),
+        headers: {
+          ...this.headers(true),
+          "Idempotency-Key": idempotencyKey(),
+        },
         body: JSON.stringify(body),
         signal,
       },

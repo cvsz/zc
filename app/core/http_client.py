@@ -1,14 +1,5 @@
-"""
-app/core/http_client.py - High-performance async HTTP client
+"""Bounded shared HTTP client for supported outbound integrations."""
 
-Features:
-- Connection pooling with keep-alive
-- Automatic retry with exponential backoff
-- Request/response compression
-- Zero-copy serialization for Protobuf
-- Circuit breaker integration
-- Distributed tracing hooks
-"""
 import asyncio
 import time
 from dataclasses import dataclass
@@ -23,6 +14,7 @@ from .config import Config, get_config
 @dataclass
 class HttpResponse:
     """Unified HTTP response wrapper."""
+
     status: int
     headers: dict[str, str]
     body: bytes
@@ -32,11 +24,16 @@ class HttpResponse:
     def json(self) -> Any:
         """Parse body as JSON."""
         import json
-        return json.loads(self.body.decode('utf-8'))
+
+        return json.loads(self.body.decode("utf-8"))
 
     def text(self) -> str:
         """Decode body as text."""
-        return self.body.decode('utf-8')
+        return self.body.decode("utf-8")
+
+
+class ResponseTooLargeError(RuntimeError):
+    """Raised before an outbound response can exceed its configured budget."""
 
 
 class PerformanceMetrics:
@@ -74,28 +71,28 @@ class PerformanceMetrics:
     async def get_stats(self) -> dict[str, Any]:
         async with self._lock:
             avg_latency = (
-                self.latency_sum / self.requests_total
-                if self.requests_total > 0 else 0
+                self.latency_sum / self.requests_total if self.requests_total > 0 else 0
             )
             return {
-                'requests_total': self.requests_total,
-                'requests_success': self.requests_success,
-                'requests_failed': self.requests_failed,
-                'success_rate': (
+                "requests_total": self.requests_total,
+                "requests_success": self.requests_success,
+                "requests_failed": self.requests_failed,
+                "success_rate": (
                     self.requests_success / self.requests_total
-                    if self.requests_total > 0 else 0
+                    if self.requests_total > 0
+                    else 0
                 ),
-                'avg_latency_ms': round(avg_latency, 2),
-                'max_latency_ms': round(self.latency_max, 2),
-                'bytes_sent': self.bytes_sent,
-                'bytes_received': self.bytes_received,
+                "avg_latency_ms": round(avg_latency, 2),
+                "max_latency_ms": round(self.latency_max, 2),
+                "bytes_sent": self.bytes_sent,
+                "bytes_received": self.bytes_received,
             }
 
 
 class EnterpriseHTTPClient:
     """
     Production-grade async HTTP client with enterprise features.
-    
+
     Usage:
         async with EnterpriseHTTPClient() as client:
             response = await client.get("https://api.example.com/data")
@@ -119,7 +116,7 @@ class EnterpriseHTTPClient:
         """Create optimized aiohttp session."""
         # Connection pooling configuration
         self._connector = TCPConnector(
-            limit=self.config.db_pool_size,  # Total connection pool size
+            limit=self.config.http_pool_size,
             limit_per_host=10,  # Per-host limit
             ttl_dns_cache=300,  # DNS cache TTL
             use_dns_cache=True,
@@ -138,8 +135,8 @@ class EnterpriseHTTPClient:
             connector=self._connector,
             timeout=timeout,
             headers={
-                'User-Agent': f'wire-enterprise/{self.config.version}',
-                'Accept-Encoding': 'gzip, deflate, br',  # Compression
+                "User-Agent": f"zcoder/{self.config.version}",
+                "Accept-Encoding": "gzip, deflate, br",  # Compression
             },
             auto_decompress=True,
         )
@@ -184,11 +181,12 @@ class EnterpriseHTTPClient:
         params: Optional[dict[str, str]] = None,
         timeout: Optional[int] = None,
         max_retries: int = 3,
+        max_response_bytes: int | None = None,
         retry_on: tuple = (ClientConnectionError, ServerTimeoutError),
     ) -> HttpResponse:
         """
         Make an HTTP request with retry logic and circuit breaker.
-        
+
         Args:
             method: HTTP method (GET, POST, PUT, DELETE, etc.)
             url: Target URL
@@ -198,15 +196,16 @@ class EnterpriseHTTPClient:
             params: Optional query parameters
             timeout: Optional request timeout override
             max_retries: Maximum retry attempts
+            max_response_bytes: Optional hard limit for the response body
             retry_on: Exception types that trigger retry
-            
+
         Returns:
             HttpResponse with status, headers, and body
         """
         if not await self._check_circuit():
-            raise ClientConnectionError(
-                "Circuit breaker is open - service unavailable"
-            )
+            raise ClientConnectionError("Circuit breaker is open - service unavailable")
+        if max_response_bytes is not None and max_response_bytes <= 0:
+            raise ValueError("max_response_bytes must be positive")
 
         session = self._session or await self._create_session()
         request_timeout = ClientTimeout(total=timeout or self.config.api_timeout)
@@ -225,12 +224,36 @@ class EnterpriseHTTPClient:
                     data=data,
                     params=params,
                     timeout=request_timeout,
+                    allow_redirects=False,
                 ) as response:
-                    body = await response.read()
+                    if (
+                        max_response_bytes is not None
+                        and response.content_length is not None
+                        and response.content_length > max_response_bytes
+                    ):
+                        raise ResponseTooLargeError(
+                            "Outbound response exceeded its configured limit"
+                        )
+                    if max_response_bytes is None:
+                        body = await response.read()
+                    else:
+                        chunks = bytearray()
+                        async for chunk in response.content.iter_chunked(64 * 1024):
+                            chunks.extend(chunk)
+                            if len(chunks) > max_response_bytes:
+                                raise ResponseTooLargeError(
+                                    "Outbound response exceeded its configured limit"
+                                )
+                        body = bytes(chunks)
                     elapsed_ms = (time.perf_counter() - start_time) * 1000
 
                     import json as json_mod
-                    bytes_sent = len(json_mod.dumps(json).encode()) if json else (len(data) if isinstance(data, bytes) else 0)
+
+                    bytes_sent = (
+                        len(json_mod.dumps(json).encode())
+                        if json
+                        else (len(data) if isinstance(data, bytes) else 0)
+                    )
                     bytes_received = len(body)
 
                     http_response = HttpResponse(
@@ -263,7 +286,9 @@ class EnterpriseHTTPClient:
 
                 if attempt < max_retries:
                     # Exponential backoff with jitter
-                    backoff = min(2 ** attempt * 0.1 + (asyncio.get_event_loop().time() % 0.1), 5)
+                    backoff = min(
+                        2**attempt * 0.1 + (asyncio.get_event_loop().time() % 0.1), 5
+                    )
                     await asyncio.sleep(backoff)
                     continue
                 break
@@ -281,7 +306,9 @@ class EnterpriseHTTPClient:
             bytes_sent=bytes_sent,
             bytes_received=0,
         )
-        raise last_exception or ClientConnectionError("Request failed after all retries")
+        raise last_exception or ClientConnectionError(
+            "Request failed after all retries"
+        )
 
     async def get(
         self,
@@ -292,7 +319,7 @@ class EnterpriseHTTPClient:
         **kwargs,
     ) -> HttpResponse:
         """Make a GET request."""
-        return await self.request('GET', url, headers=headers, params=params, **kwargs)
+        return await self.request("GET", url, headers=headers, params=params, **kwargs)
 
     async def post(
         self,
@@ -304,7 +331,9 @@ class EnterpriseHTTPClient:
         **kwargs,
     ) -> HttpResponse:
         """Make a POST request."""
-        return await self.request('POST', url, headers=headers, json=json, data=data, **kwargs)
+        return await self.request(
+            "POST", url, headers=headers, json=json, data=data, **kwargs
+        )
 
     async def put(
         self,
@@ -316,7 +345,9 @@ class EnterpriseHTTPClient:
         **kwargs,
     ) -> HttpResponse:
         """Make a PUT request."""
-        return await self.request('PUT', url, headers=headers, json=json, data=data, **kwargs)
+        return await self.request(
+            "PUT", url, headers=headers, json=json, data=data, **kwargs
+        )
 
     async def patch(
         self,
@@ -328,7 +359,9 @@ class EnterpriseHTTPClient:
         **kwargs,
     ) -> HttpResponse:
         """Make a PATCH request."""
-        return await self.request('PATCH', url, headers=headers, json=json, data=data, **kwargs)
+        return await self.request(
+            "PATCH", url, headers=headers, json=json, data=data, **kwargs
+        )
 
     async def delete(
         self,
@@ -338,15 +371,15 @@ class EnterpriseHTTPClient:
         **kwargs,
     ) -> HttpResponse:
         """Make a DELETE request."""
-        return await self.request('DELETE', url, headers=headers, **kwargs)
+        return await self.request("DELETE", url, headers=headers, **kwargs)
 
     async def health_check(self) -> dict[str, Any]:
         """Check HTTP client health."""
         stats = await self.metrics.get_stats()
         return {
-            'connected': self._session is not None and not self._session.closed,
-            'circuit_open': self._circuit_open,
-            'circuit_failures': self._circuit_failures,
+            "connected": self._session is not None and not self._session.closed,
+            "circuit_open": self._circuit_open,
+            "circuit_failures": self._circuit_failures,
             **stats,
         }
 
@@ -359,7 +392,7 @@ class EnterpriseHTTPClient:
             await self._connector.close()
             self._connector = None
 
-    async def __aenter__(self) -> 'EnterpriseHTTPClient':
+    async def __aenter__(self) -> "EnterpriseHTTPClient":
         """Async context manager entry."""
         await self._create_session()
         return self

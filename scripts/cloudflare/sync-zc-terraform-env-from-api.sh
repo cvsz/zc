@@ -9,8 +9,10 @@ API_BASE="${CLOUDFLARE_API_BASE:-https://api.cloudflare.com/client/v4}"
 ZONE_NAME="${ZONE_NAME:-zeaz.dev}"
 TUNNEL_NAME="${CLOUDFLARE_TUNNEL_NAME:-${ZC_TUNNEL_NAME:-zc}}"
 
-ZC_DOMAIN="${ZC_DOMAIN:-zai.zeaz.dev}"
-ZC_API_DOMAIN="${ZC_API_DOMAIN:-api.zeaz.dev}"
+ZC_DOMAIN="${ZC_DOMAIN:-zeaz.dev}"
+ACCESS_TEAM_NAME="${CLOUDFLARE_ACCESS_TEAM_NAME:-${TF_VAR_cloudflare_access_team_name:-}}"
+ALLOWED_EMAILS="${ZC_ALLOWED_EMAILS_JSON:-${TF_VAR_allowed_emails:-}}"
+SERVICE_TOKEN_IDS="${ZC_SERVICE_TOKEN_IDS_JSON:-${TF_VAR_service_token_ids:-}}"
 
 ENV_CLOUDFLARE="${ENV_CLOUDFLARE:-${ROOT_DIR}/.env.cloudflare}"
 ENV_MAIN="${ENV_MAIN:-${ROOT_DIR}/.env}"
@@ -20,7 +22,7 @@ REPORT="${ROOT_DIR}/docs/reports/generated/zc-cloudflare-env-sync.md"
 mkdir -p "${ROOT_DIR}/docs/reports/generated"
 
 if [[ -f "${SCRIPT_DIR}/lib/env-scope.sh" ]]; then
-  # shellcheck source=scripts/cloudflare/lib/env-scope.sh
+  # shellcheck disable=SC1091
   source "${SCRIPT_DIR}/lib/env-scope.sh"
   cf_load_cloudflare_env_scope || true
 fi
@@ -83,6 +85,7 @@ env_set() {
   local file="$1"
   local key="$2"
   local value="$3"
+  local escaped
   local tmp
 
   mkdir -p "$(dirname "$file")"
@@ -93,7 +96,9 @@ env_set() {
   chmod 600 "$tmp"
 
   awk -F= -v k="$key" '$1 != k { print }' "$file" > "$tmp"
-  printf '%s="%s"\n' "$key" "$value" >> "$tmp"
+  escaped="${value//\\/\\\\}"
+  escaped="${escaped//\"/\\\"}"
+  printf '%s="%s"\n' "$key" "$escaped" >> "$tmp"
 
   mv "$tmp" "$file"
   chmod 600 "$file"
@@ -153,16 +158,27 @@ fi
 
 validate_tunnel_id "$tunnel_id"
 
+[[ "$ACCESS_TEAM_NAME" =~ ^[a-z0-9-]+$ ]] ||
+  fail "missing or invalid CLOUDFLARE_ACCESS_TEAM_NAME"
+jq -e 'type == "array" and length > 0' <<<"$ALLOWED_EMAILS" >/dev/null ||
+  fail "ZC_ALLOWED_EMAILS_JSON must be a non-empty JSON array"
+jq -e 'type == "array" and length > 0' <<<"$SERVICE_TOKEN_IDS" >/dev/null ||
+  fail "ZC_SERVICE_TOKEN_IDS_JSON must be a non-empty JSON array"
+
 for file in "$ENV_CLOUDFLARE" "$ENV_MAIN"; do
   env_set "$file" CLOUDFLARE_ZONE_ID "$zone_id"
   env_set "$file" CLOUDFLARE_TUNNEL_ID "$tunnel_id"
   env_set "$file" CLOUDFLARE_TUNNEL_NAME "$TUNNEL_NAME"
 
+  env_set "$file" TF_VAR_cloudflare_account_id "$account_id"
   env_set "$file" TF_VAR_cloudflare_zone_id "$zone_id"
-  env_set "$file" TF_VAR_cloudflare_tunnel_id "$tunnel_id"
+  env_set "$file" TF_VAR_cloudflare_tunnel_name "$TUNNEL_NAME"
+  env_set "$file" TF_VAR_cloudflare_access_team_name "$ACCESS_TEAM_NAME"
   env_unset "$file" TF_VAR_zc_wildcard_domain
   env_set "$file" TF_VAR_zc_domain "$ZC_DOMAIN"
-  env_set "$file" TF_VAR_zc_api_domain "$ZC_API_DOMAIN"
+  env_unset "$file" TF_VAR_zc_api_domain
+  env_set "$file" TF_VAR_allowed_emails "$ALLOWED_EMAILS"
+  env_set "$file" TF_VAR_service_token_ids "$SERVICE_TOKEN_IDS"
 
   chmod 600 "$file"
 done
@@ -184,9 +200,12 @@ CLOUDFLARE_TUNNEL_ID=${tunnel_id}
 CLOUDFLARE_TUNNEL_NAME=${TUNNEL_NAME}
 
 TF_VAR_cloudflare_zone_id=${zone_id}
-TF_VAR_cloudflare_tunnel_id=${tunnel_id}
+TF_VAR_cloudflare_account_id=${account_id}
+TF_VAR_cloudflare_tunnel_name=${TUNNEL_NAME}
+TF_VAR_cloudflare_access_team_name=${ACCESS_TEAM_NAME}
 TF_VAR_zc_domain=${ZC_DOMAIN}
-TF_VAR_zc_api_domain=${ZC_API_DOMAIN}
+TF_VAR_allowed_emails='${ALLOWED_EMAILS}'
+TF_VAR_service_token_ids='${SERVICE_TOKEN_IDS}'
 EOF_ENV
 
 chmod 600 "$ENV_GENERATED"
@@ -209,8 +228,8 @@ Generated: $(date -u +%Y-%m-%dT%H:%M:%SZ)
 - zone_id: ${zone_id}
 - tunnel_name: ${TUNNEL_NAME}
 - tunnel_id: ${tunnel_id}
+- access_team_name: ${ACCESS_TEAM_NAME}
 - zc_domain: ${ZC_DOMAIN}
-- zc_api_domain: ${ZC_API_DOMAIN}
 
 Updated local files:
 

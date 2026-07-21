@@ -20,7 +20,7 @@ import os
 import urllib.error
 import urllib.request
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from wire.exceptions import AICoderError
 from wire.resilience import CircuitBreaker, raise_for_http_error, retry, urlopen_http, urlopen_json
@@ -363,3 +363,42 @@ def cmd_file_download(file_id: str, output_path: str, api_key: str):
     fa   = FilesAPI(api_key=api_key)
     path = fa.download(file_id, output_path)
     print(f"\033[92m✓ Downloaded to {path}\033[0m")
+
+
+def dispatch_file_command(args: Any, api_key: str, model: str) -> bool:
+    """Dispatch one parsed Files API command."""
+    if args.file_upload:
+        cmd_file_upload(args.file_upload, api_key, model)
+    elif args.file_list:
+        cmd_file_list(api_key, model)
+    elif args.file_delete:
+        cmd_file_delete(args.file_delete, api_key)
+    elif args.file_ask:
+        prompt = args.prompt or ""
+        if not prompt:
+            raise ValueError("--file-ask requires --prompt")
+        cmd_file_ask(
+            args.file_ask,
+            prompt,
+            api_key,
+            model,
+            media_type=args.file_media_type,
+        )
+    elif args.file_download:
+        if not args.file_output:
+            raise ValueError("--file-download requires --file-output")
+        cmd_file_download(args.file_download, args.file_output, api_key)
+    else:
+        return False
+    return True
+
+
+__all__ = [
+    "FilesAPI",
+    "cmd_file_ask",
+    "cmd_file_delete",
+    "cmd_file_download",
+    "cmd_file_list",
+    "cmd_file_upload",
+    "dispatch_file_command",
+]

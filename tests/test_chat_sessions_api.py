@@ -62,7 +62,6 @@ def chat_app(tmp_path, monkeypatch) -> tuple[FastAPI, AtomicChatSessionStore]:
     config = Config(
         environment="test",
         redis_enabled=False,
-        nats_enabled=False,
         protobuf_enabled=False,
         upload_temp_dir=tmp_path,
         storage_backend="local",

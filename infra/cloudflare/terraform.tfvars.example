@@ -1,5 +1,12 @@
-cloudflare_zone_id   = "REPLACE_WITH_REAL_ZONE_ID"
-cloudflare_tunnel_id = "REPLACE_WITH_REAL_TUNNEL_UUID"
+cloudflare_account_id      = "REPLACE_WITH_REAL_ACCOUNT_ID"
+cloudflare_zone_id         = "REPLACE_WITH_REAL_ZONE_ID"
+cloudflare_tunnel_name     = "zc"
+cloudflare_access_team_name = "REPLACE_WITH_REAL_TEAM_NAME"
 
-zc_domain     = "zai.zeaz.dev"
-zc_api_domain = "api.zeaz.dev"
+zc_domain = "zeaz.dev"
+
+allowed_emails    = ["operator@example.com"]
+service_token_ids = ["REPLACE_WITH_REAL_SERVICE_TOKEN_ID"]
+
+access_session_duration = "4h"
+local_origin_url        = "http://127.0.0.1:8000"

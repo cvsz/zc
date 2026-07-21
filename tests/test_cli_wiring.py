@@ -9,14 +9,15 @@ way zc_github.py, zc_metrics.py, zc_prompt_optimizer.py,
 and zc_router.py were before this cycle: fully written, fully
 tested at the function level, and never given a CLI flag.
 """
+
 import ast
 import glob
 import os
-import re
 
 import pytest
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+WIRE_ROOT = os.path.join(REPO_ROOT, "src", "wire")
 
 # Modules intentionally excluded from the "every cmd_* must be wired"
 # sweep, with the reason on file:
@@ -35,31 +36,46 @@ KNOWN_EXCEPTIONS = {
 def _cmd_functions(path):
     """Top-level `def cmd_*` function names in a Python source file."""
     tree = ast.parse(open(path, encoding="utf-8").read(), filename=path)
-    return [node.name for node in ast.iter_child_nodes(tree)
-            if isinstance(node, ast.FunctionDef) and node.name.startswith("cmd_")]
+    return [
+        node.name
+        for node in ast.iter_child_nodes(tree)
+        if isinstance(node, ast.FunctionDef) and node.name.startswith("cmd_")
+    ]
+
+
+def _called_function_names(source: str, filename: str) -> set[str]:
+    tree = ast.parse(source, filename=filename)
+    return {
+        node.func.id
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+    }
 
 
 def _all_zc_modules():
-    return sorted(glob.glob(os.path.join(REPO_ROOT, "zc_*.py")))
+    return sorted(glob.glob(os.path.join(WIRE_ROOT, "zc_*.py")))
 
 
 @pytest.fixture(scope="module")
 def main_source():
-    with open(os.path.join(REPO_ROOT, "main.py"), encoding="utf-8") as f:
+    with open(os.path.join(WIRE_ROOT, "main.py"), encoding="utf-8") as f:
         return f.read()
 
 
-@pytest.mark.parametrize("module_path", _all_zc_modules(),
-                         ids=lambda p: os.path.basename(p))
+@pytest.mark.parametrize(
+    "module_path", _all_zc_modules(), ids=lambda p: os.path.basename(p)
+)
 def test_every_cmd_function_is_referenced_in_main(module_path, main_source):
     module_name = os.path.basename(module_path)
+    module_source = open(module_path, encoding="utf-8").read()
+    reachable_calls = _called_function_names(main_source, "main.py")
+    reachable_calls.update(_called_function_names(module_source, module_path))
     for fn in _cmd_functions(module_path):
         if (module_name, fn) in KNOWN_EXCEPTIONS:
             continue
-        pattern = r"\b" + re.escape(fn) + r"\b"
-        assert re.search(pattern, main_source), (
-            f"{module_name}.{fn}() is defined but never referenced in "
-            f"main.py — add a CLI flag and dispatch line, or add it to "
+        assert fn in reachable_calls, (
+            f"{module_name}.{fn}() is defined but never called by main.py "
+            f"or a module dispatcher — add a CLI flag and dispatch line, or add it to "
             f"KNOWN_EXCEPTIONS with a reason if it's intentionally unwired."
         )
 
@@ -77,16 +93,102 @@ def test_known_exceptions_still_point_at_real_functions():
         )
 
 
+def test_files_dispatch_reaches_upload_command(monkeypatch):
+    from wire.main import build_parser
+    from wire import zc_files
+
+    captured = {}
+    monkeypatch.setattr(
+        zc_files,
+        "cmd_file_upload",
+        lambda path, api_key, model: captured.update(
+            path=path, api_key=api_key, model=model
+        ),
+    )
+    args = build_parser().parse_args(["--file-upload", "report.pdf"])
+
+    assert zc_files.dispatch_file_command(args, "key", "model") is True
+    assert captured == {"path": "report.pdf", "api_key": "key", "model": "model"}
+
+
+def test_research_dispatch_forwards_depth_urls_and_output(monkeypatch):
+    from wire.main import build_parser
+    from wire import zc_research
+
+    captured = {}
+    monkeypatch.setattr(
+        zc_research,
+        "cmd_research",
+        lambda topic, api_key, model, **options: captured.update(
+            topic=topic, api_key=api_key, model=model, **options
+        ),
+    )
+    args = build_parser().parse_args(
+        [
+            "--research",
+            "local-first systems",
+            "--research-depth",
+            "2",
+            "--research-urls",
+            "https://example.com",
+            "--output",
+            "report.md",
+        ]
+    )
+
+    assert zc_research.dispatch_research_command(args, "key", "model") is True
+    assert captured == {
+        "topic": "local-first systems",
+        "api_key": "key",
+        "model": "model",
+        "depth": 2,
+        "source_urls": ["https://example.com"],
+        "output": "report.md",
+    }
+
+
+def test_managed_agent_dispatch_reaches_one_shot_run(monkeypatch):
+    from wire.main import build_parser
+    from wire import zc_agents_sdk
+
+    captured = {}
+    monkeypatch.setattr(
+        zc_agents_sdk,
+        "cmd_managed_agent_run",
+        lambda task, api_key, model, **options: captured.update(
+            task=task, api_key=api_key, model=model, **options
+        ),
+    )
+    args = build_parser().parse_args(
+        [
+            "--agent-managed-run",
+            "review",
+            "--agent-memory-store",
+            "project-memory",
+            "--agent-stream-deltas",
+        ]
+    )
+
+    assert (
+        zc_agents_sdk.dispatch_managed_agent_command(args, "key", "model") is True
+    )
+    assert captured["task"] == "review"
+    assert captured["memory_store"] == "project-memory"
+    assert captured["stream_deltas"] is True
+
+
 # ── Targeted dispatch tests for the four newly-wired modules ────────────
 
 
 @pytest.fixture
 def parsed_args():
     import wire.main as main_mod
+
     parser = main_mod.build_parser()
 
     def _parse(argv):
         return parser.parse_args(argv)
+
     return _parse
 
 
@@ -102,7 +204,9 @@ def test_gh_max_items_defaults_to_20(parsed_args):
 
 
 def test_route_flags_parse(parsed_args):
-    args = parsed_args(["--route", "fix this bug", "--route-explain", "--route-parallel"])
+    args = parsed_args(
+        ["--route", "fix this bug", "--route-explain", "--route-parallel"]
+    )
     assert args.route == "fix this bug"
     assert args.route_explain is True
     assert args.route_parallel is True
@@ -120,8 +224,17 @@ def test_optimize_flag_parses(parsed_args):
 
 
 def test_ab_test_flags_parse(parsed_args):
-    args = parsed_args(["--ab-test", "--prompt", "variant A", "--ab-prompt-b", "variant B",
-                        "--ab-task", "summarize a doc"])
+    args = parsed_args(
+        [
+            "--ab-test",
+            "--prompt",
+            "variant A",
+            "--ab-prompt-b",
+            "variant B",
+            "--ab-task",
+            "summarize a doc",
+        ]
+    )
     assert args.ab_test is True
     assert args.prompt == "variant A"
     assert args.ab_prompt_b == "variant B"
@@ -129,7 +242,9 @@ def test_ab_test_flags_parse(parsed_args):
 
 
 def test_metrics_show_and_modifiers_parse(parsed_args):
-    args = parsed_args(["--metrics-show", "--metrics-today", "--metrics-model", "zc-xxx"])
+    args = parsed_args(
+        ["--metrics-show", "--metrics-today", "--metrics-model", "zc-xxx"]
+    )
     assert args.metrics_show is True
     assert args.metrics_today is True
     assert args.metrics_model == "zc-xxx"
@@ -145,6 +260,7 @@ def test_metrics_export_flag_parses(parsed_args):
 
 def _run_main_with(monkeypatch, argv, api_key="sk-ant-test"):
     import wire.main as main_mod
+
     monkeypatch.setattr("sys.argv", ["main.py"] + argv)
     monkeypatch.setenv("ANTHROPIC_API_KEY", api_key)
     main_mod.main()
@@ -152,40 +268,59 @@ def _run_main_with(monkeypatch, argv, api_key="sk-ant-test"):
 
 def test_route_list_dispatches_to_cmd_route_list(monkeypatch):
     import wire.zc_router as zc_router
+
     called = {}
-    monkeypatch.setattr(zc_router, "cmd_route_list", lambda *a, **k: called.setdefault("hit", True))
+    monkeypatch.setattr(
+        zc_router, "cmd_route_list", lambda *a, **k: called.setdefault("hit", True)
+    )
     _run_main_with(monkeypatch, ["--route-list"])
     assert called.get("hit") is True
 
 
 def test_prompt_lib_list_dispatches(monkeypatch):
     import wire.zc_prompt_optimizer as zc_prompt_optimizer
+
     called = {}
-    monkeypatch.setattr(zc_prompt_optimizer, "cmd_prompt_lib_list",
-                        lambda *a, **k: called.setdefault("hit", True))
+    monkeypatch.setattr(
+        zc_prompt_optimizer,
+        "cmd_prompt_lib_list",
+        lambda *a, **k: called.setdefault("hit", True),
+    )
     _run_main_with(monkeypatch, ["--prompt-lib-list"])
     assert called.get("hit") is True
 
 
 def test_metrics_clear_dispatches(monkeypatch):
     import wire.zc_metrics as zc_metrics
+
     called = {}
-    monkeypatch.setattr(zc_metrics, "cmd_metrics_clear",
-                        lambda *a, **k: called.setdefault("hit", True))
+    monkeypatch.setattr(
+        zc_metrics, "cmd_metrics_clear", lambda *a, **k: called.setdefault("hit", True)
+    )
     _run_main_with(monkeypatch, ["--metrics-clear"])
     assert called.get("hit") is True
 
 
 def test_gh_triage_dispatches_with_positional_order(monkeypatch):
     import wire.zc_github as zc_github
+
     seen = {}
 
     def fake_triage(repo, max_items, token, api_key, model):
         seen.update(repo=repo, max_items=max_items, token=token)
 
     monkeypatch.setattr(zc_github, "cmd_gh_triage", fake_triage)
-    _run_main_with(monkeypatch, ["--gh-triage-issues", "acme/widgets",
-                                "--gh-max-items", "5", "--gh-token", "ghp_x"])
+    _run_main_with(
+        monkeypatch,
+        [
+            "--gh-triage-issues",
+            "acme/widgets",
+            "--gh-max-items",
+            "5",
+            "--gh-token",
+            "ghp_x",
+        ],
+    )
     assert seen == {"repo": "acme/widgets", "max_items": 5, "token": "ghp_x"}
 
 
@@ -206,15 +341,23 @@ def test_ab_test_requires_both_variants(monkeypatch, capsys):
 
 
 def test_route_add_agent_flag_parses(parsed_args):
-    args = parsed_args(["--route-add-agent", "frontend", "React, CSS, and accessibility"])
+    args = parsed_args(
+        ["--route-add-agent", "frontend", "React, CSS, and accessibility"]
+    )
     assert args.route_add_agent == [["frontend", "React, CSS, and accessibility"]]
 
 
 def test_route_add_agent_repeatable(parsed_args):
-    args = parsed_args([
-        "--route-add-agent", "frontend", "React and CSS",
-        "--route-add-agent", "infra", "Terraform and k8s",
-    ])
+    args = parsed_args(
+        [
+            "--route-add-agent",
+            "frontend",
+            "React and CSS",
+            "--route-add-agent",
+            "infra",
+            "Terraform and k8s",
+        ]
+    )
     assert args.route_add_agent == [
         ["frontend", "React and CSS"],
         ["infra", "Terraform and k8s"],
@@ -228,54 +371,78 @@ def test_route_add_agent_defaults_to_none(parsed_args):
 
 def test_extra_table_from_pairs_builds_dict():
     from wire.zc_router import extra_table_from_pairs
-    table = extra_table_from_pairs([["frontend", "React and CSS"], ["infra", "Terraform"]])
+
+    table = extra_table_from_pairs(
+        [["frontend", "React and CSS"], ["infra", "Terraform"]]
+    )
     assert table == {"frontend": "React and CSS", "infra": "Terraform"}
 
 
 def test_extra_table_from_pairs_none_for_empty_input():
     from wire.zc_router import extra_table_from_pairs
+
     assert extra_table_from_pairs(None) is None
     assert extra_table_from_pairs([]) is None
 
 
 def test_extra_table_from_pairs_last_write_wins_on_duplicate_name():
     from wire.zc_router import extra_table_from_pairs
-    table = extra_table_from_pairs([["frontend", "first draft"], ["frontend", "second draft"]])
+
+    table = extra_table_from_pairs(
+        [["frontend", "first draft"], ["frontend", "second draft"]]
+    )
     assert table == {"frontend": "second draft"}
 
 
 def test_route_add_agent_merges_into_route_dispatch(monkeypatch):
     import wire.zc_router as zc_router
+
     seen = {}
 
-    def fake_cmd_route(prompt, api_key, model, explain=False, parallel=False, extra_table=None):
+    def fake_cmd_route(
+        prompt, api_key, model, explain=False, parallel=False, extra_table=None
+    ):
         seen.update(prompt=prompt, extra_table=extra_table)
 
     monkeypatch.setattr(zc_router, "cmd_route", fake_cmd_route)
-    _run_main_with(monkeypatch, ["--route", "optimise this query",
-                                "--route-add-agent", "dba", "Query plans and indexing"])
+    _run_main_with(
+        monkeypatch,
+        [
+            "--route",
+            "optimise this query",
+            "--route-add-agent",
+            "dba",
+            "Query plans and indexing",
+        ],
+    )
     assert seen["prompt"] == "optimise this query"
     assert seen["extra_table"] == {"dba": "Query plans and indexing"}
 
 
 def test_route_add_agent_merges_into_route_list_dispatch(monkeypatch):
     import wire.zc_router as zc_router
+
     seen = {}
 
     def fake_cmd_route_list(extra_table=None):
         seen["extra_table"] = extra_table
 
     monkeypatch.setattr(zc_router, "cmd_route_list", fake_cmd_route_list)
-    _run_main_with(monkeypatch, ["--route-list",
-                                "--route-add-agent", "dba", "Query plans and indexing"])
+    _run_main_with(
+        monkeypatch,
+        ["--route-list", "--route-add-agent", "dba", "Query plans and indexing"],
+    )
     assert seen["extra_table"] == {"dba": "Query plans and indexing"}
 
 
 def test_route_without_add_agent_passes_none_not_omitted(monkeypatch):
     import wire.zc_router as zc_router
+
     seen = {}
 
-    def fake_cmd_route(prompt, api_key, model, explain=False, parallel=False, extra_table=None):
+    def fake_cmd_route(
+        prompt, api_key, model, explain=False, parallel=False, extra_table=None
+    ):
         seen["extra_table"] = extra_table
 
     monkeypatch.setattr(zc_router, "cmd_route", fake_cmd_route)
@@ -316,21 +483,29 @@ def test_pdf_native_defaults_to_none_when_omitted(parsed_args):
 
 def test_docx_native_dispatches_to_cmd_docx_chat(monkeypatch):
     import wire.zc_word as zc_word
+
     seen = {}
 
-    def fake_cmd_docx_chat(api_key, model, input_path=None, output_path=None, max_tokens=4096):
+    def fake_cmd_docx_chat(
+        api_key, model, input_path=None, output_path=None, max_tokens=4096
+    ):
         seen.update(input_path=input_path, output_path=output_path)
 
     monkeypatch.setattr(zc_word, "cmd_docx_chat", fake_cmd_docx_chat)
-    _run_main_with(monkeypatch, ["--docx-native", "draft.docx", "--docx-output", "out.docx"])
+    _run_main_with(
+        monkeypatch, ["--docx-native", "draft.docx", "--docx-output", "out.docx"]
+    )
     assert seen == {"input_path": "draft.docx", "output_path": "out.docx"}
 
 
 def test_docx_native_with_no_file_passes_none_input_path(monkeypatch):
     import wire.zc_word as zc_word
+
     seen = {}
 
-    def fake_cmd_docx_chat(api_key, model, input_path=None, output_path=None, max_tokens=4096):
+    def fake_cmd_docx_chat(
+        api_key, model, input_path=None, output_path=None, max_tokens=4096
+    ):
         seen["input_path"] = input_path
 
     monkeypatch.setattr(zc_word, "cmd_docx_chat", fake_cmd_docx_chat)
@@ -340,9 +515,12 @@ def test_docx_native_with_no_file_passes_none_input_path(monkeypatch):
 
 def test_pdf_native_dispatches_to_cmd_pdf_chat(monkeypatch):
     import wire.zc_pdf as zc_pdf
+
     seen = {}
 
-    def fake_cmd_pdf_chat(api_key, model, input_path=None, output_path=None, max_tokens=4096):
+    def fake_cmd_pdf_chat(
+        api_key, model, input_path=None, output_path=None, max_tokens=4096
+    ):
         seen.update(input_path=input_path, output_path=output_path)
 
     monkeypatch.setattr(zc_pdf, "cmd_pdf_chat", fake_cmd_pdf_chat)
@@ -352,9 +530,12 @@ def test_pdf_native_dispatches_to_cmd_pdf_chat(monkeypatch):
 
 def test_pdf_native_with_no_file_passes_none_input_path(monkeypatch):
     import wire.zc_pdf as zc_pdf
+
     seen = {}
 
-    def fake_cmd_pdf_chat(api_key, model, input_path=None, output_path=None, max_tokens=4096):
+    def fake_cmd_pdf_chat(
+        api_key, model, input_path=None, output_path=None, max_tokens=4096
+    ):
         seen["input_path"] = input_path
 
     monkeypatch.setattr(zc_pdf, "cmd_pdf_chat", fake_cmd_pdf_chat)

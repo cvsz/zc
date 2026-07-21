@@ -2,21 +2,21 @@
   "version": 1,
   "applications": [
     {
-      "hostname": "zai.zeaz.dev",
-      "policy": "authenticated-company-users",
-      "decision": "allow",
+      "hostname": "zeaz.dev",
+      "paths": ["/", "/v1/*"],
+      "defaultDecision": "deny",
+      "policies": [
+        "explicit-allowed-users",
+        "explicit-cli-service-auth"
+      ],
       "identityProvider": "configure-in-cloudflare-zero-trust",
-      "sessionDuration": "8h"
+      "sessionDuration": "4h",
+      "originAuthorization": "application JWT and tenant-scoped RBAC"
     }
   ],
-  "api": {
-    "hostname": "api.zeaz.dev",
-    "protection": "application JWT and tenant-scoped RBAC",
-    "cloudflareAccess": false,
-    "reason": "Non-interactive CLI clients authenticate directly to the Enterprise API"
-  },
   "notes": [
     "Replace the identity provider placeholder before enabling Cloudflare Access.",
+    "Do not use Everyone or All valid emails in an allow policy.",
     "Do not store Access service tokens in this file."
   ]
 }

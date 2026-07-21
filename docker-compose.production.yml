@@ -7,8 +7,7 @@ services:
     command:
       - python
       - -m
-      - uvicorn
-      - app.main:app
+      - app.cli
       - --host
       - 127.0.0.1
       - --port
@@ -19,22 +18,33 @@ services:
       ENVIRONMENT: production
       DEBUG: "false"
       AUTH_REQUIRED: "true"
+      CLOUDFLARE_ACCESS_REQUIRED: "true"
+      CLOUDFLARE_ACCESS_TEAM_DOMAIN: ${CLOUDFLARE_ACCESS_TEAM_DOMAIN:?CLOUDFLARE_ACCESS_TEAM_DOMAIN is required}
+      CLOUDFLARE_ACCESS_AUD: ${CLOUDFLARE_ACCESS_AUD:?CLOUDFLARE_ACCESS_AUD is required}
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
-      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?ENCRYPTION_KEY is required}
+      JWT_ISSUER: zc
+      JWT_AUDIENCE: zc-api
+      JWT_EXPIRY_SECONDS: "3600"
+      E2E_SECRET_KEY: ${E2E_SECRET_KEY:?E2E_SECRET_KEY is required}
       CORS_ORIGINS: ${CORS_ORIGINS:?CORS_ORIGINS is required}
       AI_PROVIDER: ${AI_PROVIDER:-litellm}
       LITELLM_CONFIG_PATH: /app/litellm-config.yaml
       LITELLM_MODEL: ${LITELLM_MODEL:-zc-default}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:?ANTHROPIC_API_KEY is required}
       STORAGE_BACKEND: local
       UPLOAD_TEMP_DIR: /app/data/uploads
+      UPLOAD_RETENTION_SECONDS: "86400"
+      UPLOAD_MIN_FREE_BYTES: "1073741824"
+      MAX_MESSAGE_SIZE: "94371840"
+      IDEMPOTENCY_DIR: /app/data/idempotency
+      IDEMPOTENCY_TTL_SECONDS: "86400"
+      IDEMPOTENCY_MAX_RESPONSE_BYTES: "1048576"
+      IDEMPOTENCY_MAX_ENTRIES: "1000"
       CHAT_SESSION_DIR: /app/data/chat/sessions
       REDIS_ENABLED: "false"
-      NATS_ENABLED: "false"
       PROTOBUF_ENABLED: "false"
-      OTEL_ENABLED: "false"
       RATE_LIMIT_ENABLED: "true"
+      STRICT_READINESS: "true"
       CONTROL_PANEL_ENABLED: "true"
       FRONTEND_ENABLED: "true"
       API_HOST: 127.0.0.1
